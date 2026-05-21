@@ -20,7 +20,7 @@ def test_payment_type(page: Page) -> None:
         page.locator("input[bcheckall]").evaluate("el => el.click()")
         page.get_by_role("button", name="Прикрепить").click()
         expect(page.locator("#biruniConfirm")).to_contain_text("Прикрепить типы оплат в количестве 4?")
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да").click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         expect(page.locator("b-grid")).to_contain_text("нет данных")

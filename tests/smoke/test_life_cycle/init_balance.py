@@ -20,13 +20,13 @@ def test_init_balance(page: Page, code) -> None:
         page.get_by_role("textbox").first.fill(f"{code}")
         page.locator("b-pg-grid").get_by_role("textbox", name="Поиск").click()
         page.get_by_text(f"code_product-pw{code}").click()
-        page.locator('(//input[@ng-model="item.quantity"])[1]').first.fill("100")
-        page.locator('(//input[@ng-model="item.price"])[1]').fill("5000")
+        page.locator('input[ng-model="item.quantity"]').first.fill("100")
+        page.locator('input[ng-model="item.price"]').first.fill("5000")
 
     with allure.step("3 - Saqlash va tasdiqlash"):
         page.get_by_role("button", name="Сохранить").click()
         expect(page.locator("#biruniConfirm")).to_contain_text("Сохранить?")
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да").click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         expect(page.get_by_role("heading")).to_contain_text("Ввод начальных остатков ТМЦ")
@@ -35,7 +35,7 @@ def test_init_balance(page: Page, code) -> None:
         page.get_by_text(f"{code}", exact=True).click()
         page.get_by_role("button", name="Провести").click()
         expect(page.locator("#biruniConfirm")).to_contain_text(f"Провести документ № {code}?")
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да", exact=True).click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
 

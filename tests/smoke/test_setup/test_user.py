@@ -1,6 +1,6 @@
 import allure
 from playwright.sync_api import Page, expect
-from tests.smoke.flows.flow_authorization import login
+from tests.smoke.flows.flow_authorization import login, USER_PASS, COMPANY_CODE
 from tests.smoke.flows.flow_navigate import navigate_to, switch_filial
 from utils.base_page import BasePage
 
@@ -19,7 +19,7 @@ def test_user(page: Page, code) -> None:
         page.get_by_role("button", name="Создать").click()
         expect(page.get_by_role("heading")).to_contain_text("Пользователь (создание)")
         page.get_by_role("textbox").nth(2).fill(f"user-pw{code}")
-        page.locator("#new_password").fill("123456789")
+        page.locator("#new_password").fill(USER_PASS)
         page.locator("b-input").filter(has_text="Выбранных Добавить").get_by_placeholder("Поиск").click()
         page.get_by_text(f"robot-pw{code}").click()
         page.locator("b-input").filter(has_text="Добавить Показать все").get_by_placeholder("Поиск").click()
@@ -30,7 +30,7 @@ def test_user(page: Page, code) -> None:
         page.get_by_role("button", name="Сохранить").click()
         expect(page.get_by_role("heading")).to_contain_text("Пользователи")
         expect(page.get_by_text(f"natural_person-pw{code}").first).to_be_visible()
-        expect(page.get_by_text(f"user-pw{code}@autotest")).to_be_visible()
+        expect(page.get_by_text(f"user-pw{code}{COMPANY_CODE}")).to_be_visible()
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -55,7 +55,7 @@ def test_user_attach_form(page: Page, code) -> None:
         base_page.wait_for_loader()
         page.get_by_role("button", name="Прикрепить").click()
         expect(page.get_by_role("heading", name="Прикрепить формы в количестве", exact=False)).to_be_visible()
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да").click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         base_page.wait_for_loader()
@@ -70,7 +70,7 @@ def test_user_attach_form(page: Page, code) -> None:
         base_page.wait_for_loader()
         page.get_by_role("button", name="Прикрепить").click()
         expect(page.get_by_role("heading", name="Прикрепить формы в количестве", exact=False)).to_be_visible()
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да").click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         base_page.wait_for_loader()
@@ -83,7 +83,7 @@ def test_user_attach_form(page: Page, code) -> None:
         base_page.wait_for_loader()
         page.get_by_role("button", name="Прикрепить").click()
         expect(page.get_by_role("heading", name="Прикрепить формы в количестве", exact=False)).to_be_visible()
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да").click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         base_page.wait_for_loader()
@@ -96,7 +96,7 @@ def test_user_attach_form(page: Page, code) -> None:
         base_page.wait_for_loader()
         page.get_by_role("button", name="Прикрепить").click()
         expect(page.get_by_role("heading", name="Прикрепить формы в количестве", exact=False)).to_be_visible()
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да").click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         base_page.wait_for_loader()
@@ -147,7 +147,7 @@ def test_role_attach_form(page: Page) -> None:
     with allure.step("2 - Barcha formalarga ruxsat berish"):
         page.get_by_role("button", name="Доступ ко всем формам").click()
         page.get_by_role("link", name="Разрешить").click()
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да").click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         BasePage(page).wait_for_loader(timeout=600_000)
@@ -163,13 +163,13 @@ def test_role_attach_form(page: Page) -> None:
 @allure.title("Foydalanuvchi parolini o'zgartirish")
 def test_change_password(page: Page, code) -> None:
     with allure.step("1 - Foydalanuvchi sifatida kirish"):
-        login(page, email=f"user-pw{code}@autotest", password="123456789")
+        login(page, email=f"user-pw{code}{COMPANY_CODE}", password=USER_PASS)
         expect(page.locator(".alert-icon")).to_be_visible()
 
     with allure.step("2 - Yangi parol kiritish va tasdiqlash"):
-        page.locator("#current_password").fill("123456789")
-        page.locator("#new_password").fill("123456789")
-        page.locator("#rewritten_password").fill("123456789")
+        page.locator("#current_password").fill(USER_PASS)
+        page.locator("#new_password").fill(USER_PASS)
+        page.locator("#rewritten_password").fill(USER_PASS)
         page.get_by_role("button", name="Подтвердить").click()
         page.get_by_role("button", name="да").click()
 

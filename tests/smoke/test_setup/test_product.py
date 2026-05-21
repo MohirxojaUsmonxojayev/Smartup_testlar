@@ -34,7 +34,7 @@ def test_product(page: Page, code) -> None:
         page.locator("b-pg-grid").get_by_role("textbox").fill("7000")
         page.get_by_role("button", name="Сохранить").click()
         expect(page.locator("#biruniConfirm")).to_contain_text("Сохранить?")
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да").click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         expect(page.get_by_role("heading")).to_contain_text("ТМЦ")

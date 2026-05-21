@@ -22,7 +22,7 @@ def test_legal_person(page: Page, code) -> None:
     with allure.step("3 - Saqlash va tasdiqlash"):
         page.get_by_role("button", name="Сохранить").click()
         expect(page.locator("#biruniConfirm")).to_contain_text("Сохранить")
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да").click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
 

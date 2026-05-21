@@ -33,23 +33,14 @@ def test_buy_license(page: Page, logger) -> None:
         base_page.select_date(ng_model="purchase.begin_date", option="today")
         base_page.wait_for_loader()
 
-        if page.get_by_role("cell", name="Smartup ERP: Базовый пользователь (Обязательный)").is_visible():
-            expect(page.get_by_role("table")).to_contain_text("Smartup ERP: Базовый пользователь")
-            page.locator('input[ng-model="license.count"]').first.fill("1")
-            page.get_by_role("button", name="Купить").click()
-            page.locator("span").filter(has_text="Я ознакомился с тем").first.click()
-            page.get_by_role("button", name="Да").click()
-            base_page.wait_for_loader()
-            logger.info("Majburiy litsenziya olindi")
-        else:
-            row = page.locator('tr[ng-repeat="license in purchase.licenses"]').filter(
-                has_text="Smartup ERP: Базовый пользователь")
-            row.locator('input[ng-model="license.count"]').fill("1")
-            page.get_by_role("button", name="Купить").click()
-            page.locator("span").filter(has_text="Я ознакомился с тем").first.click()
-            page.get_by_role("button", name="Да").click()
-            base_page.wait_for_loader()
-            logger.info("Oddiy litsenziya olindi")
+        row = page.get_by_role("row", name="Smartup ERP")
+        expect(row).to_be_visible()
+        row.get_by_role("textbox").fill("1")
+        page.get_by_role("button", name="Купить").click()
+        page.locator("span").filter(has_text="Я ознакомился с тем").first.click()
+        page.get_by_role("button", name="Да").click()
+        base_page.wait_for_loader()
+        logger.info("Litsenziya olindi")
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -72,18 +63,22 @@ def test_attach_license(page: Page, code, logger) -> None:
             page.locator("input[bcheckall]").evaluate("el => el.click()")
             page.get_by_role("button", name="Открепить").click()
             expect(page.locator("#biruniConfirm")).to_contain_text("Открепить пользователей в количестве")
-            page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+            expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
             page.locator("#biruniConfirm").get_by_role("button", name="да").click()
             page.locator("#biruniConfirm").wait_for(state="hidden")
             expect(page.locator("#kt_content")).to_contain_text("нет данных")
 
         page.get_by_role("button", name="Доступные").click()
+        base_page = BasePage(page)
+        base_page.wait_for_loader(timeout=5_000)
         page.get_by_role("searchbox", name="Поиск").fill(f"natural_person-pw{code}")
         page.get_by_role("searchbox", name="Поиск").press("Enter")
+        base_page.wait_for_loader(timeout=5_000)
+
         page.get_by_text(f"natural_person-pw{code}").first.click()
         page.get_by_role("button", name="Прикрепить").click()
         expect(page.get_by_role("heading", name="Прикрепить пользователя")).to_be_visible()
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да").click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         page.get_by_role("button", name="Закрыть").click()

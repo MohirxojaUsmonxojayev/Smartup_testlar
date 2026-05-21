@@ -9,6 +9,7 @@ find "$RESULTS_DIR" -mindepth 1 -not -path "$RESULTS_DIR/history*" -delete 2>/de
 
 # 2. Testlarni ishga tushirish (fail bo'lsa ham davom etadi)
 pytest tests/smoke/test_smoke_runner.py "$@"
+#pytest tests/smoke/test_life_cycle/test_order.py::test_order_add "$@"
 
 # 3. Allure hisobotini yaratish (history Trend uchun saqlanadi)
 allure generate "$RESULTS_DIR" -o "$REPORT_DIR" --clean

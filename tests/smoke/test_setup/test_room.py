@@ -1,6 +1,6 @@
 import allure
 from playwright.sync_api import Page, expect
-from tests.smoke.flows.flow_authorization import authorization
+from tests.smoke.flows.flow_authorization import authorization, COMPANY_CODE, USER_PASS
 from tests.smoke.flows.flow_navigate import navigate_to, switch_filial
 from utils.base_page import BasePage
 
@@ -33,7 +33,7 @@ def test_room(page: Page, code) -> None:
 @allure.title("Ish zonasiga to'lov, sklad, kassa va mijoz ulash")
 def test_room_attachment(page: Page, code) -> None:
     with allure.step("1 - Foydalanuvchi sifatida kirish va ish zonasini ochish"):
-        authorization(page, email=f"user-pw{code}@autotest", password="123456789")
+        authorization(page, email=f"user-pw{code}{COMPANY_CODE}", password=USER_PASS)
         navigate_to(page, tab="Справочники", name="Рабочие зоны")
         expect(page.get_by_role("heading")).to_contain_text("Рабочие зоны")
         page.get_by_text(f"room-pw{code}").click()
@@ -49,7 +49,7 @@ def test_room_attachment(page: Page, code) -> None:
         expect(page.locator('(//b-grid[@name="table_payment_type"]//input[@type="checkbox"])[1]')).to_be_checked()
         page.get_by_role("button", name="Прикрепить").click()
         expect(page.locator("#biruniConfirm")).to_contain_text("Прикрепить 4?")
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да", exact=True).click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         expect(page.locator("b-page")).to_contain_text("нет данных")
@@ -63,7 +63,7 @@ def test_room_attachment(page: Page, code) -> None:
         expect(page.locator('(//b-grid[@name="table_warehouse"]//input[@type="checkbox"])[1]')).to_be_checked()
         page.get_by_role("button", name="Прикрепить").click()
         expect(page.locator("#biruniConfirm")).to_contain_text("Прикрепить 1?")
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да", exact=True).click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         expect(page.locator("b-page")).to_contain_text("нет данных")
@@ -77,7 +77,7 @@ def test_room_attachment(page: Page, code) -> None:
         expect(page.locator('(//b-grid[@name="table_cashbox"]//input[@type="checkbox"])[1]')).to_be_checked()
         page.get_by_role("button", name="Прикрепить").click()
         expect(page.locator("#biruniConfirm")).to_contain_text("Прикрепить 1?")
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.locator("#biruniConfirm").get_by_role("button", name="да", exact=True).click()
         page.locator("#biruniConfirm").wait_for(state="hidden")
         expect(page.locator("b-page")).to_contain_text("нет данных")
@@ -89,7 +89,7 @@ def test_room_attachment(page: Page, code) -> None:
         page.get_by_text(f"natural_client-pw{code}").click()
         page.get_by_role("button", name="Прикрепить").click()
         expect(page.locator("#biruniConfirm")).to_contain_text(f"Прикрепить natural_client-pw{code}?")
-        page.wait_for_function("window.getComputedStyle(document.querySelector('#biruniConfirm')).opacity === '1'")
+        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
         page.get_by_role("button", name="да", exact=True).click()
         page.get_by_role("button", name="Прикрепленные").click()
         expect(page.locator("b-page")).to_contain_text(f"natural_client-pw{code}")

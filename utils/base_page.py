@@ -59,6 +59,7 @@ class BasePage:
             target = today.replace(day=day)
 
         self.page.locator(f'input[ng-model="{ng_model}"]').click()
-        self.page.get_by_role("cell", name=str(target.day)).first.click()
+        # self.page.get_by_role("cell", name=str(target.day)).first.click()
+        self.page.get_by_role("cell", name=str(target.day), exact=True).first.click()
 
     # ------------------------------------------------------------------------------------------------------------------
