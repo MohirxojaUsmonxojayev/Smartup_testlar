@@ -38,6 +38,8 @@ Fayl: `$ARGUMENTS`
 - [ ] `try/except` bilan xatolar yashirilmagan
 - [ ] Hardcoded URL yo'q (`.env` dan o'qiladi)
 - [ ] Test ichida biznes logika yo'q (flows papkasida bo'lishi kerak)
+- [ ] Dublikat test qadamlari yoki takrorlanadigan UI flowlar aniqlansa, ularni flow/helperga ajratish bo'yicha foydalanuvchiga xabar berilgan
+- [ ] Testcase noto'g'ri, ortiqcha yoki biznes flowga mos kelmasa, muammo alohida ko'rsatilgan
 
 ## Natija formati
 

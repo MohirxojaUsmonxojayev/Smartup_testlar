@@ -47,6 +47,14 @@ def <nomi>(page: Page, **kwargs) -> None:
 - Flow faqat UI harakatlarni bajarsin — ma'lumot saqlash/o'qish test ichida qolsin
 - Funksiya nomi `flow_` prefiksi emas, tavsifli ism bo'lsin: `authorization`, `create_room`
 
+## Loyiha Xususiyatlari
+
+### Order flowlarni qayta ishlatish
+- Order testlari ko'p yoziladi; orderga tegishli takrorlanadigan harakatlar `tests/smoke/flows/flow_order/` ichidagi alohida flow funksiyalarga ajratilsin va yangi order case'larda shu flowlardan foydalanilsin.
+- Order case'lari contract shartlariga bog'liq bo'lishi mumkin; contract yaratish flowlari `Типы оплат` kabi shartlarni parametr sifatida qabul qiladigan qilib loyihalansin.
+- Biruni error xabarlari hamma joyda bir xil pattern bilan keladi; error kutish, text tekshirish va modal yopish umumiy flow/helper sifatida ajratilsin.
+- Listlarda kerakli ustun/search yoqilmagan bo'lsa, grid setting orqali ustun va searchni yoqadigan reusable flow yozish mumkin.
+
 ## Ish tartibi
 
 1. `$ARGUMENTS` ni o'qi — qanday flow kerak?

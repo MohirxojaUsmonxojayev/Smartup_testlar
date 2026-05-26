@@ -81,7 +81,18 @@ Yechim: <nima qilish kerak>
 ### session_page va domino effekti
 - `session_page` barcha testlar uchun umumiy — bitta test fail bo'lib modal qolsa, keyingi barcha testlar ham fail bo'ladi
 - `--maxfail=3` pytest.ini da sozlangan — 3 fail dan keyin sessiya to'xtatiladi
+- Test yozish/debug iteratsiyasida precondition entity `data_store.json` da mavjud bo'lsa, masalan contract yaratilgan va code/name saqlangan bo'lsa, keyingi order xatosini tekshirish uchun contract testni qayta run qilish shart emas; mavjud qiymatdan foydalan.
+
+### Form screenshot arxivi
+- Smartup formalarini debug qilganda avval `test-results/screens/smartup/` ichida shu URL/form uchun screenshot bor-yo'qligini tekshir.
+- Agar kerakli screenshot bo'lmasa yoki UI o'zgargan bo'lsa, formani ochib URL asosida nomlangan screenshot saqla: `test-results/screens/smartup/<url_as_filename>.png`.
+- Yangi formaga kirilganda yoki URL/form state o'zgarganda screenshotni yangilab borish keyingi locator/debug ishlari uchun majburiy odat bo'lsin.
 
 ### to_contain_text() da exact parametri yo'q
 - `expect(locator).to_contain_text("text", exact=True)` — **xato**, bu parametr mavjud emas
 - To'liq mos kelish uchun `to_have_text("text")` ishlatiladi
+
+### Orderda product chiqmasa
+- Order add product qadamida tovar/product topilmasa, zaxira/balans yo'qligi yoki product bron qilingan orderlarda bandligi ehtimolini tekshir.
+- Balans kerak bo'lsa setupdagi `test_20_init_balance` ni run qilib product balansini qo'shib kelish mumkin.
+- Agar product bron qilingan bo'lsa, order listdagi bron qilingan orderlarni `Canceled/Отменен` statusga o'tkazish kerak.

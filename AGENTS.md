@@ -18,3 +18,8 @@ Maqsad: har suhbatda bir xil xatoni takrorlamaslik.
 - Runner: `tests/smoke/test_smoke_runner.py` — barcha testlarni ketma-ket ishlatadi
 - `code` fixture: session uchun unikal 4 xonali son, runner da yangi, yakka testda `data_store.json` dan o'qiladi
 - `.env`: `COMPANY_URL`, `COMPANY_CODE`, `COMPANY_PASSWORD`, `USER_PASSWORD`
+
+## Ruxsatlar
+
+- Escalation/ruxsat kerak bo'lsa, xavfsiz va qayta ishlatiladigan holatda doim `prefix_rule` taklif qil.
+- Uzun `python -c $'...'` debug buyruqlari o'rniga workspace ichidagi vaqtinchalik yoki mavjud scriptni `./.venv/bin/python path/to/script.py` ko'rinishida ishlat.

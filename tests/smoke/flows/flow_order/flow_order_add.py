@@ -1,10 +1,26 @@
 import re
+from datetime import datetime
+
 import allure
 from playwright.sync_api import expect
+from utils.base_page import BasePage
+
+from tests.smoke.flows.flow_order.flow_order_list import flow_order_list
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def flow_order_main_page(page, check_form=False, deal_time=None, delivery_date=None, room=None, robot=None, natural_client=None, next_page=True):
+def flow_order_main_page(
+    page,
+    check_form=False,
+    deal_time=None,
+    delivery_date=None,
+    room=None,
+    robot=None,
+    natural_client=None,
+    contract=None,
+    contract_balance_text=None,
+    next_page=True,
+):
     page.wait_for_url(re.compile(r".*/order\+(add|edit)"))
     expect(page.locator("#kt_content")).to_have_text(re.compile(r"Заказ \((создание|изменение)\)"))
 
@@ -19,13 +35,30 @@ def flow_order_main_page(page, check_form=False, deal_time=None, delivery_date=N
             expect(page.locator("#anor279-input-b_input-robot_name").get_by_role("textbox", name="Поиск")).to_have_value(robot)
             expect(page.locator("#anor279-input-b_input-person_name").get_by_role("textbox", name="Поиск")).to_have_value(natural_client)
 
+            if contract:
+                expect(page.locator("b-page")).to_contain_text(contract)
+
+    if contract and not check_form:
+        with allure.step(f"Main Page: contract -> '{contract}' tanlash"):
+            BasePage(page).select_b_input_by_label("Договор", contract, exact=False)
+            if contract_balance_text:
+                expect(page.locator("#kt_content")).to_contain_text(contract_balance_text)
+
     if next_page:
         with allure.step("Main Page: Keyingi page ga o'tish"):
             page.get_by_role("button", name="Далее").click()
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def flow_order_product_page(page, check_form=False, product=None, quantity=None, warehouse=None, price_type=None, next_page=True):
+def flow_order_product_page(
+    page,
+    check_form=False,
+    product=None,
+    quantity=None,
+    warehouse=None,
+    price_type=None,
+    next_page=True,
+):
     expect(page.locator("#kt_content")).to_have_text(re.compile(r"Заказ \((создание|изменение)\)"))
 
     if product and not check_form:
@@ -59,15 +92,14 @@ def flow_order_product_page(page, check_form=False, product=None, quantity=None,
 def flow_order_final_page(page, check_form=False, payment_type=None, natural_client=None, room=None, robot=None, status=None, save=True):
     expect(page.locator("#kt_content")).to_have_text(re.compile(r"Заказ \((создание|изменение)\)"))
 
-    if payment_type and not check_form:
-        with allure.step(f"Final Page: Payment Type -> '{payment_type}' tanlash"):
-            page.locator("#anor279-inpu-b_input-payment_type").get_by_role("textbox", name="Поиск").click()
-            page.get_by_text(payment_type).click()
-
     if status and not check_form:
         with allure.step(f"Final Page: Order status -> '{status}' tanlash"):
-            page.locator("#anor279-ui_select-status").get_by_label("Select box activate").click()
+            page.locator("#anor279-ui_select-status:visible").get_by_label("Select box activate").click()
             page.get_by_text(status).click()
+
+    if payment_type and not check_form:
+        with allure.step(f"Final Page: Payment Type -> '{payment_type}' tanlash"):
+            BasePage(page).select_b_input_by_label("Тип оплаты", payment_type, clear=True)
 
     if check_form:
         with allure.step(f"Final Page: "
@@ -77,8 +109,8 @@ def flow_order_final_page(page, check_form=False, payment_type=None, natural_cli
                          f"Check room -> '{room}'"
                          f"Check robot -> '{robot}'"
                          ):
-            expect(page.locator("#anor279-inpu-b_input-payment_type").get_by_role("textbox", name="Поиск")).to_have_value(payment_type)
-            expect(page.locator("#anor279-ui_select-status")).to_contain_text(status)
+            BasePage(page).expect_b_input_value_by_label("Тип оплаты", payment_type)
+            expect(page.locator("#anor279-ui_select-status:visible")).to_contain_text(status)
             expect(page.locator("form[name=\"step2\"]")).to_contain_text(natural_client)
             expect(page.locator("form[name=\"step2\"]")).to_contain_text(room)
             expect(page.locator("form[name=\"step2\"]")).to_contain_text(robot)
@@ -90,5 +122,47 @@ def flow_order_final_page(page, check_form=False, payment_type=None, natural_cli
             expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
             page.locator("#biruniConfirm").get_by_role("button", name="да").click()
             page.locator("#biruniConfirm").wait_for(state="hidden")
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+def flow_order_prepare_with_contract(
+    page,
+    code,
+    contract_name,
+    quantity,
+    payment_type=None,
+    status=None,
+    contract_balance_text=None,
+    save=False,
+):
+    flow_order_list(page, add=True)
+    flow_order_main_page(
+        page,
+        check_form=True,
+        deal_time=datetime.now().strftime("%d.%m.%Y %H:%M"),
+        delivery_date=datetime.now().strftime("%d.%m.%Y"),
+        room=f"room-pw{code}",
+        robot=f"robot-pw{code}",
+        natural_client=f"natural_client-pw{code}",
+        next_page=False,
+    )
+    flow_order_main_page(
+        page,
+        contract=contract_name,
+        contract_balance_text=contract_balance_text,
+        next_page=True,
+    )
+    flow_order_product_page(
+        page,
+        product=f"product-pw{code}",
+        quantity=quantity,
+        next_page=True,
+    )
+    flow_order_final_page(
+        page,
+        payment_type=payment_type,
+        status=status,
+        save=save,
+    )
 
 # ----------------------------------------------------------------------------------------------------------------------
