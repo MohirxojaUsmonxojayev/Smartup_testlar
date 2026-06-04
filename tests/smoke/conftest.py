@@ -15,7 +15,7 @@ TRACE_DIR = "test-results/traces"
 DATA_DIR = "test-results/data"
 ALLURE_RESULTS_DIR = "test-results/allure-results"
 ALLURE_REPORT_DIR = "test-results/allure-report"
-PRODUCTION_COMPANY_URL = "https://smartup.online"
+CREATED_COMPANY_PASSWORD = "greenwhite"
 
 # Timeout konstantalari — bitta joyda, butun loyiha bo'ylab ishlatiladi
 DEFAULT_TIMEOUT    = 10_000    # click, fill, expect va boshqa locator amallari (ms)
@@ -33,12 +33,8 @@ def _normalized_url(value: str | None) -> str:
     return (value or "").strip().rstrip("/")
 
 
-def _is_production_company_url() -> bool:
-    return _normalized_url(os.getenv("COMPANY_URL")) == PRODUCTION_COMPANY_URL
-
-
 def _company_setup_enabled(config) -> bool:
-    return bool(_normalized_url(os.getenv("COMPANY_URL"))) and not _is_production_company_url()
+    return config.getoption("--create-company")
 
 
 def _smoke_relative_path(path: Path, root: Path) -> Path | None:
@@ -92,6 +88,29 @@ def pytest_addoption(parser):
     smoke.addoption("--headless", action="store_true", default=False, help="Chromium ni headless rejimda ishga tushiradi")
     smoke.addoption("--new-code", action="store_true", default=False, help="Yangi 4 xonali code yaratadi")
     smoke.addoption("--reuse-code", action="store_true", default=False, help="data_store.json dagi mavjud code ni ishlatadi")
+    smoke.addoption("--url", default="", help="Majburiy server URL")
+    smoke.addoption(
+        "--company-code",
+        default="",
+        help="Mavjud company code. --create-company bo'lmasa majburiy.",
+    )
+    smoke.addoption(
+        "--company-password",
+        default="",
+        help="Mavjud company admin paroli. --create-company bo'lmasa majburiy.",
+    )
+    smoke.addoption(
+        "--create-company",
+        action="store_true",
+        default=False,
+        help="Suite boshida yangi company yaratadi va keyingi testlarda shu company_code ishlatiladi.",
+    )
+    smoke.addoption(
+        "--disable-license-policy",
+        action="store_true",
+        default=False,
+        help="--create-company bilan yangi companyda Политика лицензирования ni o'chiradi.",
+    )
     smoke.addoption(
         "--scope",
         choices=("smoke", "regression"),
@@ -110,7 +129,7 @@ def pytest_collection_modifyitems(config, items):
     """Directory/default collectionda faqat mos runnerlar qolsin, duplicate business flowlar yurmasin."""
     if not _company_setup_enabled(config):
         skip_company = pytest.mark.skip(
-            reason="Company setup faqat production bo'lmagan COMPANY_URL bilan ishlaydi"
+            reason="Company setup faqat --create-company flagi bilan ishlaydi"
         )
         for item in items:
             path_name = Path(str(item.path)).name
@@ -203,6 +222,37 @@ def _write_data_file(data: dict[str, Any], file_name="data_store") -> None:
 def pytest_configure(config):
     """Allure hisoboti uchun environment, categories, executor va history tayyorlaydi."""
     expect.set_options(timeout=DEFAULT_TIMEOUT)
+    company_url = _normalized_url(config.getoption("--url"))
+    create_company = _company_setup_enabled(config)
+    company_code = str(config.getoption("--company-code") or "").strip().lstrip("@")
+    company_password = str(config.getoption("--company-password") or "").strip()
+
+    if not company_url:
+        raise pytest.UsageError("--url majburiy. Masalan: --url https://app3.greenwhite.uz/xtrade")
+    os.environ["COMPANY_URL"] = company_url
+
+    if create_company:
+        if company_code or company_password:
+            raise pytest.UsageError("--create-company bilan --company-code/--company-password berilmaydi")
+        os.environ["CREATE_COMPANY"] = "1"
+        os.environ["COMPANY_PASSWORD"] = CREATED_COMPANY_PASSWORD
+        os.environ.pop("COMPANY_CODE", None)
+    else:
+        if not company_code:
+            raise pytest.UsageError("--company-code majburiy yoki --create-company flagini bering")
+        if not company_password:
+            raise pytest.UsageError("--company-password majburiy yoki --create-company flagini bering")
+        os.environ.pop("CREATE_COMPANY", None)
+        os.environ["COMPANY_CODE"] = company_code
+        os.environ["COMPANY_PASSWORD"] = company_password
+
+    if config.getoption("--disable-license-policy"):
+        if not create_company:
+            raise pytest.UsageError("--disable-license-policy faqat --create-company bilan ishlaydi")
+        os.environ["DISABLE_LICENSE_POLICY"] = "1"
+    else:
+        os.environ.pop("DISABLE_LICENSE_POLICY", None)
+
     os.makedirs(ALLURE_RESULTS_DIR, exist_ok=True)
 
     # Trend uchun: oldingi hisobotdan history ko'chirish
@@ -221,6 +271,10 @@ def pytest_configure(config):
         f.write("Browser=Chromium\n")
         f.write(f"Browser.Headless={_is_headless(config)}\n")
         f.write(f"Test.Scope={config.getoption('--scope')}\n")
+        f.write(f"Company.URL={company_url}\n")
+        f.write(f"Company.Create={create_company}\n")
+        if not create_company:
+            f.write(f"Company.Code={company_code}\n")
         f.write("Framework=Playwright\n")
         f.write("Language=Python 3.11\n")
         f.write("Environment=Staging\n")
@@ -363,7 +417,7 @@ def test_scope(request) -> str:
 
 @pytest.fixture(scope="session")
 def company_setup_enabled(request) -> bool:
-    """Company setup non-production COMPANY_URL bilan yoqilgan-yoqilmaganini qaytaradi."""
+    """Company setup --create-company bilan yoqilgan-yoqilmaganini qaytaradi."""
     return _company_setup_enabled(request.config)
 
 # ----------------------------------------------------------------------------------------------------------------------

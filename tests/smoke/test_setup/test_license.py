@@ -1,3 +1,4 @@
+import os
 import re
 
 import allure
@@ -14,6 +15,23 @@ MANDATORY_LICENSE_ROW_RE = re.compile(r"Smartup ERP:\s*Базовый польз
 REGULAR_LICENSE_ROW_RE = re.compile(r"Smartup ERP:\s*Базовый пользователь\s+За пользователя")
 
 # ----------------------------------------------------------------------------------------------------------------------
+
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _license_policy_disabled() -> bool:
+    return _env_flag("DISABLE_LICENSE_POLICY")
+
+
+def _attach_license_skip_note(logger, step_name: str) -> None:
+    message = (
+        f"{step_name} o'tkazib yuborildi: --disable-license-policy berilgani uchun "
+        "companyda Политика лицензирования o'chirilgan."
+    )
+    allure.attach(message, name="license-policy-disabled", attachment_type=allure.attachment_type.TEXT)
+    logger.info(message)
+
 
 def _logout_if_authenticated(page: Page, logger) -> None:
     if page.locator(".btn.btn-icon.w-auto").is_visible():
@@ -75,20 +93,15 @@ def _buy_license_row(
 # ----------------------------------------------------------------------------------------------------------------------
 
 def run_buy_license(page: Page, logger, scope: str = "smoke") -> None:
+    if _license_policy_disabled():
+        _attach_license_skip_note(logger, "Litsenziya sotib olish")
+        return
+
     with allure.step("1 - Admin sifatida kirish va litsenziyalar sahifasiga o'tish"):
         _logout_if_authenticated(page, logger)
         authorization(page)
         switch_filial(page, name="Администрирование")
         navigate_to(page, tab="Главное", name="Лицензии")
-        try:
-            expect(page.locator("body")).to_contain_text("Компания не активирована", timeout=3_000)
-            raise AssertionError(
-                "Yangi company license uchun aktivatsiya qilinmagan. "
-                "COMPANY_ACTIVATION_CODE env qiymatini berib full runni qayta ishga tushiring."
-            )
-        except (AssertionError, PlaywrightTimeoutError) as exc:
-            if isinstance(exc, AssertionError) and "COMPANY_ACTIVATION_CODE" in str(exc):
-                raise
         expect(page.get_by_role("heading", name="Лицензии")).to_be_visible()
 
     with allure.step("2 - Balansni tekshirish"):
@@ -126,6 +139,10 @@ def run_buy_license(page: Page, logger, scope: str = "smoke") -> None:
 # ----------------------------------------------------------------------------------------------------------------------
 
 def run_attach_license(page: Page, code, logger, scope: str = "smoke") -> None:
+    if _license_policy_disabled():
+        _attach_license_skip_note(logger, "Litsenziyani foydalanuvchiga ulash")
+        return
+
     with allure.step("1 - Litsenziyalar va hujjatlar sahifasiga o'tish"):
         page.get_by_role("link", name="Лицензии и документы").click()
         expect(page.locator("b-page")).to_contain_text("Лицензии и документы")

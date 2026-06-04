@@ -3,13 +3,13 @@ import json
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from _debug_env import add_company_args, configure_company_env
 from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_navigate import navigate_to
 
@@ -168,10 +168,11 @@ def collect_b_input_search_options(page, ng_model, query):
 
 def main():
     parser = argparse.ArgumentParser()
+    add_company_args(parser)
     parser.add_argument("--headless", action="store_true")
     args = parser.parse_args()
 
-    load_dotenv()
+    configure_company_env(args)
     data_path = Path("test-results/data/data_store.json")
     data = json.loads(data_path.read_text(encoding="utf-8")) if data_path.exists() else {}
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)

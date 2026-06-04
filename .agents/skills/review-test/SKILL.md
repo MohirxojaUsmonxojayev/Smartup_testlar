@@ -36,7 +36,7 @@ Fayl: `$ARGUMENTS`
 ### 5. Anti-patternlar
 - [ ] `time.sleep()` yo'q (o'rniga `expect(...).to_be_visible()`)
 - [ ] `try/except` bilan xatolar yashirilmagan
-- [ ] Hardcoded URL yo'q (`.env` dan o'qiladi)
+- [ ] Hardcoded URL/credential yo'q; URL va company credentiallar runner/pytest optionlari orqali keladi (`.env` ishlatilmaydi)
 - [ ] Test ichida biznes logika yo'q (flows papkasida bo'lishi kerak)
 - [ ] Dublikat test qadamlari yoki takrorlanadigan UI flowlar aniqlansa, ularni flow/helperga ajratish bo'yicha foydalanuvchiga xabar berilgan
 - [ ] Testcase noto'g'ri, ortiqcha yoki biznes flowga mos kelmasa, muammo alohida ko'rsatilgan

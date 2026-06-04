@@ -1,15 +1,15 @@
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from _debug_env import add_company_args, configure_company_env
 
 ARCHIVE_DIR = ROOT / ".agents/skills/smartup-guide/references/forms/screenshots/user"
 
@@ -44,12 +44,11 @@ def collect_b_inputs(page) -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", required=True)
+    add_company_args(parser)
     parser.add_argument("--headless", action="store_true")
     args = parser.parse_args()
 
-    load_dotenv()
-    os.environ["COMPANY_URL"] = args.url
+    configure_company_env(args)
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
     from tests.smoke.flows.flow_authorization import USER_PASS, authorization  # noqa: E402

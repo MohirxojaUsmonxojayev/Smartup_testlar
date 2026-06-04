@@ -19,7 +19,10 @@ Maqsad: har suhbatda bir xil xatoni takrorlamaslik.
 - All runner: `tests/smoke/test_all_runner.py` — barcha runner fayllarini ketma-ket jamlab ishlatadi
 - Full script: `run_tests.sh` — `test_all_runner.py` ni Allure bilan ishlatadi
 - `code` fixture: session uchun unikal 4 xonali son, runner da yangi, yakka testda `data_store.json` dan o'qiladi
-- `.env`: `COMPANY_URL`, `COMPANY_CODE`, `COMPANY_PASSWORD`, `USER_PASSWORD`
+- `.env` ishlatilmaydi; runnerda `--url` majburiy
+- Mavjud company: `--url <server_url> --company-code <code> --company-password <password>`
+- Yangi company: `--url <server_url> --create-company`; yangi company admin paroli kod ichidagi default qiymat
+- User password test ichida hardcode, lekin qoida fayllarida literal qiymat yozilmaydi
 
 ## Ruxsatlar
 

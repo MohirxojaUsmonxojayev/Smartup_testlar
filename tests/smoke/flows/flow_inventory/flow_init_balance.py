@@ -7,6 +7,12 @@ from tests.smoke.flows.flow_navigate import navigate_to
 from utils.base_page import BasePage
 
 
+def _select_main_warehouse(page: Page) -> None:
+    base_page = BasePage(page)
+    base_page.select_b_input("d.warehouse_name", "Основной склад", clear=True)
+    base_page.wait_for_loader()
+
+
 def flow_create_initial_balance(
     page: Page,
     document_number: str,
@@ -20,6 +26,7 @@ def flow_create_initial_balance(
         page.get_by_role("button", name="Создать").click()
         expect(page.get_by_role("heading")).to_contain_text("Ввод начальных остатков ТМЦ (создание)")
         page.get_by_role("textbox").first.fill(document_number)
+        _select_main_warehouse(page)
         page.locator("b-pg-grid").get_by_role("textbox", name="Поиск").click()
         page.get_by_text(product_code).click()
         page.locator('input[ng-model="item.quantity"]').first.fill(quantity)
@@ -28,10 +35,12 @@ def flow_create_initial_balance(
     with allure.step("Inventory: boshlang'ich qoldiqni saqlash"):
         page.get_by_role("button", name="Сохранить").click()
         BasePage(page).confirm_biruni("Сохранить?")
-        expect(page.get_by_role("heading")).to_contain_text("Ввод начальных остатков ТМЦ")
+        BasePage(page).wait_for_loader()
+        expect(page).to_have_url(re.compile(r".*/init_inventory_balance_list"))
+        expect(page.get_by_role("heading")).to_have_text("Ввод начальных остатков ТМЦ")
 
     with allure.step("Inventory: boshlang'ich qoldiq hujjatini o'tkazish"):
-        page.locator("#kt_content").get_by_text(document_number, exact=True).click()
+        BasePage(page).click_grid_row(document_number)
         page.get_by_role("button", name="Провести").click()
         BasePage(page).confirm_biruni(f"Провести документ № {document_number}?")
         BasePage(page).wait_for_loader()

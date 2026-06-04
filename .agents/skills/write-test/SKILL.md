@@ -58,11 +58,12 @@ def test_XX_<nomi>(session_page: Page, code):
 
 ## 5. Loyiha Xususiyatlari
 
-### .env va dinamik qiymatlar
-- `.env` da Python f-string **ishlamaydi**: `TEST_USER_EMAIL=f"user-pw{code}@autotest"` — xato
-- Dinamik email va shunga o'xshash qiymatlar test/flow ichida f-string bilan quriladi:
+### Runner config va dinamik qiymatlar
+- `.env` ishlatilmaydi; test run konfiguratsiyasi `scripts/run_tests.py` yoki pytest optionlari orqali keladi.
+- Har bir run uchun `--url` va company mode majburiy: mavjud company uchun `--company-code/--company-password`, yangi company uchun `--create-company`.
+- Dinamik email va shunga o'xshash qiymatlar test/flow ichida active company code bilan quriladi:
   ```python
-  user_email = f"user-pw{code}{COMPANY_CODE}"
+  user_email = f"user-pw{code}@{active_company_code}"
   ```
 
 ### code fixture
@@ -72,7 +73,7 @@ def test_XX_<nomi>(session_page: Page, code):
 
 ### authorization_user
 - `authorization_user(page, code)` — `code` parametrni qabul qiladi
-- Email ichida quriladi: `f"user-pw{code}{COMPANY_CODE}"`
+- Email ichida quriladi: `f"user-pw{code}@<active_company_code>"`
 
 ### Selenium migratsiya source fayli
 - Foydalanuvchi Selenium test kodini rootdagi `for_migratsiya.py` fayliga qo'yadi; migratsiya so'ralganda shu fayldan o'qib Playwright + pytest smoke testga o'tkaz, UI da run qilib xatolarini tuzat.
@@ -107,7 +108,7 @@ def test_XX_<nomi>(session_page: Page, code):
 - Foydalanuvchi “shu testni regression qilamiz” desa, bu avtomatik ravishda add formani full to'ldirish, list check, view check, viewdagi mos card/tab/module holatlarini check qilish degani.
 - Fieldlarni taxmin qilma. Har yangi regression forma uchun avval browserda add/view ochib screenshot/field state ol, screenshotlarni `smartup-guide/references/forms/screenshots/<form-slug>/` ichiga arxivla va forma bilimini `smartup-guide/references/forms/<form-slug>.md` ga yoz.
 - Regression-only qiymatlar `data_store.json` da eski runlardan qolib ketmasin: smoke branch ularni `None`/null qilib tozalasin, regression branch esa view/list assert uchun kerak hamma muhim qiymatlarni saqlasin.
-- Scope bilan yozilgan testni yakunda ikki mode bilan tekshir: smoke minimal path, regression full path. Cross-platform runnerda `python scripts/run_tests.py --url <server_url>` va `python scripts/run_tests.py --url <server_url> --regression` ishlatiladi.
+- Scope bilan yozilgan testni yakunda ikki mode bilan tekshir: smoke minimal path, regression full path. Cross-platform runnerda mavjud company uchun `python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password>` va `python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password> --regression` ishlatiladi; yangi company kerak bo'lsa `--create-company` mode ishlatiladi.
 
 ### Setup va Group test dependency modeli
 - Yangi testlar har doim yangi server/baza holatida ham ishlashi kerak; lokal debugda oldingi rerunlardan data ko'paygan bo'lsa ham, testni mavjud dataga suyanib yozma.

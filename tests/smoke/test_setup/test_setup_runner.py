@@ -108,7 +108,7 @@ def run_setup_chain(
 @allure.title("00 - Company")
 def test_00_company(session_page: Page, code, save_data, company_setup_enabled):
     if not company_setup_enabled:
-        pytest.skip("Company setup faqat production bo'lmagan COMPANY_URL bilan ishlaydi")
+        pytest.skip("Company setup faqat --create-company flagi bilan ishlaydi")
     run_company(session_page, code, save_data)
 
 @allure.title("01 - Authorization")

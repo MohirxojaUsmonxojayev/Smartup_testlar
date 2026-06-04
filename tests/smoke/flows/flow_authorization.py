@@ -2,16 +2,10 @@ import os
 import json
 from pathlib import Path
 
-from dotenv import load_dotenv
 from playwright.sync_api import Page, expect
 from utils.base_page import BasePage
 
-load_dotenv()
-
-COMPANY_URL = os.environ["COMPANY_URL"]
-COMPANY_CODE = os.environ["COMPANY_CODE"]
-COMPANY_PASS = os.environ["COMPANY_PASSWORD"]
-USER_PASS = os.environ["USER_PASSWORD"]
+USER_PASS = "123456789"
 
 DATA_STORE_PATH = Path("test-results/data/data_store.json")
 
@@ -20,8 +14,28 @@ def _normalize_company_code(value: str) -> str:
     return value.strip().lstrip("@")
 
 
+def _create_company_enabled() -> bool:
+    return os.getenv("CREATE_COMPANY", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def company_url() -> str:
+    value = os.getenv("COMPANY_URL", "").strip().rstrip("/")
+    if not value:
+        raise AssertionError("--url majburiy. Testni scripts/run_tests.py --url <server_url> orqali ishga tushiring.")
+    return value
+
+
+def company_password() -> str:
+    value = os.getenv("COMPANY_PASSWORD", "").strip()
+    if not value:
+        raise AssertionError(
+            "--company-password majburiy. Mavjud company bilan run qilinganda password flag orqali beriladi."
+        )
+    return value
+
+
 def current_company_code() -> str:
-    if DATA_STORE_PATH.exists():
+    if _create_company_enabled() and DATA_STORE_PATH.exists():
         try:
             data = json.loads(DATA_STORE_PATH.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
@@ -29,7 +43,12 @@ def current_company_code() -> str:
         company_code = data.get("company_code") if isinstance(data, dict) else None
         if company_code:
             return _normalize_company_code(str(company_code))
-    return _normalize_company_code(COMPANY_CODE)
+    value = os.getenv("COMPANY_CODE", "").strip()
+    if not value:
+        raise AssertionError(
+            "--company-code majburiy yoki --create-company orqali yangi company yaratilgan bo'lishi kerak."
+        )
+    return _normalize_company_code(value)
 
 
 def company_suffix() -> str:
@@ -44,8 +63,6 @@ def user_email_for(code: str) -> str:
     return f"user-pw{code}{company_suffix()}"
 
 
-ADMIN_EMAIL = admin_email()
-
 # ----------------------------------------------------------------------------------------------------------------------
 
 def logout(page: Page) -> None:
@@ -56,10 +73,10 @@ def logout(page: Page) -> None:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def login(page: Page, email: str | None = None, password: str = COMPANY_PASS) -> None:
-    page.goto(f"{COMPANY_URL}/login.html")
+def login(page: Page, email: str | None = None, password: str | None = None) -> None:
+    page.goto(f"{company_url()}/login.html")
     page.get_by_placeholder("Логин@компания").fill(email or admin_email())
-    page.get_by_role("textbox", name="Пароль").fill(password)
+    page.get_by_role("textbox", name="Пароль").fill(password or company_password())
     page.get_by_role("button", name="Войти").click()
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -69,7 +86,7 @@ def dashboard(page: Page) -> None:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def authorization(page: Page, email: str | None = None, password: str = COMPANY_PASS) -> None:
+def authorization(page: Page, email: str | None = None, password: str | None = None) -> None:
     login(page, email=email, password=password)
     dashboard(page)
 

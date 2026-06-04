@@ -1,6 +1,6 @@
 {
   "initial": {
-    "url": "https://smartup.online/#/!65gs9zfqp/anor/mr/filial_view?filial_id=19823405",
+    "url": "<server_url>/#/!<session>/anor/mr/filial_view?filial_id=<filial_id>",
     "heading_texts": [
       "Основная информация",
       "Основная информация"
@@ -63,7 +63,7 @@
     "body": "Команда Smartup\nЗдравствуйте! Готова помочь вам. Напишите мне, если у вас появятся вопросы.\nГлавное\nПродажа\nСклад\nФинансы\nКадры и зарплата\nСправочники\nТорговый маркетинг\nОборудование\nA\n\nTrade\n\nАдминистрирование\n\n Организация (просмотр)\nИЗМЕНИТЬ ЗАКРЫТЬ\nfilial-pw7177  (19823405)\nАктивный\nОсновная информация\nПользователи\nПродукты\nИстория изменений\nСистемные ошибки\nОсновная информация\nНазвание\n\nfilial-pw7177\nВалюта\n\nУзбекский сум\nКод\n\ncod_lg_pw7177\nЮридическое лицо\n\nОАО «Семенов, Алексеева и Крылов» legal_person-pw7177\nСтавка НДС (%)\n\n12\nАкциз\n\nДа\nЧасовой пояс\n\n(+05:00) Ташкент\nСоздал\nAdmin\nДата создания\n02.06.2026 18:26:45\nИзменил\nAdmin\nДата изменения\n02.06.2026 18:26:45\nCopyright © 2012-2026,  Green White Solutions LLC. All rights reserved. , "
   },
   "Основная информация": {
-    "url": "https://smartup.online/#/!65gs9zfqp/anor/mr/filial_view?filial_id=19823405",
+    "url": "<server_url>/#/!<session>/anor/mr/filial_view?filial_id=<filial_id>",
     "heading_texts": [
       "Основная информация",
       "Основная информация"
@@ -126,7 +126,7 @@
     "body": "Команда Smartup\nЗдравствуйте! Готова помочь вам. Напишите мне, если у вас появятся вопросы.\nГлавное\nПродажа\nСклад\nФинансы\nКадры и зарплата\nСправочники\nТорговый маркетинг\nОборудование\nA\n\nTrade\n\nАдминистрирование\n\n Организация (просмотр)\nИЗМЕНИТЬ ЗАКРЫТЬ\nfilial-pw7177  (19823405)\nАктивный\nОсновная информация\nПользователи\nПродукты\nИстория изменений\nСистемные ошибки\nОсновная информация\nНазвание\n\nfilial-pw7177\nВалюта\n\nУзбекский сум\nКод\n\ncod_lg_pw7177\nЮридическое лицо\n\nОАО «Семенов, Алексеева и Крылов» legal_person-pw7177\nСтавка НДС (%)\n\n12\nАкциз\n\nДа\nЧасовой пояс\n\n(+05:00) Ташкент\nСоздал\nAdmin\nДата создания\n02.06.2026 18:26:45\nИзменил\nAdmin\nДата изменения\n02.06.2026 18:26:45\nCopyright © 2012-2026,  Green White Solutions LLC. All rights reserved. , "
   },
   "Продукты": {
-    "url": "https://smartup.online/#/!65gs9zfqp/anor/mr/filial_view?filial_id=19823405",
+    "url": "<server_url>/#/!<session>/anor/mr/filial_view?filial_id=<filial_id>",
     "heading_texts": [
       "finance",
       "trade"

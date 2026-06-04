@@ -6,15 +6,13 @@ import pytest
 from playwright.sync_api import Page, expect
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
-from tests.smoke.flows.flow_authorization import COMPANY_URL, login
+from tests.smoke.flows.flow_authorization import login
 from utils.base_page import BasePage
 
 pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("Company")]
 
 HEAD_ADMIN_EMAIL = "admin@head"
 HEAD_ADMIN_PASSWORD = "greenwhite"
-PRODUCTION_COMPANY_URL = "https://smartup.online"
-COMPANY_ACTIVATION_CODE = os.getenv("COMPANY_ACTIVATION_CODE", "").strip()
 TRADE_CHILD_PRODUCTS = (
     "Call center",
     "Equipment",
@@ -34,6 +32,11 @@ TRADE_CHILD_PRODUCTS = (
     "Warehouse - Main",
     "Warehouse - Advanced",
 )
+COMPANY_FORM_TIMEOUT = 60_000
+
+
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def company_code_for(code: str) -> str:
@@ -45,14 +48,6 @@ def _company_code_text_pattern(company_code: str) -> re.Pattern:
     if match:
         return re.compile(rf"{re.escape(match.group(1))}\s*{re.escape(match.group(2))}", re.IGNORECASE)
     return re.compile(re.escape(company_code), re.IGNORECASE)
-
-
-def _ensure_non_production_url() -> None:
-    if COMPANY_URL.rstrip("/") == PRODUCTION_COMPANY_URL:
-        raise AssertionError(
-            "Company yaratish production serverda ishlamaydi. "
-            "COMPANY_URL ni https://smartup.online dan boshqa test serverga o'zgartiring."
-        )
 
 
 def _expect_page_title(page: Page, title: re.Pattern | str, timeout: int | None = None) -> None:
@@ -97,29 +92,32 @@ def _open_company_add(page: Page) -> None:
     page.get_by_role("button", name="Создать").click()
     BasePage(page).wait_for_loader()
     _expect_page_title(page, re.compile(r"создание|Creation", re.IGNORECASE))
+    form = page.locator("#companyForm").first
+    expect(form).to_be_visible(timeout=COMPANY_FORM_TIMEOUT)
+    expect(form.locator("smt-control").first).to_be_visible(timeout=COMPANY_FORM_TIMEOUT)
 
 
-def _label_pattern(label: str) -> re.Pattern:
-    return re.compile(rf"^\s*{re.escape(label)}\s*(?:\*)?\s*$", re.IGNORECASE)
-
-
-def _control_by_label(page: Page, label: str):
-    control = page.locator("smt-control").filter(
-        has=page.locator("label").filter(has_text=_label_pattern(label))
-    ).first
-    expect(control).to_be_visible()
-    return control
+def _labels_pattern(labels: tuple[str, ...]) -> re.Pattern:
+    variants = "|".join(re.escape(label) for label in labels)
+    return re.compile(rf"^\s*(?:{variants})\s*(?:\*)?\s*$", re.IGNORECASE)
 
 
 def _find_control_by_labels(page: Page, labels: tuple[str, ...]):
-    for label in labels:
-        control = page.locator("smt-control").filter(
-            has=page.locator("label").filter(has_text=_label_pattern(label))
-        ).first
-        if control.count() > 0:
-            expect(control).to_be_visible()
-            return control
-    return None
+    control = page.locator("smt-control").filter(
+        has=page.locator("label").filter(has_text=_labels_pattern(labels))
+    ).first
+    try:
+        expect(control).to_be_visible(timeout=COMPANY_FORM_TIMEOUT)
+    except (AssertionError, PlaywrightTimeoutError):
+        return None
+    return control
+
+
+def _control_by_label(page: Page, label: str):
+    control = _find_control_by_labels(page, (label,))
+    if control is None:
+        raise AssertionError(f"Company formasida '{label}' control topilmadi")
+    return control
 
 
 def _fill_text_control_by_labels(page: Page, labels: tuple[str, ...], value: str) -> bool:
@@ -285,33 +283,129 @@ def _open_company_view(page: Page, company_code: str) -> None:
     _expect_page_title(page, re.compile(r"просмотр|View", re.IGNORECASE))
 
 
-def _activate_company_for_license_if_configured(page: Page) -> None:
-    activation_tab = page.get_by_text("Активация для лицензии", exact=True).first
-    expect(activation_tab).to_be_visible()
-    activation_tab.click()
-    BasePage(page).wait_for_loader()
-    expect(page.locator("body")).to_contain_text("Код активации")
-
-    if page.locator("body").get_by_text("Активирован", exact=True).count() > 0:
+def _open_company_security_tab(page: Page) -> None:
+    for tab_name in ("Безопасность", "Security"):
+        tab = page.get_by_text(tab_name, exact=True).first
+        if tab.count() == 0:
+            continue
+        expect(tab).to_be_visible()
+        tab.click()
+        BasePage(page).wait_for_loader()
+        expect(page.locator("body")).to_contain_text("Политика лицензирования")
         return
+    raise AssertionError("Company viewda Security/Безопасность tab topilmadi")
 
-    if not COMPANY_ACTIVATION_CODE:
-        allure.attach(
-            "COMPANY_ACTIVATION_CODE berilmagan. License sotib olish uchun yangi company "
-            "viewidagi 'Активация для лицензии' tabida activation code kiritilishi kerak.",
-            name="company-license-activation-missing",
-            attachment_type=allure.attachment_type.TEXT,
-        )
-        return
 
-    textbox = page.get_by_role("textbox").first
-    expect(textbox).to_be_visible()
-    textbox.fill(COMPANY_ACTIVATION_CODE)
-    activate = page.get_by_role("button", name="Активация", exact=True)
-    expect(activate).to_be_enabled()
-    activate.click()
+def _license_policy_container(page: Page):
+    label = page.get_by_text("Политика лицензирования", exact=True).first
+    expect(label).to_be_visible()
+
+    for ancestor in (
+        "ancestor::*[.//*[@role='switch'] or .//input[@type='checkbox'] or .//*[contains(@class,'switch')]][1]",
+        "ancestor::smt-control[1]",
+        "ancestor::*[contains(@class,'form-group')][1]",
+        "ancestor::*[contains(@class,'col')][1]",
+        "..",
+    ):
+        container = label.locator(f"xpath={ancestor}")
+        if container.count() == 0:
+            continue
+        if (
+            container.get_by_role("switch").count() > 0
+            or container.locator("input[type='checkbox']").count() > 0
+            or container.locator(".switch").count() > 0
+            or container.get_by_role("radio").count() > 0
+        ):
+            return container.first
+
+    raise AssertionError("'Политика лицензирования' control topilmadi")
+
+
+def _set_license_policy_enabled(page: Page, enabled: bool) -> bool:
+    container = _license_policy_container(page)
+
+    switch = container.get_by_role("switch").first
+    if switch.count() > 0 and switch.is_visible():
+        current = switch.get_attribute("aria-checked")
+        if current in {"true", "false"} and (current == "true") == enabled:
+            return True
+        try:
+            switch.click(timeout=5_000)
+        except PlaywrightTimeoutError:
+            return False
+        expect(switch).to_have_attribute("aria-checked", "true" if enabled else "false")
+        return True
+
+    checkbox = container.locator("input[type='checkbox']").first
+    if checkbox.count() > 0:
+        BasePage(page).set_checkbox(checkbox, checked=enabled)
+        return True
+
+    switch_fallback = container.locator(".switch").first
+    if switch_fallback.count() > 0 and switch_fallback.is_visible():
+        switch_text = re.sub(r"\s+", " ", switch_fallback.inner_text()).strip().lower()
+        current = any(word in switch_text for word in ("да", "yes", "on", "вкл"))
+        if current != enabled:
+            switch_fallback.click()
+        expected_text = re.compile(r"\b(да|yes|on|вкл)\b" if enabled else r"\b(нет|no|off|выкл)\b", re.IGNORECASE)
+        expect(switch_fallback).to_contain_text(expected_text)
+        return True
+
+    if not enabled:
+        off_option = container.get_by_text(re.compile(r"^\s*(нет|no|off|отключено|выкл)\s*$", re.IGNORECASE)).first
+        if off_option.count() > 0 and off_option.is_visible():
+            off_option.click()
+            return True
+
+    return False
+
+
+def _save_company_changes(page: Page) -> None:
+    save_button = page.get_by_role("button", name="Сохранить", exact=True).first
+    expect(save_button).to_be_visible()
+    save_button.click()
+    confirm = page.locator("#biruniConfirm")
+    try:
+        expect(confirm).to_be_visible(timeout=3_000)
+        expect(confirm).to_have_css("opacity", "1", timeout=3_000)
+        confirm.get_by_role("button", name="да", exact=True).click()
+        confirm.wait_for(state="hidden", timeout=30_000)
+    except (AssertionError, PlaywrightTimeoutError):
+        pass
     BasePage(page).wait_for_loader(timeout=600_000)
-    expect(page.locator("body")).to_contain_text("Активирован")
+
+
+def _ensure_company_view(page: Page, company_code: str) -> None:
+    try:
+        _expect_page_title(page, re.compile(r"просмотр|View", re.IGNORECASE), timeout=5_000)
+        return
+    except (AssertionError, PlaywrightTimeoutError):
+        pass
+
+    close_button = page.get_by_role("button", name="Закрыть", exact=True).first
+    if close_button.count() > 0 and close_button.is_visible():
+        close_button.click()
+        BasePage(page).wait_for_loader()
+
+    _open_company_list(page)
+    _assert_company_list_row(page, company_code)
+    _open_company_view(page, company_code)
+
+
+def _disable_license_policy_if_configured(page: Page, company_code: str) -> None:
+    if not _env_flag("DISABLE_LICENSE_POLICY"):
+        return
+
+    _open_company_security_tab(page)
+
+    if not _set_license_policy_enabled(page, enabled=False):
+        raise AssertionError("'Политика лицензирования' off qilinmadi")
+    BasePage(page).wait_for_loader(timeout=600_000)
+
+    save_button = page.get_by_role("button", name="Сохранить", exact=True).first
+    if save_button.count() > 0 and save_button.is_visible():
+        _save_company_changes(page)
+        _ensure_company_view(page, company_code)
 
 
 def _wait_for_company_code_in_page(page: Page, company_code: str, timeout: int) -> None:
@@ -329,7 +423,6 @@ def _save_company_code(save_data, company_code: str) -> None:
 
 
 def run_company(page: Page, code, save_data=None, company_code: str | None = None) -> str:
-    _ensure_non_production_url()
     company_code = company_code or company_code_for(code)
 
     with allure.step("1 - Head profilga kirish"):
@@ -342,7 +435,7 @@ def run_company(page: Page, code, save_data=None, company_code: str | None = Non
     with allure.step("3 - Company mavjud bo'lsa qayta yaratmasdan code saqlash"):
         if _company_exists(page, company_code):
             _open_company_view(page, company_code)
-            _activate_company_for_license_if_configured(page)
+            _disable_license_policy_if_configured(page, company_code)
             _save_company_code(save_data, company_code)
             return company_code
 
@@ -363,9 +456,9 @@ def run_company(page: Page, code, save_data=None, company_code: str | None = Non
     with allure.step("8 - Ro'yxatda yaratilgan company code ni tekshirish"):
         _assert_company_list_row(page, company_code)
 
-    with allure.step("9 - License uchun company activation holatini tekshirish"):
+    with allure.step("9 - Company viewda license policy sozlamasini qo'llash"):
         _open_company_view(page, company_code)
-        _activate_company_for_license_if_configured(page)
+        _disable_license_policy_if_configured(page, company_code)
 
     with allure.step("10 - Company code ni data storega saqlash"):
         _save_company_code(save_data, company_code)
@@ -382,5 +475,5 @@ def test_company(page: Page, code, save_data, company_setup_enabled) -> None:
     4. Company ro'yxatida code bo'yicha tekshirish va data storega company_code saqlash.
     """
     if not company_setup_enabled:
-        pytest.skip("Company setup faqat production bo'lmagan COMPANY_URL bilan ishlaydi")
+        pytest.skip("Company setup faqat --create-company flagi bilan ishlaydi")
     run_company(page, code, save_data)
