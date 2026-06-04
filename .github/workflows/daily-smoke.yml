@@ -5,6 +5,30 @@ on:
     - cron: "15 9 * * *"
       timezone: "Asia/Tashkent"
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Test scope
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - regression
+      server_url:
+        description: Server URL
+        required: true
+        default: https://smartup.online/
+        type: string
+      target:
+        description: Test target
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - setup
+          - group-a
+          - group-b
 
 concurrency:
   group: daily-smoke-tests
@@ -14,6 +38,10 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      TEST_SCOPE: ${{ github.event.inputs.scope || 'smoke' }}
+      TEST_SERVER_URL: ${{ github.event.inputs.server_url || 'https://smartup.online/' }}
+      TEST_TARGET: ${{ github.event.inputs.target || 'all' }}
 
     steps:
       - name: Checkout
@@ -35,11 +63,14 @@ jobs:
 
       - name: Run daily smoke tests
         run: |
-          python scripts/run_tests.py \
-            --url https://smartup.online/ \
+          mkdir -p test-results
+          set -o pipefail
+          python scripts/run_tests.py "$TEST_TARGET" \
+            --url "$TEST_SERVER_URL" \
             --company-code "${{ secrets.SMARTUP_COMPANY_CODE }}" \
             --company-password "${{ secrets.SMARTUP_COMPANY_PASSWORD }}" \
-            --headless
+            --scope "$TEST_SCOPE" \
+            --headless 2>&1 | tee test-results/ci-test-output.log
 
       - name: Upload test results
         if: ${{ always() }}
@@ -57,6 +88,8 @@ jobs:
           JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           BRANCH: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
             echo "Telegram secrets are not configured; skipping notification."
@@ -64,13 +97,27 @@ jobs:
           fi
 
           if [ "$JOB_STATUS" = "success" ]; then
-            STATUS_TEXT="Daily Smoke Tests: PASSED"
+            STATUS_TEXT="[PASSED]"
           else
-            STATUS_TEXT="Daily Smoke Tests: FAILED"
+            STATUS_TEXT="[FAILED]"
           fi
 
-          MESSAGE=$(printf '%s\nRepository: %s\nBranch: %s\nRun: %s' \
-            "$STATUS_TEXT" "$GITHUB_REPOSITORY" "$BRANCH" "$RUN_URL")
+          SUMMARY=$(grep -E "={2,} .* (passed|failed|errors?|skipped|xfailed|xpassed).* in .* ={2,}" \
+            test-results/ci-test-output.log 2>/dev/null | tail -1 | sed -E 's/^=+ //; s/ =+$//' || true)
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY="Pytest summary not found. Open the run link for logs."
+          fi
+
+          FAILED_TESTS=$(grep -E "^(FAILED|ERROR) " test-results/ci-test-output.log 2>/dev/null \
+            | head -5 | sed 's/^/- /' || true)
+
+          COMMIT_SHORT=$(printf '%s' "$GITHUB_SHA" | cut -c1-7)
+          MESSAGE=$(printf 'Daily Smoke Tests %s\nRepository: %s\nBranch: %s\nCommit: %s\nScope: %s\nTarget: %s\nServer: %s\nTriggered by: %s (%s)\nSummary: %s\nRun: %s' \
+            "$STATUS_TEXT" "$GITHUB_REPOSITORY" "$BRANCH" "$COMMIT_SHORT" "$TEST_SCOPE" "$TEST_TARGET" "$TEST_SERVER_URL" "$ACTOR" "$EVENT_NAME" "$SUMMARY" "$RUN_URL")
+
+          if [ -n "$FAILED_TESTS" ]; then
+            MESSAGE=$(printf '%s\n\nFailed tests:\n%s' "$MESSAGE" "$FAILED_TESTS")
+          fi
 
           curl --fail-with-body -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
