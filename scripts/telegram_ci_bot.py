@@ -35,11 +35,49 @@ class RunRequest:
     server_url: str
     target: str = DEFAULT_TARGET
 
+    @property
+    def company_source(self) -> str:
+        if self.server_key == "app3":
+            return "APP3 secrets"
+        return "SMARTUP secrets"
+
 
 @dataclass(frozen=True)
 class WorkflowRun:
     run_id: int | None
     html_url: str
+
+
+@dataclass(frozen=True)
+class ActiveRun:
+    chat_id: str
+    request: RunRequest
+    workflow_run: WorkflowRun
+    started_at: float
+
+
+class ActiveRunStore:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._active: ActiveRun | None = None
+
+    def get(self) -> ActiveRun | None:
+        with self._lock:
+            return self._active
+
+    def set(self, active: ActiveRun) -> bool:
+        with self._lock:
+            if self._active is not None:
+                return False
+            self._active = active
+            return True
+
+    def clear(self, run_id: int | None) -> None:
+        with self._lock:
+            if self._active is None:
+                return
+            if run_id is None or self._active.workflow_run.run_id == run_id:
+                self._active = None
 
 
 @dataclass(frozen=True)
@@ -241,7 +279,8 @@ def help_text() -> str:
     return (
         "Test run qilish uchun /run yuboring.\n\n"
         "Bot avval serverni so'raydi, keyin scope tanlatadi.\n"
-        "Company code/password GitHub Secrets'dan olinadi."
+        "Company code/password GitHub Secrets'dan olinadi.\n"
+        "Test jarayonda bo'lsa yangi /run bloklanadi."
     )
 
 
@@ -265,11 +304,41 @@ def scope_keyboard(server_key: str) -> dict[str, Any]:
     }
 
 
-def show_run_start(telegram: TelegramClient, chat_id: str, config: BotConfig) -> None:
+def active_run_text(active: ActiveRun) -> str:
+    elapsed_seconds = max(0, int(time.monotonic() - active.started_at))
+    elapsed_minutes = elapsed_seconds // 60
+    elapsed_text = "1 daqiqadan kam" if elapsed_minutes == 0 else f"{elapsed_minutes} daqiqa"
+    return (
+        "Hozir test jarayonda.\n\n"
+        f"Server: {active.request.server_url}\n"
+        f"Scope: {active.request.scope}\n"
+        f"Company: {active.request.company_source}\n"
+        f"Vaqt: {elapsed_text}\n"
+        f"Run: {active.workflow_run.html_url}\n\n"
+        "Test tugagach /run yana ishlaydi."
+    )
+
+
+def show_run_start(
+    telegram: TelegramClient,
+    chat_id: str,
+    config: BotConfig,
+    active_store: ActiveRunStore,
+) -> None:
+    active = active_store.get()
+    if active is not None:
+        telegram.send_message(chat_id, active_run_text(active))
+        return
     telegram.send_message(chat_id, "Qaysi serverda run qilamiz?", reply_markup=server_keyboard(config))
 
 
-def handle_message(telegram: TelegramClient, config: BotConfig, chat_id: str, text: str) -> None:
+def handle_message(
+    telegram: TelegramClient,
+    config: BotConfig,
+    active_store: ActiveRunStore,
+    chat_id: str,
+    text: str,
+) -> None:
     if chat_id not in config.allowed_chat_ids:
         telegram.send_message(chat_id, "This chat is not allowed to run CI.")
         return
@@ -283,7 +352,7 @@ def handle_message(telegram: TelegramClient, config: BotConfig, chat_id: str, te
         telegram.send_message(chat_id, "Ruxsat berilgan serverlar:\n" + "\n".join(lines))
         return
     if command == "/run":
-        show_run_start(telegram, chat_id, config)
+        show_run_start(telegram, chat_id, config, active_store)
         return
 
     telegram.send_message(chat_id, "Noto'g'ri command. Test run qilish uchun /run yuboring.")
@@ -293,6 +362,7 @@ def handle_callback(
     telegram: TelegramClient,
     github: GitHubActionsClient,
     config: BotConfig,
+    active_store: ActiveRunStore,
     callback: dict[str, Any],
 ) -> None:
     callback_id = str(callback.get("id", ""))
@@ -307,6 +377,12 @@ def handle_callback(
         return
     if not isinstance(message_id, int):
         telegram.answer_callback(callback_id)
+        return
+
+    active = active_store.get()
+    if active is not None:
+        telegram.answer_callback(callback_id, "Test jarayonda")
+        telegram.send_message(chat_id, active_run_text(active))
         return
 
     if data.startswith("server:"):
@@ -330,7 +406,7 @@ def handle_callback(
             return
         telegram.answer_callback(callback_id, "Run boshlanyapti")
         request = RunRequest(scope=scope, server_key=server_key, server_url=SERVERS[server_key])
-        start_run(telegram, github, chat_id, message_id, request)
+        start_run(telegram, github, chat_id, message_id, request, active_store)
         return
 
     telegram.answer_callback(callback_id, "Unknown action")
@@ -342,6 +418,7 @@ def start_run(
     chat_id: str,
     message_id: int,
     request: RunRequest,
+    active_store: ActiveRunStore,
 ) -> None:
     telegram.edit_message(
         chat_id,
@@ -350,7 +427,7 @@ def start_run(
             "Test boshlanyapti...\n"
             f"Server: {request.server_url}\n"
             f"Scope: {request.scope}\n"
-            "Company: GitHub Secrets"
+            f"Company: {request.company_source}"
         ),
     )
     try:
@@ -359,12 +436,26 @@ def start_run(
         telegram.send_message(chat_id, f"Testni boshlashda xato:\n{exc}")
         return
 
+    if workflow_run.run_id is not None:
+        active = ActiveRun(
+            chat_id=chat_id,
+            request=request,
+            workflow_run=workflow_run,
+            started_at=time.monotonic(),
+        )
+        if not active_store.set(active):
+            current = active_store.get()
+            if current is not None:
+                telegram.send_message(chat_id, active_run_text(current))
+            return
+
     telegram.send_message(
         chat_id,
         (
             "GitHub Actions run boshlandi.\n"
             f"Server: {request.server_url}\n"
             f"Scope: {request.scope}\n"
+            f"Company: {request.company_source}\n"
             f"Run: {workflow_run.html_url}"
         ),
     )
@@ -375,7 +466,7 @@ def start_run(
 
     thread = threading.Thread(
         target=monitor_run,
-        args=(telegram, github, chat_id, workflow_run, request),
+        args=(telegram, github, chat_id, workflow_run, request, active_store),
         daemon=True,
     )
     thread.start()
@@ -387,6 +478,7 @@ def monitor_run(
     chat_id: str,
     workflow_run: WorkflowRun,
     request: RunRequest,
+    active_store: ActiveRunStore,
 ) -> None:
     assert workflow_run.run_id is not None
     started = time.monotonic()
@@ -398,10 +490,12 @@ def monitor_run(
         try:
             status, conclusion, html_url = github.get_run_status(workflow_run.run_id)
         except Exception as exc:
+            active_store.clear(workflow_run.run_id)
             telegram.send_message(chat_id, f"Run statusini olishda xato:\n{exc}")
             return
 
         if status == "completed":
+            active_store.clear(workflow_run.run_id)
             result = (conclusion or "unknown").upper()
             telegram.send_message(
                 chat_id,
@@ -433,6 +527,7 @@ def main() -> int:
 
     telegram = TelegramClient(config.telegram_token)
     github = GitHubActionsClient(config.github_token, config.repository, config.workflow, config.ref)
+    active_store = ActiveRunStore()
 
     offset: int | None = None
     print(f"Telegram CI bot started for {config.repository}/{config.workflow} on {config.ref}")
@@ -451,12 +546,12 @@ def main() -> int:
                     chat_id = str(chat.get("id", ""))
                     text = message.get("text")
                     if isinstance(text, str):
-                        handle_message(telegram, config, chat_id, text.strip())
+                        handle_message(telegram, config, active_store, chat_id, text.strip())
                     continue
 
                 callback = update.get("callback_query")
                 if isinstance(callback, dict):
-                    handle_callback(telegram, github, config, callback)
+                    handle_callback(telegram, github, config, active_store, callback)
         except KeyboardInterrupt:
             print("Stopping Telegram CI bot.")
             return 0

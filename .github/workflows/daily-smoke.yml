@@ -32,7 +32,7 @@ on:
 
 concurrency:
   group: daily-smoke-tests
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   smoke:
@@ -42,8 +42,10 @@ jobs:
       TEST_SCOPE: ${{ github.event.inputs.scope || 'smoke' }}
       TEST_SERVER_URL: ${{ github.event.inputs.server_url || 'https://smartup.online/' }}
       TEST_TARGET: ${{ github.event.inputs.target || 'all' }}
-      TEST_COMPANY_CODE: ${{ secrets.SMARTUP_COMPANY_CODE }}
-      TEST_COMPANY_PASSWORD: ${{ secrets.SMARTUP_COMPANY_PASSWORD }}
+      SMARTUP_COMPANY_CODE: ${{ secrets.SMARTUP_COMPANY_CODE }}
+      SMARTUP_COMPANY_PASSWORD: ${{ secrets.SMARTUP_COMPANY_PASSWORD }}
+      APP3_COMPANY_CODE: ${{ secrets.APP3_COMPANY_CODE }}
+      APP3_COMPANY_PASSWORD: ${{ secrets.APP3_COMPANY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -63,10 +65,28 @@ jobs:
       - name: Install Playwright browser
         run: python -m playwright install --with-deps chromium
 
-      - name: Mask company credentials
+      - name: Select and mask company credentials
         run: |
-          echo "::add-mask::$TEST_COMPANY_CODE"
-          echo "::add-mask::$TEST_COMPANY_PASSWORD"
+          NORMALIZED_TEST_SERVER_URL="${TEST_SERVER_URL%/}"
+          echo "TEST_SERVER_URL=$NORMALIZED_TEST_SERVER_URL" >> "$GITHUB_ENV"
+          if [ "$NORMALIZED_TEST_SERVER_URL" = "https://app3.greenwhite.uz/xtrade" ]; then
+            SELECTED_COMPANY_SOURCE="APP3 secrets"
+            SELECTED_COMPANY_CODE="$APP3_COMPANY_CODE"
+            SELECTED_COMPANY_PASSWORD="$APP3_COMPANY_PASSWORD"
+          else
+            SELECTED_COMPANY_SOURCE="SMARTUP secrets"
+            SELECTED_COMPANY_CODE="$SMARTUP_COMPANY_CODE"
+            SELECTED_COMPANY_PASSWORD="$SMARTUP_COMPANY_PASSWORD"
+          fi
+          echo "TEST_COMPANY_SOURCE=$SELECTED_COMPANY_SOURCE" >> "$GITHUB_ENV"
+          echo "TEST_COMPANY_CODE=$SELECTED_COMPANY_CODE" >> "$GITHUB_ENV"
+          echo "TEST_COMPANY_PASSWORD=$SELECTED_COMPANY_PASSWORD" >> "$GITHUB_ENV"
+          [ -n "$SMARTUP_COMPANY_CODE" ] && echo "::add-mask::$SMARTUP_COMPANY_CODE"
+          [ -n "$SMARTUP_COMPANY_PASSWORD" ] && echo "::add-mask::$SMARTUP_COMPANY_PASSWORD"
+          [ -n "$APP3_COMPANY_CODE" ] && echo "::add-mask::$APP3_COMPANY_CODE"
+          [ -n "$APP3_COMPANY_PASSWORD" ] && echo "::add-mask::$APP3_COMPANY_PASSWORD"
+          [ -n "$SELECTED_COMPANY_CODE" ] && echo "::add-mask::$SELECTED_COMPANY_CODE"
+          [ -n "$SELECTED_COMPANY_PASSWORD" ] && echo "::add-mask::$SELECTED_COMPANY_PASSWORD"
 
       - name: Run daily smoke tests
         run: |
@@ -117,17 +137,40 @@ jobs:
 
           FAILED_TESTS=$(grep -E "^(FAILED|ERROR) " test-results/ci-test-output.log 2>/dev/null \
             | head -5 | sed 's/^/- /' || true)
+          FAILED_TEST=$(printf '%s' "$FAILED_TESTS" | head -1 | sed -E 's/^- (FAILED|ERROR) //; s/ - .*$//' || true)
+          ERROR_LINE=$(printf '%s' "$FAILED_TESTS" | head -1 | sed -E 's/^- (FAILED|ERROR) [^ ]+ - //' || true)
 
           COMMIT_SHORT=$(printf '%s' "$GITHUB_SHA" | cut -c1-7)
-          MESSAGE=$(printf 'Daily Smoke Tests %s\nRepository: %s\nBranch: %s\nCommit: %s\nScope: %s\nTarget: %s\nServer: %s\nTriggered by: %s (%s)\nSummary: %s\nRun: %s' \
-            "$STATUS_TEXT" "$GITHUB_REPOSITORY" "$BRANCH" "$COMMIT_SHORT" "$TEST_SCOPE" "$TEST_TARGET" "$TEST_SERVER_URL" "$ACTOR" "$EVENT_NAME" "$SUMMARY" "$RUN_URL")
+          MESSAGE=$(printf 'Daily Smoke Tests %s\n\nServer: %s\nScope: %s\nTarget: %s\nCompany: %s\nSummary: %s\n\nRun: %s' \
+            "$STATUS_TEXT" "$TEST_SERVER_URL" "$TEST_SCOPE" "$TEST_TARGET" "$TEST_COMPANY_SOURCE" "$SUMMARY" "$RUN_URL")
 
-          if [ -n "$FAILED_TESTS" ]; then
-            MESSAGE=$(printf '%s\n\nFailed tests:\n%s' "$MESSAGE" "$FAILED_TESTS")
+          if [ -n "$FAILED_TEST" ]; then
+            MESSAGE=$(printf '%s\n\nFailed test:\n%s' "$MESSAGE" "$FAILED_TEST")
           fi
+          if [ -n "$ERROR_LINE" ]; then
+            MESSAGE=$(printf '%s\n\nError:\n%s' "$MESSAGE" "$ERROR_LINE")
+          fi
+          MESSAGE=$(printf '%s\n\nArtifacts:\nOpen run link -> daily-smoke-test-results' "$MESSAGE")
 
           curl --fail-with-body -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
             --data-urlencode "text=${MESSAGE}" \
             --data-urlencode "disable_web_page_preview=true" \
             || echo "Telegram notification failed."
+
+          if [ "$JOB_STATUS" != "success" ]; then
+            SCREENSHOT=$(find test-results -type f -name "*.png" 2>/dev/null | sort | tail -1 || true)
+            if [ -n "$SCREENSHOT" ]; then
+              curl --fail-with-body -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto" \
+                -F "chat_id=${TELEGRAM_CHAT_ID}" \
+                -F "caption=Failed screenshot" \
+                -F "photo=@${SCREENSHOT}" \
+                || echo "Telegram screenshot upload failed."
+            else
+              curl --fail-with-body -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+                --data-urlencode "text=Failed screenshot topilmadi. Trace/log artifact ichida bo'lishi mumkin." \
+                --data-urlencode "disable_web_page_preview=true" \
+                || echo "Telegram screenshot-missing notification failed."
+            fi
+          fi

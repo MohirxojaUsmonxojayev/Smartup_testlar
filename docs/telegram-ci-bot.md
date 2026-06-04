@@ -33,8 +33,22 @@ Test hali davom etyapti... 5 daqiqa bo'ldi
 Test tugadi: SUCCESS
 ```
 
-Workflow tugagach `.github/workflows/daily-smoke.yml` ham yakuniy test summary
-xabarini Telegramga yuboradi.
+Test jarayonda bo'lsa, yangi `/run` boshlanmaydi. Bot mavjud runni ko'rsatadi:
+
+```text
+Hozir test jarayonda.
+
+Server: https://app3.greenwhite.uz/xtrade
+Scope: smoke
+Company: APP3 secrets
+Run: https://github.com/turgunovjasur/Playwright/actions/runs/...
+
+Test tugagach /run yana ishlaydi.
+```
+
+Workflow tugagach `.github/workflows/daily-smoke.yml` yakuniy test summary
+xabarini Telegramga yuboradi. Failed bo'lsa oxirgi screenshot ham yuboriladi,
+screenshot topilmasa artifact linki beriladi.
 
 ## Commands
 
@@ -44,12 +58,12 @@ xabarini Telegramga yuboradi.
 /help
 ```
 
-Company code/password botdan so'ralmaydi. Ular GitHub Actions secrets orqali
-olinadi:
+Company code/password botdan so'ralmaydi. Ular tanlangan serverga qarab GitHub
+Actions secrets orqali olinadi:
 
 ```text
-SMARTUP_COMPANY_CODE
-SMARTUP_COMPANY_PASSWORD
+smartup.online -> SMARTUP_COMPANY_CODE / SMARTUP_COMPANY_PASSWORD
+app3.greenwhite.uz/xtrade -> APP3_COMPANY_CODE / APP3_COMPANY_PASSWORD
 ```
 
 ## Required Environment Variables

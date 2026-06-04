@@ -83,6 +83,11 @@ allure serve test-results/allure-results
 - `scripts/run_tests.py` report/trace viewerlarni faqat `--open-report` yoki `--show-trace` bo'lsa ochadi.
 - Directory/default collectionda runner bo'lmagan smoke testlar duplicate flow bo'lmasligi uchun deselect qilinadi; kerak bo'lsa `--include-leaf-tests` ishlatiladi.
 
+## Loyiha Xususiyatlari
+
+### Telegram CI bot
+- Telegram CI botda bir vaqtning o'zida faqat bitta test run faol bo'ladi; run tugaguncha yangi `/run` bloklanadi.
+
 ## Test dependency modeli
 
 - User setup testlari ketma-ket va bir-biriga bog'liq: oldingi setup test keyingi setup test uchun kerakli entity yaratadi.
