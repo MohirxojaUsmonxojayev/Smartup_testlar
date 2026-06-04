@@ -8,6 +8,21 @@ from utils.base_page import BasePage
 
 # ----------------------------------------------------------------------------------------------------------------------
 
+
+def _order_grid_row(page, row_text):
+    row = page.locator("b-grid .tbl-row").filter(has_text=row_text).first
+    expect(row).to_be_visible()
+    return row
+
+
+def _ensure_order_grid_row_open(page, row_text):
+    row = _order_grid_row(page, row_text)
+    if "open" not in (row.get_attribute("class") or "").split():
+        row.click()
+    expect(row.locator(".tbl-row-menu")).to_be_visible()
+    return row
+
+
 def flow_open_order_list(page):
     navigate_to(page, tab="Продажа", name="Заказы")
     expect(page).to_have_url(re.compile(r".*/order_list"))
@@ -27,27 +42,29 @@ def flow_order_list(page, add=False, find_row=None, view=False, edit=False, stat
 
     if find_row:
         with allure.step(f"Order List: find_row -> '{find_row}'"):
-            page.locator("b-grid .tbl-row").filter(has_text=find_row).first.click()
+            row = _ensure_order_grid_row_open(page, find_row)
+    else:
+        row = None
 
     if view:
         with allure.step("Order List: 'Просмотреть' button click"):
-            page.get_by_role("button", name="Просмотреть", exact=True).click()
+            button_scope = row or page
+            button_scope.get_by_role("button", name="Просмотреть", exact=True).click()
 
     if edit:
         with allure.step("Order List: 'Изменить' button click"):
-            page.get_by_role("button", name="Изменить", exact=True).click()
+            button_scope = row or page
+            button_scope.get_by_role("button", name="Изменить", exact=True).click()
 
     if status:
         with allure.step("Order List: 'Изменить статус' button click"):
-            page.get_by_role("button", name="Изменить статус", exact=True).click()
+            button_scope = row or page
+            button_scope.get_by_role("button", name="Изменить статус", exact=True).click()
 
             flow_modal.dialog_status(page)
 
             page.get_by_role("link", name=status).click()
-            expect(page.locator("#biruniConfirm")).to_contain_text(f"Изменить на {status}?")
-            expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-            page.locator("#biruniConfirm").get_by_role("button", name="да", exact=True).click()
-            page.locator("#biruniConfirm").wait_for(state="hidden")
+            BasePage(page).confirm_biruni(f"Изменить на {status}?")
             BasePage(page).wait_for_loader()
 
             if page.locator("#dropdown").count() > 0:

@@ -6,8 +6,7 @@ pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("Secto
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@allure.title("TMC to'plami (sector) yaratish")
-def test_sector(page: Page, code) -> None:
+def run_sector(page: Page, code, scope: str = "smoke") -> None:
     with allure.step("1 - TMC to'plamlari ro'yxatiga o'tish"):
         navigate_to(page, tab="Справочники", name="ТМЦ")
         expect(page.get_by_role("heading")).to_contain_text("ТМЦ")
@@ -29,3 +28,7 @@ def test_sector(page: Page, code) -> None:
         expect(page.locator("b-grid")).to_contain_text(f"sector-pw{code}")
 
 # ----------------------------------------------------------------------------------------------------------------------
+
+@allure.title("TMC to'plami (sector) yaratish")
+def test_sector(page: Page, code, test_scope) -> None:
+    run_sector(page, code, scope=test_scope)

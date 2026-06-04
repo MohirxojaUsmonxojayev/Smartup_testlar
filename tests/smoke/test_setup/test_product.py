@@ -1,13 +1,13 @@
 import allure
 from playwright.sync_api import Page, expect
 from tests.smoke.flows.flow_navigate import navigate_to
+from utils.base_page import BasePage
 
 pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("Product")]
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@allure.title("Mahsulot (TMC) yaratish va narx belgilash")
-def test_product(page: Page, code) -> None:
+def run_product(page: Page, code, scope: str = "smoke") -> None:
     with allure.step("1 - TMC ro'yxatiga o'tish"):
         navigate_to(page, tab="Справочники", name="ТМЦ")
         expect(page.get_by_role("heading")).to_contain_text("ТМЦ")
@@ -33,10 +33,12 @@ def test_product(page: Page, code) -> None:
         expect(page.get_by_role("heading")).to_contain_text("ТМЦ (установка цен)")
         page.locator("b-pg-grid").get_by_role("textbox").fill("7000")
         page.get_by_role("button", name="Сохранить").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text("Сохранить?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да").click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni("Сохранить?")
+        BasePage(page).wait_for_loader()
         expect(page.get_by_role("heading")).to_contain_text("ТМЦ")
 
 # ----------------------------------------------------------------------------------------------------------------------
+
+@allure.title("Mahsulot (TMC) yaratish va narx belgilash")
+def test_product(page: Page, code, test_scope) -> None:
+    run_product(page, code, scope=test_scope)

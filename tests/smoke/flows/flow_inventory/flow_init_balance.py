@@ -27,18 +27,12 @@ def flow_create_initial_balance(
 
     with allure.step("Inventory: boshlang'ich qoldiqni saqlash"):
         page.get_by_role("button", name="Сохранить").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text("Сохранить?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да").click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni("Сохранить?")
         expect(page.get_by_role("heading")).to_contain_text("Ввод начальных остатков ТМЦ")
 
     with allure.step("Inventory: boshlang'ich qoldiq hujjatini o'tkazish"):
         page.locator("#kt_content").get_by_text(document_number, exact=True).click()
         page.get_by_role("button", name="Провести").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text(f"Провести документ № {document_number}?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да", exact=True).click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni(f"Провести документ № {document_number}?")
         BasePage(page).wait_for_loader()
         expect(page).to_have_url(re.compile(r".*/init_inventory_balance_list"))

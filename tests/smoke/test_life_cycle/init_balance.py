@@ -2,13 +2,13 @@ import allure
 from playwright.sync_api import Page, expect
 from tests.smoke.flows.flow_authorization import authorization_user
 from tests.smoke.flows.flow_navigate import navigate_to
+from utils.base_page import BasePage
 
 pytestmark = [allure.epic("Smoke"), allure.feature("Life Cycle"), allure.story("Init Balance")]
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@allure.title("Boshlang'ich qoldiqlarni kiritish va o'tkazish")
-def test_init_balance(page: Page, code) -> None:
+def run_init_balance(page: Page, code, scope: str = "smoke") -> None:
     with allure.step("1 - Foydalanuvchi sifatida kirish va sahifani ochish"):
         authorization_user(page, code)
         navigate_to(page, tab="Склад", name="Ввод начальных остатков ТМЦ")
@@ -25,19 +25,13 @@ def test_init_balance(page: Page, code) -> None:
 
     with allure.step("3 - Saqlash va tasdiqlash"):
         page.get_by_role("button", name="Сохранить").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text("Сохранить?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да").click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni("Сохранить?")
         expect(page.get_by_role("heading")).to_contain_text("Ввод начальных остатков ТМЦ")
 
     with allure.step("4 - Hujjatni o'tkazish (провести)"):
         page.get_by_text(f"{code}", exact=True).click()
         page.get_by_role("button", name="Провести").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text(f"Провести документ № {code}?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да", exact=True).click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni(f"Провести документ № {code}?")
 
     with allure.step("5 - Provodkalarni tekshirish (miqdor va summa)"):
         page.locator("#kt_content").get_by_text(f"{code}").click()
@@ -48,3 +42,7 @@ def test_init_balance(page: Page, code) -> None:
         expect(page2.get_by_role("rowgroup")).to_contain_text("500 000")
 
 # ----------------------------------------------------------------------------------------------------------------------
+
+@allure.title("Boshlang'ich qoldiqlarni kiritish va o'tkazish")
+def test_init_balance(page: Page, code, test_scope) -> None:
+    run_init_balance(page, code, scope=test_scope)

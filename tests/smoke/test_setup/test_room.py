@@ -1,6 +1,6 @@
 import allure
 from playwright.sync_api import Page, expect
-from tests.smoke.flows.flow_authorization import authorization, COMPANY_CODE, USER_PASS
+from tests.smoke.flows.flow_authorization import authorization, USER_PASS, user_email_for
 from tests.smoke.flows.flow_navigate import navigate_to, switch_filial
 from utils.base_page import BasePage
 
@@ -8,8 +8,17 @@ pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("Room"
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@allure.title("Ish zonasi yaratish")
-def test_room(page: Page, code) -> None:
+def _select_grid_checkall(page: Page, grid_name: str) -> None:
+    grid = page.locator(f'b-grid[name="{grid_name}"]')
+    expect(grid).to_be_visible()
+    checkbox = grid.locator("input[bcheckall]").first
+    if checkbox.count() == 0:
+        checkbox = grid.locator('input[type="checkbox"]').first
+    BasePage(page).set_checkbox(checkbox, checked=True)
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+def run_room(page: Page, code, scope: str = "smoke") -> None:
     with allure.step("1 - Ish zonalari ro'yxatiga o'tish"):
         switch_filial(page, name=f"filial-pw{code}")
         navigate_to(page, tab="Справочники", name="Рабочие зоны")
@@ -30,10 +39,9 @@ def test_room(page: Page, code) -> None:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@allure.title("Ish zonasiga to'lov, sklad, kassa va mijoz ulash")
-def test_room_attachment(page: Page, code) -> None:
+def run_room_attachment(page: Page, code, scope: str = "smoke") -> None:
     with allure.step("1 - Foydalanuvchi sifatida kirish va ish zonasini ochish"):
-        authorization(page, email=f"user-pw{code}{COMPANY_CODE}", password=USER_PASS)
+        authorization(page, email=user_email_for(code), password=USER_PASS)
         navigate_to(page, tab="Справочники", name="Рабочие зоны")
         expect(page.get_by_role("heading")).to_contain_text("Рабочие зоны")
         page.get_by_text(f"room-pw{code}").click()
@@ -45,13 +53,9 @@ def test_room_attachment(page: Page, code) -> None:
         expect(page.locator("b-page")).to_contain_text("Типы оплат")
         page.get_by_role("button", name="Доступные").click()
         BasePage(page).wait_for_loader()
-        page.locator('(//b-grid[@name="table_payment_type"]//label)[1]').dispatch_event("click")
-        expect(page.locator('(//b-grid[@name="table_payment_type"]//input[@type="checkbox"])[1]')).to_be_checked()
+        _select_grid_checkall(page, "table_payment_type")
         page.get_by_role("button", name="Прикрепить").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text("Прикрепить 4?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да", exact=True).click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni("Прикрепить 4?")
         expect(page.locator("b-page")).to_contain_text("нет данных")
 
     with allure.step("3 - Skladni ulash"):
@@ -59,13 +63,9 @@ def test_room_attachment(page: Page, code) -> None:
         expect(page.locator("b-page")).to_contain_text("Склады")
         page.get_by_role("button", name="Доступные").click()
         BasePage(page).wait_for_loader()
-        page.locator('(//b-grid[@name="table_warehouse"]//label)[1]').dispatch_event("click")
-        expect(page.locator('(//b-grid[@name="table_warehouse"]//input[@type="checkbox"])[1]')).to_be_checked()
+        _select_grid_checkall(page, "table_warehouse")
         page.get_by_role("button", name="Прикрепить").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text("Прикрепить 1?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да", exact=True).click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni("Прикрепить 1?")
         expect(page.locator("b-page")).to_contain_text("нет данных")
 
     with allure.step("4 - Kassani ulash"):
@@ -73,13 +73,9 @@ def test_room_attachment(page: Page, code) -> None:
         expect(page.locator("b-page")).to_contain_text("Кассы")
         page.get_by_role("button", name="Доступные").click()
         BasePage(page).wait_for_loader()
-        page.locator('(//b-grid[@name="table_cashbox"]//label)[1]').dispatch_event("click")
-        expect(page.locator('(//b-grid[@name="table_cashbox"]//input[@type="checkbox"])[1]')).to_be_checked()
+        _select_grid_checkall(page, "table_cashbox")
         page.get_by_role("button", name="Прикрепить").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text("Прикрепить 1?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да", exact=True).click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni("Прикрепить 1?")
         expect(page.locator("b-page")).to_contain_text("нет данных")
 
     with allure.step("5 - Mijozni ulash"):
@@ -88,9 +84,7 @@ def test_room_attachment(page: Page, code) -> None:
         page.get_by_role("button", name="Доступные").click()
         page.get_by_text(f"natural_client-pw{code}").click()
         page.get_by_role("button", name="Прикрепить").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text(f"Прикрепить natural_client-pw{code}?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.get_by_role("button", name="да", exact=True).click()
+        BasePage(page).confirm_biruni(f"Прикрепить natural_client-pw{code}?")
         page.get_by_role("button", name="Прикрепленные").click()
         expect(page.locator("b-page")).to_contain_text(f"natural_client-pw{code}")
 
@@ -99,3 +93,12 @@ def test_room_attachment(page: Page, code) -> None:
         expect(page.get_by_role("heading")).to_contain_text("Рабочие зоны")
 
 # ----------------------------------------------------------------------------------------------------------------------
+
+@allure.title("Ish zonasi yaratish")
+def test_room(page: Page, code, test_scope) -> None:
+    run_room(page, code, scope=test_scope)
+
+
+@allure.title("Ish zonasiga to'lov, sklad, kassa va mijoz ulash")
+def test_room_attachment(page: Page, code, test_scope) -> None:
+    run_room_attachment(page, code, scope=test_scope)

@@ -1,6 +1,7 @@
 import random
 
 import allure
+import pytest
 from faker import Faker
 from playwright.sync_api import Page, expect
 
@@ -14,11 +15,15 @@ from tests.smoke.flows.flow_contract.flow_contract_add import (
 )
 from tests.smoke.flows.flow_contract.flow_contract_list import flow_contract_list, flow_open_contract_list
 
-pytestmark = [allure.epic("A Group"), allure.feature("Order Preconditions"), allure.story("Contract")]
+pytestmark = [
+    pytest.mark.smoke_group("A"),
+    allure.epic("A Group"),
+    allure.feature("Order Preconditions"),
+    allure.story("Contract"),
+]
 
 
-@allure.title("A Group: Zakaz uchun UZS contract yaratish")
-def test_a_group_create_order_contract(page: Page, code: str, save_data) -> None:
+def run_a_group_create_order_contract(page: Page, code: str, save_data, scope: str = "smoke", login: bool = True) -> None:
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -31,9 +36,10 @@ def test_a_group_create_order_contract(page: Page, code: str, save_data) -> None
     """
     contract_code = f"contract_code_{random.randint(1000, 9999)}"
 
-    with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-        authorization_user(page, code)
-        expect(page.get_by_role("heading", name="Trade")).to_be_visible()
+    if login:
+        with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
+            authorization_user(page, code)
+            expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - Finans > Dоговоры ro'yxati ochiladi"):
         flow_open_contract_list(page)
@@ -60,12 +66,11 @@ def test_a_group_create_order_contract(page: Page, code: str, save_data) -> None
         flow_contract_close_view(page)
 
     with allure.step("9 - Contract code va name keyingi A-group/order testlari uchun saqlanadi"):
-        save_data("contract_code", contract_code)
-        save_data("contract_name", contract_name)
+        save_data("a_group_contract_code", contract_code)
+        save_data("a_group_contract_name", contract_name)
 
 
-@allure.title("A Group: Tip oplati sharti bilan zakaz contract yaratish")
-def test_a_group_create_order_contract_with_payment_type(page: Page, code: str, save_data) -> None:
+def run_a_group_create_order_contract_with_payment_type(page: Page, code: str, save_data, scope: str = "smoke", login: bool = True) -> None:
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -78,9 +83,10 @@ def test_a_group_create_order_contract_with_payment_type(page: Page, code: str, 
     """
     contract_code = f"contract_payment_type_{random.randint(1000, 9999)}"
 
-    with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-        authorization_user(page, code)
-        expect(page.get_by_role("heading", name="Trade")).to_be_visible()
+    if login:
+        with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
+            authorization_user(page, code)
+            expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - Finans > Договоры ro'yxati ochiladi"):
         flow_open_contract_list(page)
@@ -120,6 +126,16 @@ def test_a_group_create_order_contract_with_payment_type(page: Page, code: str, 
         flow_contract_close_view(page)
 
     with allure.step("7 - Tip oplati contract ma'lumotlari saqlanadi"):
-        save_data("contract_payment_type_code", contract_code)
-        save_data("contract_payment_type_name", contract_name)
-        save_data("contract_payment_type", "Перечисление")
+        save_data("a_group_contract_payment_type_code", contract_code)
+        save_data("a_group_contract_payment_type_name", contract_name)
+        save_data("a_group_contract_payment_type", "Перечисление")
+
+
+@allure.title("A Group: Zakaz uchun UZS contract yaratish")
+def test_a_group_create_order_contract(page: Page, code: str, save_data, test_scope) -> None:
+    run_a_group_create_order_contract(page, code, save_data, scope=test_scope)
+
+
+@allure.title("A Group: Tip oplati sharti bilan zakaz contract yaratish")
+def test_a_group_create_order_contract_with_payment_type(page: Page, code: str, save_data, test_scope) -> None:
+    run_a_group_create_order_contract_with_payment_type(page, code, save_data, scope=test_scope)

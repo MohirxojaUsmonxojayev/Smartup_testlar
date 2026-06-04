@@ -6,7 +6,7 @@ Tags: smoke, setup, runner, dependency, data-store, license, balance, tmc, room,
 
 ### 2026-05-25 Run Natijasi
 Tags: smoke, run-result, sandbox
-- Buyruq: `./.venv/bin/pytest tests/smoke/test_smoke_runner.py -v --tb=short`
+- Buyruq: `./.venv/bin/pytest tests/smoke/test_all_runner.py -v --tb=short`
 - Natija: 21 passed, 0 failed, umumiy vaqt 196.22s.
 - Session code: `1384`; `test_01_authorization` `test-results/data/data_store.json` ichidagi `code` qiymatini yangiladi.
 - `data_store.json` ichidagi A-group `contract_*` va `order_id` qiymatlari bu runnerda yangilanmadi; ular avvalgi run code qiymatlariga tegishli bo'lishi mumkin.
@@ -15,20 +15,51 @@ Tags: smoke, run-result, sandbox
 
 ### Runner Qoidasi
 Tags: smoke, setup, dependency, data-store
-- `tests/smoke/test_smoke_runner.py` ichidagi testlar bitta `session_page` bilan ketma-ket ishlaydi; UI state va login holati testlar orasida saqlanadi.
-- `code` fixture full runnerda yangi random 4 xonali qiymat beradi; yakka testlarda `test-results/data/data_store.json` dan o'qiladi.
+- `tests/smoke/test_all_runner.py` barcha runnerlarni jamlaydi: user setup, keyin A/B/... group runnerlar.
+- Umumiy runner pytest `test_*` funksiyalarini import qilib chaqirmaydi; runnerlar `run_*_chain` va biznes `run_*` funksiyalarini setup -> A -> B -> ... tartibida chaqiradi.
+- `tests/smoke/test_setup/test_setup_runner.py` ichidagi testlar bitta `session_page` bilan ketma-ket ishlaydi; UI state va login holati testlar orasida saqlanadi.
+- `00 - Company` productiondan boshqa barcha `COMPANY_URL`larda default setup boshida ishlaydi; `COMPANY_URL=https://smartup.online` bo'lsa skip bo'ladi.
+- Company testi run bo'lsa, `data_store.json`ga saqlangan `company_code` keyingi loginlarda `.env`dagi `COMPANY_CODE` o'rniga ishlatiladi; production runlarda stale `company_code` tozalanadi.
+- Yangi company license sotib olishi uchun head viewda `Активация для лицензии` tabida activation kerak; `COMPANY_ACTIVATION_CODE` env berilsa company test shu tabdagi `Код активации`ni to'ldirib `Активация` qiladi, berilmasa `Buy License` qadamida `Компания не активирована` aniq xabar bilan to'xtaydi.
+- Non-production full runnerda A/B group loginlari ham yaratilgan `company_code`ni ishlatadi; setup zanjirida user/role/password/license kabi user login precondition qadamlari o'chirilgan bo'lsa `user-pw{code}@<company_code>` yaratilmaydi va group login `login.html`da qolib ketadi.
+- Har bir group boshida user bir marta login qiladi; group ichidagi test/flowlar shu oynada davom etadi va group tugaganda yoki failed/skip bo'lganda fixture oynani yopadi.
+- Full runnerda har group uchun alohida `group_page` ochiladi; alohida group runner faylida testlar `group_user_page` module-scoped fixture bilan bitta login/page ishlatadi.
+- Har bir group runner ichida `*_GROUP_TEST_SCENARIO` ko'rinishida group-level test ssenariy yoziladi va `run_*_group_chain` uni Allure description'ga beradi; foydalanuvchi group qaysi biznes ssenariyni qamrab olishini runnerdan ko'rishi kerak.
+- `code` fixture full/setup runnerda yoki `--new-code` bilan yangi random 4 xonali qiymat beradi; yakka/group debugda `--reuse-code` yoki default orqali `test-results/data/data_store.json` dan o'qiladi.
 - `test_01_authorization` `save_data("code", code)` orqali yangi code ni keyingi yakka/debug testlar uchun saqlaydi.
 - Smoke runner `data_store.json` ni tozalab qayta yaratmaydi; faqat `code` yozadi. Shu sabab group testlardan qolgan eski `contract_*` yoki `order_id` qiymatlarini smoke setupning hozirgi code qiymati bilan bir xil deb qabul qilmaslik kerak.
 - Setup zanjiri buzilsa keyingi testlar ham precondition yo'qligi sabab yiqilishi mumkin; yakka testdan oldin to'liq runner yoki mos precondition ma'lumotlari kerak.
+- Directory/default collection duplicate business flow yurmasligi uchun default holatda faqat mos runner fayllarini qoldiradi; leaf testlarni collect qilish kerak bo'lsa `--include-leaf-tests` ishlatiladi.
+- Cross-platform asosiy run: `python scripts/run_tests.py --url {server_url}`; Mac/Linux wrapper: `./run_tests.sh --url {server_url}`.
+- Runner debug mode'lari: `all`, `setup`, `company`, `group-a`, `group-b`; foydalanuvchi odatda bo'laklarga bo'lib run qilmaydi, normal run doim full suite.
+- Test scope mode global bo'ladi: all/setup/group runnerlar smoke yoki regression mode bilan yuradi va bu mode `run_*_chain` -> `run_*` flowlarga uzatiladi.
+- Yangi testlar bitta biznes flow ichida ikki scope bilan yoziladi: smoke branch minimal data va asosiy list/assertlar, regression branch optional data, kengroq tab/view assertlar va edge case tekshiruvlarni bajaradi.
+
+### Smoke/Regression Scope Arxitekturasi
+Tags: smoke, regression, scope, runner, write-test, data-store
+- Scope butun suite uchun global: `scripts/run_tests.py` default `smoke`, `--regression` yoki `--scope regression` esa pytestga `--scope <mode>` qilib uzatiladi; pytestda `test_scope` fixture shu qiymatni qaytaradi.
+- Scope berilmasa default `smoke`; pytest bevosita yurgizilganda `--scope=regression` yoki env `TEST_SCOPE=regression` ishlatiladi.
+- Runnerlar `test_scope` ni chain funksiyalarga uzatadi: `test_all_runner.py` -> `run_setup_chain/run_*_group_chain` -> biznes `run_*` funksiyalar. Yangi runner/testlarda ham shu propagation buzilmasin.
+- Bitta testni alohida smoke va regression faylga bo'lma; bitta `run_*` funksiyada `scope: str = "smoke"` parametr bo'lsin, smoke va regression branchlar shu parametr bilan ajralsin.
+- Smoke branch minimal bo'ladi: formaning yurishi uchun kerakli majburiy maydonlar, downstream uchun zarur data-store keylar, save, listdagi asosiy `code/name/status` tekshiruvlar.
+- Regression branch foydalanuvchi aytganda `full` ma'nosini beradi: real add formadagi mavjud barcha muhim input/switch/tab/modal maydonlar to'ldiriladi, Faker bilan mantiqli real qiymatlar ishlatiladi, kerakli dependency entitylar yaratiladi, list va view tekshiriladi.
+- Regression view tekshiruvi faqat view ochilganini ko'rish emas: addda yozilgan qiymatlar viewdagi mos card/tablarda ko'rinishini tekshir; formaga xos product/module/permission tablari bo'lsa ularning holatini ham tekshir.
+- Hech qachon add form fieldlarini taxmin qilib yozma. Regression qilishdan oldin browserda real forma ochiladi, screenshot va field state olinadi, keyin `smartup-guide/references/forms/<form-slug>.md` va `screenshots/<form-slug>/` yangilanadi.
+- Data store smoke va regressionda toza ajratilsin: smoke faqat keyingi testlarga kerak minimal keylarni yozadi va regression-only keylarni stale bo'lib qolmasligi uchun `None`/null bilan tozalaydi; regression qo'shimcha view/list assertlar uchun kerak bo'lgan hamma muhim keylarni saqlaydi.
+- Scope ishidan keyin kamida tegishli runner ikki mode bilan tekshiriladi: `python scripts/run_tests.py --url <server_url>` va `python scripts/run_tests.py --url <server_url> --regression`.
 
 ### Entity Naming
 Tags: smoke, entity, naming
-- Legal person: `cod_lg_pw{code}` / `legal_person-pw{code}`.
+- Company server code: `autotest{code}`; login suffix sifatida `@autotest{code}` ishlatiladi.
+- Legal person: `cod_lg_pw{code}` / Faker company name + `legal_person-pw{code}` suffix.
+- Legal person owner: `cod_owner_lg_pw{code}` / Faker company name + `legal_owner-pw{code}` suffix.
+- Legal person director: `director_np_pw{code}` natural person, Faker F.I.O.
+- Legal person contact position: `contact_position_pw{code}` / `Директор по развитию-pw{code}`.
 - Filial/organization: `filial-pw{code}`; yuridik shaxs `cod_lg_pw{code}` ga ulanadi.
 - Room/work zone: `code_room_pw{code}` / `room-pw{code}`.
 - Robot/staff: `code_robot-pw{code}` / `robot-pw{code}`.
 - Employee natural person: `natural_person-pw{code}`.
-- User: `user-pw{code}{COMPANY_CODE}`; password `USER_PASSWORD`.
+- User: `user-pw{code}@<active_company_code>`; active company code company testi yaratgan `company_code`, bo'lmasa `.env COMPANY_CODE`; password `USER_PASSWORD`.
 - Price type: `code_price_type_uzb_pw{code}` / `Price Type UZB-pw{code}`.
 - Sector/TMC set: `code_sector_pw{code}` / `sector-pw{code}`.
 - Product/TMC: `code_product-pw{code}` / `product-pw{code}`; price `7000`.
@@ -37,26 +68,44 @@ Tags: smoke, entity, naming
 
 ## Testlar Tartibi Va Vazifasi
 
+### 00 Company
+Tags: company, setup, head, data-store
+- Fayl: `tests/smoke/test_setup/test_company.py`.
+- Ishga tushirish: non-production `COMPANY_URL` bilan default runlarda avtomatik ishlaydi.
+- Production guard: `COMPANY_URL=https://smartup.online` bo'lsa `admin@head` bilan company yaratish ishlatilmaydi.
+- Login: `admin@head` / `greenwhite`.
+- Navigation: `Главное` -> `Компании`.
+- Nima qiladi: `Код сервера` sifatida `autotest{code}` kiritadi, visible required maydonlarni minimal to'ldiradi, Products card ichida `trade` va child productlarni yoqadi, saqlaydi va listda code bo'yicha tekshiradi.
+- License activation: company viewdagi `Активация для лицензии` tabini ochadi. `COMPANY_ACTIVATION_CODE` bo'lsa `Код активации`ni kiritib `Активация` qiladi; bo'lmasa attachmentga activation code kerakligini yozadi.
+- Nima saqlaydi: `company_code`.
+
 ### 01 Authorization
 Tags: authorization, data-store
-- Fayl/flow: `tests/smoke/test_smoke_runner.py`, `tests/smoke/flows/flow_authorization.py`.
+- Fayl/flow: `tests/smoke/test_setup/test_setup_runner.py`, `tests/smoke/flows/flow_authorization.py`.
 - Nima qiladi: admin sifatida login qiladi va `Trade` dashboard headingini kutadi.
-- Nima saqlaydi: session `code` qiymatini `data_store.json` ga yozadi.
+- Nima saqlaydi: session `code` qiymatini `data_store.json` ga yozadi; company setup ishlamagan bo'lsa stale `company_code`ni `null` qiladi.
 
 ### 02 Legal Person
-Tags: legal-person, setup
+Tags: legal-person, setup, owner, director, data-store
 - Fayl: `tests/smoke/test_setup/test_legal_person.py`.
 - Navigation: `Справочники` -> `Юридические лица`.
-- Nima yaratadi: `cod_lg_pw{code}` kodli, `legal_person-pw{code}` nomli yuridik shaxs.
-- Tekshiruv: ro'yxatda code va nom search orqali ko'rinadi; save uchun `#biruniConfirm` modalida `да` bosiladi.
+- Smoke: minimal branch. Faqat `cod_lg_pw{code}` va `legal_person-pw{code}` uchun asosiy maydonlar to'ldiriladi, saqlanadi va listda `Код`, `Название`, `Активный` tekshiriladi.
+- Regression: to'liq branch. Avval `Собственник` (`cod_owner_lg_pw{code}`), `Руководитель` (`director_np_pw{code}`) va `contact_position_pw{code}` yaratiladi, so‘ng asosiy legal personga bog'lanadi. `Собственник`, `Руководитель`, `GPS`, bank, kontakt, qo'shimcha tablar to'ldiriladi.
+- GPS: map modalida `41.2994958,69.2400734` search qilib `d.latlng=41.2994958,69.2400734,12` saqlanadi.
+- Bank account: `МФО=00001` yozib `Tab` bosilganda bank auto-fill `Центр расчетов Центрального банка по г. Ташкенту`; valyuta `Узбекский сум`.
+- Data store: smoke rejimda `legal_person_code/name` va regression uchun owner/director/accountant, `tin`, `phone`, `email`, `region`, `gps`, bank account va contact person/lavozim qiymatlari saqlanadi (smoke branch uchun regression-only kalitlar nullga o'chiriladi).
+- Tekshiruv: smoke mode ro'yxatda `Код`, `Название`, `Активный`ni tekshiradi. Regression mode qo'shimcha:
+  - ro'yxatda `Альтернативное название` ham ko'rinadi;
+  - viewda `Основная информация`, `Дополнительная информация`, `Расчетный счет`, `Контактные лица` tablaridagi qo'shilgan qiymatlar tekshiriladi.
 
 ### 03 Filial
 Tags: filial, organization, legal-person
 - Fayl: `tests/smoke/test_setup/test_filial.py`.
 - Navigation: `Главное` -> `Организации`.
-- Nima yaratadi: `filial-pw{code}` tashkilot/filial.
-- Bog'lanish: valyuta `Узбекский сум`, yuridik shaxs `cod_lg_pw{code}`.
-- Tekshiruv: ro'yxatda filial va legal person code ko'rinadi; keyin sahifa reload va loader kutish bor.
+- Smoke: minimal branch. `filial-pw{code}` tashkilot yaratiladi, valyuta `Узбекский сум` va `cod_lg_pw{code}` yuridik shaxs bilan ulanadi.
+- Regression: qo'shimcha tekshiruv: row click + `Просмотреть` orqali view ochiladi; viewda filial nomi, valyuta, status (`Активный`) va legal person code ko'riladi; agar `legal_person_name` data-store’da bo'lsa u ham tekshiriladi.
+- Har ikki rejimda: ro'yxatda filial va legal person code ni tekshirib, reload + loader kutiladi.
+- Data store: `filial_name`, `filial_code`, `filial_currency`, `filial_legal_person_code`, va agar mavjud bo'lsa `filial_legal_person_name` saqlanadi.
 
 ### 04 Room
 Tags: room, filial, work-zone
@@ -79,13 +128,13 @@ Tags: natural-person, employee
 - Precondition: `filial-pw{code}` filialiga o'tadi.
 - Navigation: `Справочники` -> `Физические лица`.
 - Nima yaratadi: xodim uchun `natural_person-pw{code}` jismoniy shaxs.
-- Tekshiruv: save confirmdan keyin ro'yxatda nom ko'rinadi.
+- Tekshiruv: save confirmdan keyin ro'yxatda nom va `Активный` status ko'rinadi; `Просмотр` viewda nom va status tekshiriladi.
 
 ### 07 User
 Tags: user, robot, natural-person
 - Fayl: `tests/smoke/test_setup/test_user.py`.
 - Navigation: `Главное` -> `Пользователи`.
-- Nima yaratadi: `user-pw{code}{COMPANY_CODE}` loginli user.
+- Nima yaratadi: `user-pw{code}@<active_company_code>` loginli user.
 - Bog'lanish: `robot-pw{code}` va `natural_person-pw{code}` ulanadi; password `USER_PASSWORD`.
 - Tekshiruv: user ro'yxatida natural person va login ko'rinadi.
 
@@ -93,7 +142,7 @@ Tags: user, robot, natural-person
 Tags: user, permissions, forms
 - Fayl: `tests/smoke/test_setup/test_user.py`.
 - Nima qiladi: user view ichida `Формы` sahifasini ochib `Формы`, `Отчеты`, `Накладные`, `Внешние системы` tablaridagi mavjud elementlarni userga ulaydi.
-- Muhim pattern: page size `1000` qilinadi, `BasePage.click_js()` orqali birinchi checkbox/select all bosiladi, `#biruniConfirm` orqali tasdiqlanadi.
+- Muhim pattern: page size `1000` qilinadi, `BasePage.click_first_visible_checkbox()` orqali real checkbox/select all bosiladi, `#biruniConfirm` orqali tasdiqlanadi.
 - Tekshiruv: har bo'limda `Доступные` ro'yxati `нет данных` bo'lishi kerak.
 
 ### 09 Role
@@ -112,7 +161,9 @@ Tags: role, forms, permissions
 ### 11 Buy License
 Tags: license, admin, balance
 - Fayl: `tests/smoke/test_setup/test_license.py`.
-- Nima qiladi: logout qilib admin sifatida qayta kiradi, `Администрирование` filialiga o'tadi, `Главное` -> `Лицензии` sahifasida balans musbatligini tekshiradi va `Smartup ERP` uchun 1 ta license sotib oladi.
+- Nima qiladi: logout qilib admin sifatida qayta kiradi, `Администрирование` filialiga o'tadi, `Главное` -> `Лицензии` sahifasida balans musbatligini tekshiradi va `Smartup ERP` uchun kerakli license sotib oladi.
+- Oyning boshida yoki shu oy uchun birinchi xaridda `Smartup ERP: Базовый пользователь (Обязательный)` alohida row chiqadi; bu rowda quantity `5` disabled/auto-filled bo'ladi, avval shu majburiy license olinadi, keyin oddiy `Smartup ERP: Базовый пользователь` rowdan 1 ta license olinadi. Shu oy keyingi runlarda majburiy row chiqmasligi mumkin.
+- Standalone `test_buy_license` blank `page` bilan boshlanishi mumkin; faol sessiya headeri ko'rinsa logout qilinadi, aks holda logout skip qilinib admin login qilinadi.
 - Kerakli ma'lumotlar: payer `AUTOTEST GWS`, contract `Договор № bn от 01.01.2025`, begin date today.
 - Log: balans musbat bo'lsa `Balans musbat — Success`, sotib olinsa `Litsenziya olindi`.
 
@@ -125,7 +176,7 @@ Tags: license, user
 ### 13 Change Password
 Tags: user, password
 - Fayl: `tests/smoke/test_setup/test_user.py`.
-- Nima qiladi: yangi `user-pw{code}{COMPANY_CODE}` login bilan kiradi; majburiy password change alert chiqishini kutadi.
+- Nima qiladi: yangi `user-pw{code}@<active_company_code>` login bilan kiradi; majburiy password change alert chiqishini kutadi.
 - Amaliyot: current/new/rewrite password maydonlariga `USER_PASSWORD` kiritib `Подтвердить` va confirm `да` bosadi.
 
 ### 14 Price Type
@@ -158,7 +209,7 @@ Tags: tmc, product, price
 Tags: natural-person, client
 - Fayl: `tests/smoke/test_setup/test_natural_person.py`.
 - Nima yaratadi: `natural_client-pw{code}` jismoniy shaxs, `Клиент` belgisi yoqiladi.
-- Tekshiruv: avval `Физические лица`, keyin `Клиенты` ro'yxatida ko'rinadi.
+- Tekshiruv: avval `Физические лица` list va `Просмотр` viewda nom/status tekshiriladi, keyin `Клиенты` ro'yxatida ko'rinadi.
 
 ### 19 Room Attachment
 Tags: room, payment-type, warehouse, cashbox, client

@@ -1,3 +1,5 @@
+import re
+
 import allure
 from tests.smoke.flows.flow_authorization import authorization, logout
 from tests.smoke.flows.flow_navigate import navigate_to, switch_filial
@@ -6,15 +8,87 @@ from playwright.sync_api import Page, expect, TimeoutError as PlaywrightTimeoutE
 
 pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("License")]
 
+MANDATORY_LICENSE_COUNT = "5"
+REGULAR_LICENSE_COUNT = "1"
+MANDATORY_LICENSE_ROW_RE = re.compile(r"Smartup ERP:\s*Базовый пользователь\s*\(Обязательный\)")
+REGULAR_LICENSE_ROW_RE = re.compile(r"Smartup ERP:\s*Базовый пользователь\s+За пользователя")
+
 # ----------------------------------------------------------------------------------------------------------------------
 
-@allure.title("Litsenziya sotib olish")
-def test_buy_license(page: Page, logger) -> None:
-    with allure.step("1 - Admin sifatida kirish va litsenziyalar sahifasiga o'tish"):
+def _logout_if_authenticated(page: Page, logger) -> None:
+    if page.locator(".btn.btn-icon.w-auto").is_visible():
         logout(page)
+    else:
+        logger.info("Faol sessiya topilmadi — logout o'tkazib yuborildi")
+
+
+def _prepare_license_purchase(page: Page, base_page: BasePage) -> None:
+    if not page.get_by_role("button", name="Купить").is_visible():
+        page.get_by_role("link", name="Покупка").click()
+
+    base_page.select_option(ng_model="purchase.payer.name", option_text="AUTOTEST GWS", clear=True)
+    base_page.select_option(ng_model="purchase.contract_name", option_text="Договор № bn от 01.01.2025", clear=True)
+    base_page.select_date(ng_model="purchase.begin_date", option="today")
+    base_page.wait_for_loader()
+
+
+def _optional_license_row(page: Page, row_name: re.Pattern, timeout=3_000):
+    row = page.get_by_role("row", name=row_name).first
+    try:
+        row.wait_for(state="visible", timeout=timeout)
+        return row
+    except PlaywrightTimeoutError:
+        return None
+
+
+def _license_row(page: Page, row_name: re.Pattern):
+    row = page.get_by_role("row", name=row_name).first
+    expect(row).to_be_visible()
+    return row
+
+
+def _buy_license_row(
+    page: Page,
+    base_page: BasePage,
+    row,
+    count: str,
+    logger,
+    success_message: str,
+    editable_quantity=True,
+) -> None:
+    if editable_quantity:
+        quantity = row.get_by_role("textbox").first
+        quantity.fill(count)
+        expect(quantity).to_have_value(count)
+    else:
+        expect(page.locator("body")).to_contain_text(f"Итого лицензий: {count}")
+
+    page.get_by_role("button", name="Купить").click()
+    terms = page.locator("span").filter(has_text="Я ознакомился с тем").first
+    expect(terms).to_be_visible()
+    terms.click()
+    page.get_by_role("button", name="Да", exact=True).click()
+    base_page.wait_for_loader()
+    logger.info(success_message)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+def run_buy_license(page: Page, logger, scope: str = "smoke") -> None:
+    with allure.step("1 - Admin sifatida kirish va litsenziyalar sahifasiga o'tish"):
+        _logout_if_authenticated(page, logger)
         authorization(page)
         switch_filial(page, name="Администрирование")
         navigate_to(page, tab="Главное", name="Лицензии")
+        try:
+            expect(page.locator("body")).to_contain_text("Компания не активирована", timeout=3_000)
+            raise AssertionError(
+                "Yangi company license uchun aktivatsiya qilinmagan. "
+                "COMPANY_ACTIVATION_CODE env qiymatini berib full runni qayta ishga tushiring."
+            )
+        except (AssertionError, PlaywrightTimeoutError) as exc:
+            if isinstance(exc, AssertionError) and "COMPANY_ACTIVATION_CODE" in str(exc):
+                raise
         expect(page.get_by_role("heading", name="Лицензии")).to_be_visible()
 
     with allure.step("2 - Balansni tekshirish"):
@@ -23,29 +97,35 @@ def test_buy_license(page: Page, logger) -> None:
             balance_locator.wait_for(state="visible", timeout=5_000)
             logger.info("Balans musbat — Success")
         except Exception:
-            logger.fail("Balans musbat emas yoki element topilmadi!")
+            logger.fail("Balans musbat emas yoki element topilmadi!", raise_error=True)
 
     with allure.step("3 - Litsenziya sotib olish"):
-        page.get_by_role("link", name="Покупка").click()
         base_page = BasePage(page)
-        base_page.select_option(ng_model="purchase.payer.name", option_text="AUTOTEST GWS", clear=True)
-        base_page.select_option(ng_model="purchase.contract_name", option_text="Договор № bn от 01.01.2025", clear=True)
-        base_page.select_date(ng_model="purchase.begin_date", option="today")
-        base_page.wait_for_loader()
+        _prepare_license_purchase(page, base_page)
 
-        row = page.get_by_role("row", name="Smartup ERP")
-        expect(row).to_be_visible()
-        row.get_by_role("textbox").fill("1")
-        page.get_by_role("button", name="Купить").click()
-        page.locator("span").filter(has_text="Я ознакомился с тем").first.click()
-        page.get_by_role("button", name="Да").click()
-        base_page.wait_for_loader()
-        logger.info("Litsenziya olindi")
+        mandatory_row = _optional_license_row(page, MANDATORY_LICENSE_ROW_RE)
+        if mandatory_row:
+            with allure.step("3.1 - Majburiy bazaviy litsenziyalarni sotib olish"):
+                _buy_license_row(
+                    page,
+                    base_page,
+                    mandatory_row,
+                    MANDATORY_LICENSE_COUNT,
+                    logger,
+                    "Majburiy bazaviy litsenziyalar olindi",
+                    editable_quantity=False,
+                )
+                _prepare_license_purchase(page, base_page)
+        else:
+            logger.info("Majburiy bazaviy litsenziya bu oy uchun chiqmagan")
+
+        with allure.step("3.2 - Oddiy bazaviy litsenziya sotib olish"):
+            row = _license_row(page, REGULAR_LICENSE_ROW_RE)
+            _buy_license_row(page, base_page, row, REGULAR_LICENSE_COUNT, logger, "Litsenziya olindi")
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@allure.title("Foydalanuvchiga litsenziya ulash")
-def test_attach_license(page: Page, code, logger) -> None:
+def run_attach_license(page: Page, code, logger, scope: str = "smoke") -> None:
     with allure.step("1 - Litsenziyalar va hujjatlar sahifasiga o'tish"):
         page.get_by_role("link", name="Лицензии и документы").click()
         expect(page.locator("b-page")).to_contain_text("Лицензии и документы")
@@ -60,12 +140,9 @@ def test_attach_license(page: Page, code, logger) -> None:
             no_data = page.locator('b-grid[name="table"]').get_by_text("нет данных")
             no_data.wait_for(state="visible", timeout=5_000)
         except PlaywrightTimeoutError:
-            page.locator("input[bcheckall]").evaluate("el => el.click()")
+            BasePage(page).set_checkall()
             page.get_by_role("button", name="Открепить").click()
-            expect(page.locator("#biruniConfirm")).to_contain_text("Открепить пользователей в количестве")
-            expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-            page.locator("#biruniConfirm").get_by_role("button", name="да").click()
-            page.locator("#biruniConfirm").wait_for(state="hidden")
+            BasePage(page).confirm_biruni("Открепить пользователей в количестве")
             expect(page.locator("#kt_content")).to_contain_text("нет данных")
 
         page.get_by_role("button", name="Доступные").click()
@@ -78,9 +155,16 @@ def test_attach_license(page: Page, code, logger) -> None:
         page.get_by_text(f"natural_person-pw{code}").first.click()
         page.get_by_role("button", name="Прикрепить").click()
         expect(page.get_by_role("heading", name="Прикрепить пользователя")).to_be_visible()
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да").click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni()
         page.get_by_role("button", name="Закрыть").click()
 
 # ----------------------------------------------------------------------------------------------------------------------
+
+@allure.title("Litsenziya sotib olish")
+def test_buy_license(page: Page, logger, test_scope) -> None:
+    run_buy_license(page, logger, scope=test_scope)
+
+
+@allure.title("Foydalanuvchiga litsenziya ulash")
+def test_attach_license(page: Page, code, logger, test_scope) -> None:
+    run_attach_license(page, code, logger, scope=test_scope)

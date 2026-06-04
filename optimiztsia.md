@@ -7,11 +7,11 @@ Ushbu hujjat Playwright + pytest smoke suite tekshiruvida topilgan kamchiliklarn
 **Prioritet:** Yuqori  
 **Maqsad:** pytest collection, runner va biznes qadamlar aralashib ketmasin.
 
-### Muammolar
+### Muammolar (tuzatilgan)
 
-- `test_smoke_runner.py` va `test_a_group_runner.py` boshqa `test_*.py` fayllardagi test funksiyalarni import qilib chaqiryapti.
-- Bir xil biznes flow pytest tomonidan alohida test sifatida ham, runner ichida ham collect bo'ladi.
-- Allure history, failure diagnosis, retry va fixture lifecycle chalkashadi.
+- Runnerlar endi boshqa modullardagi pytest `test_*` funksiyalarni import qilib chaqirmaydi; biznes body `run_*` funksiyalarda turadi.
+- Directory/default collection duplicate biznes flowlarni yurgizmasligi uchun faqat mos runnerlar selected qoladi; leaf testlar uchun `--include-leaf-tests` bor.
+- Allure history, failure diagnosis, retry va fixture lifecycle kamroq chalkashadi.
 
 ### Ishlar
 
@@ -31,11 +31,11 @@ Ushbu hujjat Playwright + pytest smoke suite tekshiruvida topilgan kamchiliklarn
 **Prioritet:** Yuqori  
 **Maqsad:** setup, group va full smoke run aniq boshqarilsin.
 
-### Muammolar
+### Muammolar (tuzatilgan)
 
-- `run_tests.sh` hozir to'liq smoke emas, faqat A-group runnerni ishlatyapti.
-- README va skilllarda `test_smoke_runner.py` asosiy runner deyilgan, script esa boshqa runnerni yurityapti.
-- `code` fixture faqat `test_smoke_runner.py` ni full run deb taniydi.
+- `run_tests.sh` `all`, `setup`, `group-a`, `group-b` mode'larini qo'llaydi.
+- README va skilllarda `test_all_runner.py` asosiy full smoke entrypoint sifatida ko'rsatilgan.
+- `code` fixture `--new-code`, `--reuse-code` va user_setup marker orqali boshqariladi.
 
 ### Ishlar
 
@@ -220,7 +220,7 @@ Ushbu hujjat Playwright + pytest smoke suite tekshiruvida topilgan kamchiliklarn
 
 Quyidagi ishlar birinchi sprint uchun eng katta foyda beradi:
 
-- `test_smoke_runner.py` import qilayotgan test funksiyalarni step/flow funksiyalarga ajratish.
+- Runnerlar import qilayotgan test funksiyalarni step/flow `run_*` funksiyalarga ajratish.
 - `test_a_group_runner.py` uchun ham shu refactorni qilish.
 - `run_tests.sh` ga `setup`, `group-a`, `all` rejimlarini qo'shish.
 - `code` fixturega `--new-code` option qo'shish.

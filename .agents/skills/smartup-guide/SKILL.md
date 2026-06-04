@@ -11,8 +11,9 @@ Bu skill Smartup bo'yicha bilimlarni tez topish uchun index vazifasini bajaradi.
 
 1. User so'rovidagi domainni aniqlash: contract, order, list/grid, Biruni error, setup/debug.
 2. Agar so'rov aniq forma haqida bo'lsa, avval `references/forms/<form-slug>.md` dossier faylini o'qi.
-3. Keyin kerak bo'lsa quyidagi domain reference fayllardan faqat keraklisini o'qi.
-4. Agar kerakli bilim topilmasa, UI/test/trace orqali aniqlab, tegishli form dossier yoki reference faylga qisqa va tagli qilib qo'sh.
+3. Forma rasmi kerak bo'lsa, avval shu skill ichidagi `references/forms/screenshots/<form-slug>/` papkasidan ol; `test-results` vaqtinchalik output bo'lgani uchun doimiy bilim manbasi sifatida ishlatilmasin.
+4. Keyin kerak bo'lsa quyidagi domain reference fayllardan faqat keraklisini o'qi.
+5. Agar kerakli bilim topilmasa, UI/test/trace orqali aniqlab, tegishli form dossier yoki reference faylga qisqa va tagli qilib qo'sh.
 
 ## Reference Xarita
 
@@ -34,7 +35,7 @@ references/forms/<form-slug>.md
 Dossier ichida shu mavzu bo'yicha bir harakatda kerak bo'ladigan ma'lumotlar turadi:
 
 - URL pattern va navigation
-- screenshot pathlari
+- screenshot pathlari; forma screenshotlari doim `references/forms/screenshots/<form-slug>/` ichida arxivlanadi
 - visual regression uchun baseline/current screenshot state nomlari va metadata
 - asosiy locatorlar
 - ishlatiladigan flow/helper/test fayllari

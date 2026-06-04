@@ -15,6 +15,7 @@ def flow_contract_add_page(
     payment_type=None,
 ) -> None:
     expect(page).to_have_url(re.compile(r".*/anor/mkf/contract\+add"))
+    BasePage(page).wait_for_loader()
     expect(page.locator("b-page")).to_contain_text("Номер*")
     expect(page.locator("b-page")).to_contain_text("Название*")
     expect(page.locator("b-page")).to_contain_text("Валюта*")

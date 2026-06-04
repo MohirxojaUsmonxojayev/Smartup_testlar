@@ -14,8 +14,8 @@ Playwright + pytest asosida yozilgan smoke test suite. Allure hisoboti va trace 
 ## O'rnatish
 
 ```bash
-pip install -r requirements.txt
-playwright install chromium
+python -m pip install -r requirements.txt
+python -m playwright install chromium
 ```
 
 ---
@@ -31,9 +31,11 @@ cp .env.example .env
 
 | O'zgaruvchi    | Tavsif                  |
 |----------------|-------------------------|
-| `BASE_URL`     | Test muhiti manzili     |
-| `TEST_EMAIL`   | Admin login             |
-| `TEST_PASSWORD`| Admin parol             |
+| `COMPANY_URL`  | Test muhiti manzili     |
+| `COMPANY_CODE` | Kompaniya kodi          |
+| `COMPANY_PASSWORD` | Admin parol        |
+| `USER_PASSWORD` | Test user paroli       |
+| `COMPANY_ACTIVATION_CODE` | Yangi companyda license sotib olish uchun activation code (non-production full run uchun kerak bo'lishi mumkin) |
 
 > `.env.example` — xavfsiz namuna fayl, gitda saqlanadi. `.env` — haqiqiy credentials, **gitga kirmaydi**.
 
@@ -44,46 +46,77 @@ cp .env.example .env
 ### Tavsiya etilgan — to'liq tsikl (test + allure hisobot)
 
 ```bash
-bash run_tests.sh
+python scripts/run_tests.py --url https://app3.greenwhite.uz/xtrade
 ```
 
 Bu buyruq:
 1. Eski natijalarni tozalaydi (history saqlanadi)
 2. Smoke runner testlarini o'tkazadi
 3. Allure hisobotini yaratadi
-4. Hisobotni brauzerda ochadi
+4. Productiondan boshqa serverlarda company setupni avtomatik ishlatadi
+5. `--open-report` bo'lsa hisobotni brauzerda ochadi
+
+> Non-production serverda yangi company yaratilganda `Лицензии` sahifasi uchun company viewdagi `Активация для лицензии` tabida activation kerak bo'lishi mumkin. Bunday full run uchun `COMPANY_ACTIVATION_CODE=<code>` env qiymatini ham bering.
 
 ---
 
-### Faqat testlarni ishga tushirish (alluresiz)
+### Cross-platform variantlar
 
 ```bash
-pytest tests/smoke/test_smoke_runner.py -v
-```
-
-### `run_tests.sh` ga argument berish
-
-```bash
-# Verbose + qisqa xato ko'rsatish
-bash run_tests.sh -v --tb=short
+# Production: company setup skip
+python scripts/run_tests.py --url https://smartup.online
 
 # Headless rejimda
-bash run_tests.sh --headed=false
+python scripts/run_tests.py --url https://app3.greenwhite.uz/xtrade --headless
+
+# Yangi company license aktivatsiyasi bilan (macOS/Linux)
+COMPANY_ACTIVATION_CODE=<code> python scripts/run_tests.py --url https://app3.greenwhite.uz/xtrade --headless
+
+# Yangi company license aktivatsiyasi bilan (Windows PowerShell)
+$env:COMPANY_ACTIVATION_CODE="<code>"; python scripts/run_tests.py --url https://app3.greenwhite.uz/xtrade --headless
+
+# Regression scope
+python scripts/run_tests.py --url https://app3.greenwhite.uz/xtrade --regression
+
+# Testdan keyin eng oxirgi traceni ochish
+python scripts/run_tests.py --url https://app3.greenwhite.uz/xtrade --show-trace
+
+# Reportni ochish
+python scripts/run_tests.py --url https://app3.greenwhite.uz/xtrade --open-report
+```
+
+### Mac/Linux wrapper
+
+```bash
+./run_tests.sh --url https://app3.greenwhite.uz/xtrade
+```
+
+### Faqat pytest orqali debug qilish
+
+```bash
+./.venv/bin/pytest tests/smoke/test_all_runner.py -v
 ```
 
 ---
 
-> **Muhim:** Testlar bir-biriga bog'liq — har biri oldingi test yaratgan ma'lumotdan foydalanadi.
-> Shuning uchun har doim **`test_smoke_runner.py`** to'liq ishlatiladi. Alohida test fayllari mustaqil ishlamaydi.
+> **Muhim:** User setup testlari bir-biriga bog'liq — har biri oldingi test yaratgan ma'lumotdan foydalanadi.
+> Shuning uchun full smoke uchun **`test_all_runner.py`**, setup uchun esa **`test_setup_runner.py`** ishlatiladi. Oddiy `pytest` yoki directory collection duplicate flowlarni yurgizmasligi uchun default holatda runner bo'lmagan smoke testlar deselect qilinadi; kerak bo'lsa `--include-leaf-tests` ishlatiladi.
 
 ---
 
 ## Test qamrovi
 
-`test_smoke_runner.py` — barcha testlar **bitta browser sessiyasida** ketma-ket ishlaydi.
+`tests/smoke/test_all_runner.py` — barcha runnerlarni jamlaydi va mavjud runner fayllarini ketma-ket chaqiradi: user setup, keyin A va B group runnerlar.
+
+`tests/smoke/test_setup/test_setup_runner.py` — user setup testlari **bitta browser sessiyasida** ketma-ket ishlaydi.
+
+Group runnerlar — har bir group boshida user sifatida bir marta login qiladi, group ichidagi testlar shu oynada davom etadi. Group tugaganda yoki failed bo'lganda oyna/context yopiladi; keyingi group yangi oyna va yangi login bilan boshlanadi.
+
+### Setup runner
 
 | # | Test nomi              | Nima tekshiriladi                                     |
 |---|------------------------|-------------------------------------------------------|
+| 00 | Company               | Non-production serverlarda company yaratish va code saqlash |
 | 01 | Authorization         | Login, dashboard yuklanishi                           |
 | 02 | Legal Person          | Yuridik shaxs yaratish va qidirish                   |
 | 03 | Filial                | Organizatsiya yaratish, valyuta va yuridik shaxs bog'lash |
@@ -101,8 +134,19 @@ bash run_tests.sh --headed=false
 | 15 | Payment Type          | To'lov turlarini biriktirish                          |
 | 16 | Sector                | TMT to'plami (Набор ТМЦ) yaratish                    |
 | 17 | Product               | TMT (mahsulot) yaratish                               |
+| 18 | Natural Person For Client_1 | Qo'shimcha client uchun jismoniy shaxs yaratish |
+| 19 | Room Attachment       | Ish zonasiga kerakli bog'lanishlarni biriktirish      |
+| 20 | Init Balance          | Boshlang'ich qoldiq uchun hujjat yaratish             |
+| 21 | Balance               | Qoldiq/harakatlar hayot siklini tekshirish            |
 
-> **Eslatma:** `test_smoke_runner.py` da `#` bilan comment qilingan testlar hali faol emas.
+### Group runnerlar
+
+| Group | Testlar | Nima tekshiriladi |
+|-------|---------|-------------------|
+| A | A-01 ... A-05 | Contract yaratish, payment type sharti, contract limit validatsiyasi, order yaratish va edit qilish |
+| B | B-01 ... B-02 | Konsignatsiya limiti bilan order yaratish, edit qilish va konsignatsiya summasini bo'lish |
+
+> **Eslatma:** `test_setup_runner.py` user setup runner bo'lib, setup testlari bilan bir papkada turadi.
 
 ---
 
@@ -116,9 +160,12 @@ test-results/
 │   ├── executor.json
 │   └── categories.json
 ├── allure-report/           # Allure CLI tomonidan render qilingan HTML
+├── data/                    # Runnerlar orasida ishlatiladigan saqlangan code va test ma'lumotlari
+│   └── data_store.json
+├── playwright/              # pytest-playwright output papkasi
 ├── traces/                  # Playwright trace fayllari (.zip)
 │   ├── smoke_trace.zip      # session_page ishlatgan testlar (to'liq sessiya)
-│   └── *.zip                # page fixture ishlatgan har bir test uchun alohida
+│   └── *.zip                # group/page fixture ishlatgan testlar uchun alohida
 └── logs/                    # Muvaffaqiyatsiz testlar uchun log fayllar
     └── *.log
 ```
@@ -182,7 +229,7 @@ Playwright Codegen brauzerda harakatlarni yozib, avtomatik test kodi generatsiya
 ### Ishga tushirish
 
 ```bash
-# BASE_URL ga o'tib codegen ochish
+# COMPANY_URL ga o'tib codegen ochish
 playwright codegen https://smartup.online
 
 # Login sahifasidan boshlash
@@ -204,14 +251,14 @@ playwright codegen https://smartup.online/login.html
 
 ```bash
 # Testlarni headless rejimda ishlatish
-pytest tests/smoke/test_smoke_runner.py --headed=false
+HEADLESS=1 ./.venv/bin/pytest tests/smoke/test_all_runner.py --headless
 
 # Faqat muvaffaqiyatsiz testlarni qayta ishlatish
-pytest tests/smoke/test_smoke_runner.py --lf
+./.venv/bin/pytest tests/smoke/test_all_runner.py --lf
 
 # Xato bo'lganda darhol to'xtatish
-pytest tests/smoke/test_smoke_runner.py -x
+./.venv/bin/pytest tests/smoke/test_all_runner.py -x
 
 # Verbose + to'liq xato traceback
-pytest tests/smoke/test_smoke_runner.py -v --tb=long
+./.venv/bin/pytest tests/smoke/test_all_runner.py -v --tb=long
 ```

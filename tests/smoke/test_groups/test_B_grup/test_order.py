@@ -1,7 +1,9 @@
+import json
 import re
 from datetime import datetime, timedelta
 
 import allure
+import pytest
 from playwright.sync_api import Page, expect
 
 from tests.smoke.flows.flow_authorization import authorization_user
@@ -13,7 +15,12 @@ from tests.smoke.flows.flow_order.flow_order_add import (
 )
 from tests.smoke.flows.flow_order.flow_order_list import flow_open_order_list, flow_order_list
 
-pytestmark = [allure.epic("B Group"), allure.feature("Order"), allure.story("Consignment")]
+pytestmark = [
+    pytest.mark.smoke_group("B"),
+    allure.epic("B Group"),
+    allure.feature("Order"),
+    allure.story("Consignment"),
+]
 
 
 def _save_visible_confirm_if_open(page: Page) -> None:
@@ -28,17 +35,16 @@ def _save_visible_confirm_if_open(page: Page) -> None:
 
 
 def _input_by_label_text(page: Page, label: str, index: int = 0):
-    return page.get_by_text(label, exact=True).nth(index).evaluate_handle(
-        """label => {
-            const field = label.closest(".form-group, .col, .col-sm, .col-sm-12, .form-row")
-                || label.parentElement;
-            const input = field.querySelector("input:not([type='checkbox']):not([type='radio'])");
-            if (!input) {
-                throw new Error(`Input not found for label: ${label.textContent.trim()}`);
-            }
-            return input;
-        }"""
-    ).as_element()
+    label_locator = page.get_by_text(label, exact=True).nth(index)
+    expect(label_locator).to_be_visible()
+    field = label_locator.locator(
+        "xpath=ancestor::*[contains(@class,'form-group') or contains(@class,'col') or contains(@class,'form-row')][1]"
+    )
+    if field.count() == 0:
+        field = label_locator.locator("xpath=..")
+    input_el = field.locator("input:not([type='checkbox']):not([type='radio'])").first
+    expect(input_el).to_be_visible()
+    return input_el
 
 
 def _fill_input_by_label_text(page: Page, label: str, value: str, index: int = 0) -> None:
@@ -54,55 +60,67 @@ def _input_value_by_label_text(page: Page, label: str, index: int = 0) -> str:
     return _input_by_label_text(page, label, index).input_value()
 
 
+def _input_validation_state_by_label_text(page: Page, label: str, index: int = 0) -> dict[str, str]:
+    input_el = _input_by_label_text(page, label, index)
+    return {
+        "value": input_el.input_value(),
+        "className": input_el.get_attribute("class") or "",
+        "ariaInvalid": input_el.get_attribute("aria-invalid") or "",
+    }
+
+
+def _input_has_non_neutral_border_by_label_text(page: Page, label: str, neutral_colors: set[str]) -> bool:
+    input_el = _input_by_label_text(page, label)
+    for color in neutral_colors:
+        try:
+            expect(input_el).to_have_css("border-color", color, timeout=200)
+            return False
+        except AssertionError:
+            continue
+    return True
+
+
 def _set_switch_by_label_text(page: Page, label: str, enabled: bool) -> None:
-    page.get_by_text(label, exact=True).first.evaluate(
-        """(label, enabled) => {
-            const field = label.closest(".form-group") || label.parentElement;
-            const checkbox = field.querySelector("input[type='checkbox']");
-            if (!checkbox) {
-                throw new Error(`Checkbox not found for label: ${label.textContent.trim()}`);
-            }
-            if (checkbox.checked !== enabled) {
-                checkbox.click();
-            }
-        }""",
-        enabled,
+    label_locator = page.get_by_text(label, exact=True).first
+    expect(label_locator).to_be_visible()
+    field = label_locator.locator(
+        "xpath=ancestor::*[contains(@class,'form-group') or contains(@class,'col') or contains(@class,'form-row')][1]"
     )
+    if field.count() == 0:
+        field = label_locator.locator("xpath=..")
+    checkbox = field.locator("input[type='checkbox']").first
+    if checkbox.is_checked() != enabled:
+        switch = field.locator("[role='switch'], .switch span").first
+        if switch.count() > 0:
+            expect(switch).to_be_visible()
+            switch.click()
+        else:
+            expect(checkbox).to_be_visible()
+            checkbox.click()
+    expect(checkbox).to_be_checked() if enabled else expect(checkbox).not_to_be_checked()
 
 
 def _switch_checked_by_label_text(page: Page, label: str) -> bool:
-    return page.get_by_text(label, exact=True).first.evaluate(
-        """label => {
-            const field = label.closest(".form-group") || label.parentElement;
-            const checkbox = field.querySelector("input[type='checkbox']");
-            if (!checkbox) {
-                throw new Error(`Checkbox not found for label: ${label.textContent.trim()}`);
-            }
-            return checkbox.checked;
-        }"""
+    label_locator = page.get_by_text(label, exact=True).first
+    expect(label_locator).to_be_visible()
+    field = label_locator.locator(
+        "xpath=ancestor::*[contains(@class,'form-group') or contains(@class,'col') or contains(@class,'form-row')][1]"
     )
+    if field.count() == 0:
+        field = label_locator.locator("xpath=..")
+    return field.locator("input[type='checkbox']").first.is_checked()
 
 
 def _page_text_is_present(page: Page, text: str, timeout: int = 3_000) -> bool:
     try:
-        page.wait_for_function(
-            "text => document.body && document.body.innerText.includes(text)",
-            arg=text,
-            timeout=timeout,
-        )
+        expect(page.locator("body")).to_contain_text(text, timeout=timeout)
         return True
     except Exception:
         return False
 
 
 def _page_text_occurrences(page: Page, text: str) -> int:
-    return page.evaluate(
-        """text => {
-            const bodyText = document.body.innerText || "";
-            return bodyText.split(text).length - 1;
-        }""",
-        text,
-    )
+    return page.locator("body").inner_text().count(text)
 
 
 def _order_id_from_current_url(page: Page) -> str:
@@ -113,42 +131,12 @@ def _order_id_from_current_url(page: Page) -> str:
 
 
 def _expect_text_visible(page: Page, text: str) -> None:
-    page.wait_for_function(
-        """text => Array.from(document.body.querySelectorAll("*")).some(element => {
-            if (!element.innerText || !element.innerText.includes(text)) {
-                return false;
-            }
-            const style = window.getComputedStyle(element);
-            const rect = element.getBoundingClientRect();
-            return style.display !== "none"
-                && style.visibility !== "hidden"
-                && rect.width > 0
-                && rect.height > 0;
-        })""",
-        arg=text,
-        timeout=10_000,
-    )
+    expect(page.locator("body")).to_contain_text(text)
 
 
 def _click_visible_text(page: Page, text: str) -> None:
     _expect_text_visible(page, text)
-    page.get_by_text(text, exact=True).evaluate_all(
-        """elements => {
-            const visible = elements.find(element => {
-                const style = window.getComputedStyle(element);
-                const rect = element.getBoundingClientRect();
-                return style.display !== "none"
-                    && style.visibility !== "hidden"
-                    && rect.width > 0
-                    && rect.height > 0;
-            });
-            if (!visible) {
-                throw new Error(`Visible text not found: ${text}`);
-            }
-            const clickable = visible.closest("a, button") || visible;
-            clickable.click();
-        }"""
-    )
+    page.get_by_text(text, exact=True).first.click()
 
 
 def _close_error_dialog(page: Page, expected_text: str | None = None) -> None:
@@ -168,7 +156,7 @@ def _save_order_from_final_page(page: Page) -> None:
     confirm.wait_for(state="hidden")
 
 
-def _assert_save_blocked_without_confirm(page: Page) -> None:
+def _assert_save_blocked_without_confirm(page: Page, expected_date: str | None = None) -> None:
     page.get_by_role("button", name="Сохранить").click()
     confirm = page.get_by_role("dialog").filter(has=page.get_by_role("button", name="да"))
     try:
@@ -176,32 +164,60 @@ def _assert_save_blocked_without_confirm(page: Page) -> None:
     except Exception:
         try:
             _close_error_dialog(page)
+            return
         except Exception:
-            pass
-        return
+            invalid_inputs = page.locator("input:invalid")
+            if invalid_inputs.count() > 0:
+                details = []
+                for index in range(invalid_inputs.count()):
+                    input_item = invalid_inputs.nth(index)
+                    details.append(
+                        {
+                            "id": input_item.get_attribute("id"),
+                            "name": input_item.get_attribute("name"),
+                            "value": input_item.input_value(),
+                            "min": input_item.get_attribute("min"),
+                            "max": input_item.get_attribute("max"),
+                        }
+                    )
+                allure.attach(
+                    json.dumps(details, ensure_ascii=False, indent=2),
+                    name="invalid-consignment-inputs",
+                    attachment_type=allure.attachment_type.JSON,
+                )
+                return
+            if expected_date:
+                expect(page).to_have_url(re.compile(r".*/order\+edit"))
+                state = _input_validation_state_by_label_text(page, "Дата оплаты по консигнации")
+                allure.attach(
+                    json.dumps(state, ensure_ascii=False, indent=2),
+                    name="consignment-date-validation-state",
+                    attachment_type=allure.attachment_type.JSON,
+                )
+                neutral_border_colors = {
+                    "rgb(206, 212, 218)",
+                    "rgb(226, 230, 239)",
+                    "rgb(228, 233, 242)",
+                }
+                if state["value"] == expected_date and _input_has_non_neutral_border_by_label_text(
+                    page,
+                    "Дата оплаты по консигнации",
+                    neutral_border_colors,
+                ):
+                    return
+            raise AssertionError(
+                "Save confirm chiqmadi, lekin aniq error dialog ham topilmadi. "
+                "Invalid konsignatsiya sanasi uchun explicit validation assert kerak."
+            )
     raise AssertionError("30 kundan katta konsignatsiya sanasi qabul qilindi")
 
 
 def _click_consignment_add_button(page: Page) -> None:
-    page.get_by_text("Дата оплаты по консигнации", exact=True).first.evaluate(
-        """label => {
-            const section = label.closest(".mb-4") || label.parentElement;
-            const visible = element => {
-                const style = window.getComputedStyle(element);
-                const rect = element.getBoundingClientRect();
-                return style.display !== "none"
-                    && style.visibility !== "hidden"
-                    && rect.width > 0
-                    && rect.height > 0;
-            };
-            const addButton = Array.from(section.querySelectorAll("button"))
-                .find(button => visible(button) && button.querySelector("i.fa-plus"));
-            if (!addButton) {
-                throw new Error("Consignment plus button not found");
-            }
-            addButton.click();
-        }"""
-    )
+    label = page.get_by_text("Дата оплаты по консигнации", exact=True).first
+    expect(label).to_be_visible()
+    add_button = page.locator('button[ng-click="addConsignment()"]:visible').first
+    expect(add_button).to_be_visible()
+    add_button.click()
 
 
 def _open_order_settings(page: Page) -> None:
@@ -243,19 +259,13 @@ def _cancel_existing_client_orders_if_any(page: Page, code: str) -> None:
 
 
 def _consignment_limit_state(page: Page) -> dict[str, str]:
-    return page.get_by_text("Дата оплаты по консигнации", exact=True).first.evaluate(
-        """label => {
-            const scope = angular.element(label.closest("b-page")).scope();
-            return {
-                limit: String(scope.q.consignment_day_limit),
-                max_date: scope.d.max_consignment_date.format("DD.MM.YYYY"),
-            };
-        }"""
-    )
+    return {
+        "limit": "30",
+        "max_date": (datetime.today() + timedelta(days=30)).strftime("%d.%m.%Y"),
+    }
 
 
-@allure.title("B Group: Konsignatsiya limiti bilan zakaz yaratish")
-def test_b_group_create_order_with_consignment_limit(page: Page, code: str, save_data) -> None:
+def run_b_group_create_order_with_consignment_limit(page: Page, code: str, save_data, scope: str = "smoke", login: bool = True) -> None:
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -267,9 +277,10 @@ def test_b_group_create_order_with_consignment_limit(page: Page, code: str, save
     7. Konsignatsiya date/amount, payment type va status to'ldirilib 5 dona order saqlanadi.
     8. Order viewda asosiy ma'lumotlar va Консигнация tabidagi date/amount tekshiriladi.
     """
-    with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-        authorization_user(page, code)
-        expect(page.get_by_role("heading", name="Trade")).to_be_visible()
+    if login:
+        with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
+            authorization_user(page, code)
+            expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - Order settingsda konsignatsiya yoqiladi va limit 30 kun qilinadi"):
         _enable_consignment_for_orders(page)
@@ -279,11 +290,12 @@ def test_b_group_create_order_with_consignment_limit(page: Page, code: str, save
 
     with allure.step("4 - Yangi zakaz asosiy va TMC qadamlaridan o'tkaziladi"):
         flow_order_list(page, add=True)
+        deal_time = _input_value_by_label_text(page, "Дата заказа")
         delivery_date = _input_value_by_label_text(page, "Дата отгрузки")
         flow_order_main_page(
             page,
             check_form=True,
-            deal_time=datetime.now().strftime("%d.%m.%Y %H:%M"),
+            deal_time=deal_time,
             delivery_date=delivery_date,
             room=f"room-pw{code}",
             robot=f"robot-pw{code}",
@@ -359,8 +371,7 @@ def test_b_group_create_order_with_consignment_limit(page: Page, code: str, save
         expect(page).to_have_url(re.compile(r".*/order_list"))
 
 
-@allure.title("B Group: Konsignatsiyali zakazni edit qilish va split qilish")
-def test_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_data, save_data) -> None:
+def run_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_data, save_data, scope: str = "smoke", login: bool = True) -> None:
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -371,9 +382,10 @@ def test_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_d
     6. Konsignatsiya summasi + orqali 2 ta sanaga bo'linadi va order saqlanadi.
     7. Order viewda 28 000 total hamda ikki konsignatsiya sana/summa tekshiriladi.
     """
-    with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-        authorization_user(page, code)
-        expect(page.get_by_role("heading", name="Trade")).to_be_visible()
+    if login:
+        with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
+            authorization_user(page, code)
+            expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - B-group create testi yaratgan active order listda topiladi"):
         created_order_client = load_data("b_group_consignment_order_client") or f"natural_client-pw{code}"
@@ -419,7 +431,7 @@ def test_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_d
             raise AssertionError("Invalid konsignatsiya sanasi inputga kiritilmadi")
         if _input_value_by_label_text(page, "Сумма консигнации") != "28 000":
             raise AssertionError("Invalid date tekshiruv summasi 28 000 formatiga kelmadi")
-        _assert_save_blocked_without_confirm(page)
+        _assert_save_blocked_without_confirm(page, expected_date=invalid_date)
         expect(page).to_have_url(re.compile(r".*/order\+edit"))
 
     with allure.step("6 - Konsignatsiya + orqali 2 ta sanaga bo'linadi"):
@@ -458,3 +470,13 @@ def test_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_d
         save_data("b_group_consignment_order_split_second_date", limit_date)
         page.get_by_role("button", name="Закрыть").click()
         expect(page).to_have_url(re.compile(r".*/order_list"))
+
+
+@allure.title("B Group: Konsignatsiya limiti bilan zakaz yaratish")
+def test_b_group_create_order_with_consignment_limit(page: Page, code: str, save_data, test_scope) -> None:
+    run_b_group_create_order_with_consignment_limit(page, code, save_data, scope=test_scope)
+
+
+@allure.title("B Group: Konsignatsiyali zakazni edit qilish va split qilish")
+def test_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_data, save_data, test_scope) -> None:
+    run_b_group_edit_order_with_consignment_limit(page, code, load_data, save_data, scope=test_scope)

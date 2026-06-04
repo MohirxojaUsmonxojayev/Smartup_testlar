@@ -1,21 +1,36 @@
 import re
 
 import allure
+import pytest
 from playwright.sync_api import Page, expect
 
 from tests.smoke.flows.flow_authorization import authorization_user
 from tests.smoke.flows.flow_order.flow_order_add import (
     flow_order_final_page,
+    flow_order_main_page,
+    flow_order_product_page,
     flow_order_prepare_with_contract,
 )
 from tests.smoke.flows.flow_order.flow_order_list import flow_open_order_list, flow_order_list
+from tests.smoke.flows.flow_order.flow_order_view import flow_order_view
 from utils.base_page import BasePage
 
-pytestmark = [allure.epic("A Group"), allure.feature("Order"), allure.story("Order With Contract")]
+pytestmark = [
+    pytest.mark.smoke_group("A"),
+    allure.epic("A Group"),
+    allure.feature("Order"),
+    allure.story("Order With Contract"),
+]
 
 
-@allure.title("A Group: Contract limit tekshiruvi va limit ichida zakaz yaratish")
-def test_a_group_contract_limit_validation_and_valid_order(page: Page, code: str, load_data, save_data) -> None:
+def run_a_group_contract_limit_validation_and_valid_order(
+    page: Page,
+    code: str,
+    load_data,
+    save_data,
+    scope: str = "smoke",
+    login: bool = True,
+) -> None:
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -29,14 +44,15 @@ def test_a_group_contract_limit_validation_and_valid_order(page: Page, code: str
     9. Order id qiymatini keyingi A-group testlari uchun data_store.json ga saqlash.
     """
 
-    with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-        authorization_user(page, code)
-        expect(page.get_by_role("heading", name="Trade")).to_be_visible()
+    if login:
+        with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
+            authorization_user(page, code)
+            expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - A-group contract name data_store.json dan olinadi"):
-        contract_name = load_data("contract_name")
+        contract_name = load_data("a_group_contract_name") or load_data("contract_name")
         if not contract_name:
-            raise AssertionError("A-group contract_name topilmadi. Avval test_contract.py ni run qiling.")
+            raise AssertionError("A-group contract name topilmadi. Avval A-01 testni run qiling.")
 
     with allure.step("3 - Eski orderlar Отменен statusga o'tkazilib, product booking tozalanadi"):
         flow_open_order_list(page)
@@ -66,10 +82,7 @@ def test_a_group_contract_limit_validation_and_valid_order(page: Page, code: str
 
     with allure.step("5 - Contract limitidan oshgani uchun save xabari chiqadi"):
         page.get_by_role("button", name="Сохранить").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text("Сохранить?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да").click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni("Сохранить?")
         expect(page.locator("body")).to_contain_text("Сумма заказа превышает сумму остатка по договору")
         expect(page.locator("body")).to_contain_text(re.compile(r"Сумма остатка по договору: \d+"))
         expect(page.locator("body")).to_contain_text("сумма заказа = 700000")
@@ -94,10 +107,7 @@ def test_a_group_contract_limit_validation_and_valid_order(page: Page, code: str
 
     with allure.step("7 - 7000 summali zakaz muvaffaqiyatli saqlanadi"):
         page.get_by_role("button", name="Сохранить").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text("Сохранить?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да").click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni("Сохранить?")
         expect(page).to_have_url(re.compile(r".*/order_list"))
         expect(page.get_by_role("heading")).to_contain_text("Заказы")
 
@@ -121,8 +131,14 @@ def test_a_group_contract_limit_validation_and_valid_order(page: Page, code: str
         expect(page).to_have_url(re.compile(r".*/order_list"))
 
 
-@allure.title("A Group: Contract tip oplati auto-fill va limit tekshiruvi")
-def test_a_group_order_uses_contract_payment_type(page: Page, code: str, load_data, save_data) -> None:
+def run_a_group_order_uses_contract_payment_type(
+    page: Page,
+    code: str,
+    load_data,
+    save_data,
+    scope: str = "smoke",
+    login: bool = True,
+) -> None:
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -135,17 +151,18 @@ def test_a_group_order_uses_contract_payment_type(page: Page, code: str, load_da
     8. Order id qiymatini keyingi A-group testlari uchun data_store.json ga saqlash.
     """
 
-    with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-        authorization_user(page, code)
-        expect(page.get_by_role("heading", name="Trade")).to_be_visible()
+    if login:
+        with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
+            authorization_user(page, code)
+            expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - Tip oplati contract ma'lumotlari data_store.json dan olinadi"):
-        contract_name = load_data("contract_payment_type_name")
-        contract_payment_type = load_data("contract_payment_type")
+        contract_name = load_data("a_group_contract_payment_type_name") or load_data("contract_payment_type_name")
+        contract_payment_type = load_data("a_group_contract_payment_type") or load_data("contract_payment_type")
         if not contract_name or not contract_payment_type:
             raise AssertionError(
                 "Tip oplati contract ma'lumotlari topilmadi. Avval "
-                "test_a_group_create_order_contract_with_payment_type ni run qiling."
+                "A-02 testni run qiling."
             )
 
     with allure.step("3 - Eski orderlar Отменен statusga o'tkazilib, product booking tozalanadi"):
@@ -172,10 +189,7 @@ def test_a_group_order_uses_contract_payment_type(page: Page, code: str, load_da
         BasePage(page).expect_b_input_value_by_label("Тип оплаты", contract_payment_type)
 
         page.get_by_role("button", name="Сохранить").click()
-        expect(page.locator("#biruniConfirm")).to_contain_text("Сохранить?")
-        expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-        page.locator("#biruniConfirm").get_by_role("button", name="да").click()
-        page.locator("#biruniConfirm").wait_for(state="hidden")
+        BasePage(page).confirm_biruni("Сохранить?")
         expect(page.locator("body")).to_contain_text("Сумма заказа превышает сумму остатка по договору")
         expect(page.locator("body")).to_contain_text(re.compile(r"Сумма остатка по договору: \d+"))
         expect(page.locator("body")).to_contain_text("сумма заказа = 700000")
@@ -227,3 +241,145 @@ def test_a_group_order_uses_contract_payment_type(page: Page, code: str, load_da
         save_data("a_group_payment_type_order_id", page.locator('//t[contains(text(),"ИД заказа")]/../../span').inner_text().strip())
         page.get_by_role("button", name="Закрыть").click()
         expect(page).to_have_url(re.compile(r".*/order_list"))
+
+
+def run_a_group_edit_order_and_save_as_new(
+    page: Page,
+    code: str,
+    load_data,
+    scope: str = "smoke",
+    login: bool = True,
+) -> None:
+    """
+    Testcase:
+    1. User sifatida tizimga kirish.
+    2. A-04 testida yaratilgan order id va contract name qiymatlarini data_store.json dan olish.
+    3. Order listda yaratilgan orderni edit qilish uchun ochish.
+    4. Edit asosiy sahifasidagi mavjud qiymatlar to'g'ri ko'rinishini tekshirib, hech narsa o'zgartirmasdan keyingi sahifaga o'tish.
+    5. Product sahifasidagi product, sklad, price type va quantity qiymatlari o'zgarmaganini tekshirib, keyingi sahifaga o'tish.
+    6. Final sahifada client, room, robot, contract, payment type, status va summa tekshiriladi.
+    7. Order statusi Новый qilib saqlanadi.
+    8. Saqlangandan keyin view oynasida order id va asosiy qiymatlar to'g'riligi tekshiriladi.
+    """
+
+    if login:
+        with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
+            authorization_user(page, code)
+            expect(page.get_by_role("heading", name="Trade")).to_be_visible()
+
+    with allure.step("2 - A-04 yaratgan order ma'lumotlari data_store.json dan olinadi"):
+        order_id = load_data("a_group_payment_type_order_id")
+        contract_name = load_data("a_group_contract_payment_type_name")
+        if not order_id or not contract_name:
+            raise AssertionError(
+                "A-04 order ma'lumotlari topilmadi. Avval A-group runnerni A-01 dan boshlab run qiling."
+            )
+
+    with allure.step("3 - Yaratilgan order edit qilish uchun ochiladi"):
+        flow_open_order_list(page)
+        expect(page.locator("b-grid")).to_contain_text(f"natural_client-pw{code}")
+        flow_order_list(page, find_row=f"natural_client-pw{code}", edit=True)
+        expect(page).to_have_url(re.compile(rf".*/order\+edit.*deal_id={re.escape(order_id)}"))
+
+    with allure.step("4 - Edit asosiy sahifasida qiymatlar tekshiriladi va hech narsa o'zgartirilmaydi"):
+        deal_time_input = page.locator("#anor279-input-deal_time")
+        delivery_date_input = page.locator("#anor279-input-delivery_date")
+        expect(deal_time_input).to_have_value(re.compile(r"\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}"))
+        expect(delivery_date_input).to_have_value(re.compile(r"\d{2}\.\d{2}\.\d{4}"))
+        deal_time = deal_time_input.input_value().strip()
+        delivery_date = delivery_date_input.input_value().strip()
+
+        flow_order_main_page(
+            page,
+            check_form=True,
+            deal_time=deal_time,
+            delivery_date=delivery_date,
+            room=f"room-pw{code}",
+            robot=f"robot-pw{code}",
+            natural_client=f"natural_client-pw{code}",
+            contract=contract_name,
+            next_page=True,
+        )
+
+    with allure.step("5 - Product sahifasida qiymatlar tekshiriladi va hech narsa o'zgartirilmaydi"):
+        flow_order_product_page(
+            page,
+            check_form=True,
+            product=f"product-pw{code}",
+            quantity="1",
+            warehouse="Основной склад",
+            price_type=f"Price Type UZB-pw{code}",
+            next_page=True,
+        )
+
+    with allure.step("6 - Final sahifada qiymatlar tekshiriladi"):
+        expect(page.locator("#kt_content")).to_contain_text(contract_name)
+        expect(page.locator("#kt_content")).to_contain_text(f"product-pw{code}")
+        expect(page.locator("#kt_content")).to_contain_text("7 000")
+        flow_order_final_page(
+            page,
+            check_form=True,
+            payment_type="Наличные деньги",
+            natural_client=f"natural_client-pw{code}",
+            room=f"room-pw{code}",
+            robot=f"robot-pw{code}",
+            status="Черновик",
+            save=False,
+        )
+
+    with allure.step("7 - Order statusi Новый qilib saqlanadi"):
+        flow_order_final_page(
+            page,
+            status="Новый",
+            save=True,
+        )
+        expect(page).to_have_url(re.compile(r".*/order_list"))
+        expect(page.get_by_role("heading")).to_contain_text("Заказы")
+
+    with allure.step("8 - View oynasida editdan keyin qiymatlar tekshiriladi"):
+        flow_order_list(page, find_row=f"natural_client-pw{code}", view=True)
+        expect(page.locator("#kt_content")).to_contain_text(contract_name)
+        expect(page.locator("#kt_content")).to_contain_text(f"product-pw{code}")
+        expect(page.locator("#kt_content")).to_contain_text("7 000")
+        order_data = flow_order_view(
+            page,
+            get_value=[
+                "ИД заказа",
+                "Дата заказа",
+                "Дата отгрузки",
+                "Статус",
+                "Рабочая зона",
+                "Штат",
+                "Клиент",
+                "Тип оплаты",
+            ],
+        )
+        expected_values = {
+            "ИД заказа": order_id,
+            "Дата заказа": delivery_date,
+            "Дата отгрузки": delivery_date,
+            "Статус": "Новый",
+            "Рабочая зона": f"room-pw{code}",
+            "Штат": f"robot-pw{code}",
+            "Клиент": f"natural_client-pw{code}",
+            "Тип оплаты": "Наличные деньги",
+        }
+        for key, expected in expected_values.items():
+            actual = order_data.get(key)
+            if actual != expected:
+                raise AssertionError(f"{key} o'zgargan. Expected: {expected!r}, actual: {actual!r}")
+
+
+@allure.title("A Group: Contract limit tekshiruvi va limit ichida zakaz yaratish")
+def test_a_group_contract_limit_validation_and_valid_order(page: Page, code: str, load_data, save_data, test_scope) -> None:
+    run_a_group_contract_limit_validation_and_valid_order(page, code, load_data, save_data, scope=test_scope)
+
+
+@allure.title("A Group: Contract tip oplati auto-fill va limit tekshiruvi")
+def test_a_group_order_uses_contract_payment_type(page: Page, code: str, load_data, save_data, test_scope) -> None:
+    run_a_group_order_uses_contract_payment_type(page, code, load_data, save_data, scope=test_scope)
+
+
+@allure.title("A Group: Order editda statusni Новый qilib saqlash")
+def test_a_group_edit_order_and_save_as_new(page: Page, code: str, load_data, test_scope) -> None:
+    run_a_group_edit_order_and_save_as_new(page, code, load_data, scope=test_scope)

@@ -1,8 +1,12 @@
 import allure
-from datetime import datetime
 from tests.smoke.flows.flow_navigate import navigate_to
 from tests.smoke.flows.flow_authorization import authorization_user
-from tests.smoke.flows.flow_order.flow_order_add import flow_order_main_page, flow_order_product_page, flow_order_final_page
+from tests.smoke.flows.flow_order.flow_order_add import (
+    auto_filled_order_dates,
+    flow_order_main_page,
+    flow_order_product_page,
+    flow_order_final_page,
+)
 from tests.smoke.flows.flow_order.flow_order_list import flow_order_list, flow_order_list_grid_setting
 from tests.smoke.flows.flow_order.flow_order_view import flow_order_view
 
@@ -10,8 +14,7 @@ pytestmark = [allure.epic("Smoke"), allure.feature("Life Cycle"), allure.story("
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@allure.title("Order Basic")
-def test_order_basic(page, code, save_data) -> None:
+def run_order_basic(page, code, save_data, scope: str = "smoke") -> None:
     authorization_user(page, code)
 
     with allure.step("Navigate To: Order Page"):
@@ -23,8 +26,7 @@ def test_order_basic(page, code, save_data) -> None:
         flow_order_list(page, add=True)
 
     with allure.step("Order Add: Main Page"):
-        deal_time =  datetime.now().strftime("%d.%m.%Y %H:%M")
-        delivery_date = datetime.now().strftime("%d.%m.%Y")
+        deal_time, delivery_date = auto_filled_order_dates(page)
         flow_order_main_page(page,
                              check_form=True,
                              deal_time=deal_time,
@@ -114,14 +116,22 @@ def test_order_basic(page, code, save_data) -> None:
         flow_order_list(page, find_row=f"room-pw{code}", status="Доставлен")
         # flow_order_list(page, find_row=f"room-pw{code}", status="Архив")
         # flow_order_list(page, find_row=f"room-pw{code}", status="Отменен")
-        test_order_add_column_order_id(page, code)
+        run_order_add_column_order_id(page, code)
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@allure.title("Order Add Column -> Order Id")
-def test_order_add_column_order_id(page, code) -> None:
+def run_order_add_column_order_id(page, code, scope: str = "smoke") -> None:
 
     with allure.step("Order List: Grid Setting"):
         flow_order_list_grid_setting(page, colum_name="ИД заказа", search_name="ИД заказа")
 
 # ----------------------------------------------------------------------------------------------------------------------
+
+@allure.title("Order Basic")
+def test_order_basic(page, code, save_data, test_scope) -> None:
+    run_order_basic(page, code, save_data, scope=test_scope)
+
+
+@allure.title("Order Add Column -> Order Id")
+def test_order_add_column_order_id(page, code, test_scope) -> None:
+    run_order_add_column_order_id(page, code, scope=test_scope)

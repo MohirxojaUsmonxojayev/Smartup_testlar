@@ -28,7 +28,7 @@ Avval `test-results/logs/` dagi tegishli log faylni o'qi.
 | `ElementNotFound` | Element yo'q | Page state tekshir, flow tartibini ko'r |
 | `AssertionError` | Qiymat mos kelmayapti | Kutilgan vs haqiqiy qiymatni solishtir |
 | `JSONDecodeError` | data_store.json buzilgan | Faylni o'chirib qayta run qil |
-| `pytest.exit` | `code` fixture topilmadi | Avval `test_smoke_runner.py` ishlatilsin |
+| `pytest.exit` | `code` fixture topilmadi | Avval `test_setup_runner.py` yoki `run_tests.sh` ishlatilsin |
 
 ### 3. Locator muammolari
 
@@ -84,9 +84,10 @@ Yechim: <nima qilish kerak>
 - Test yozish/debug iteratsiyasida precondition entity `data_store.json` da mavjud bo'lsa, masalan contract yaratilgan va code/name saqlangan bo'lsa, keyingi order xatosini tekshirish uchun contract testni qayta run qilish shart emas; mavjud qiymatdan foydalan.
 
 ### Form screenshot arxivi
-- Smartup formalarini debug qilganda avval `test-results/screens/smartup/` ichida shu URL/form uchun screenshot bor-yo'qligini tekshir.
-- Agar kerakli screenshot bo'lmasa yoki UI o'zgargan bo'lsa, formani ochib URL asosida nomlangan screenshot saqla: `test-results/screens/smartup/<url_as_filename>.png`.
-- Yangi formaga kirilganda yoki URL/form state o'zgarganda screenshotni yangilab borish keyingi locator/debug ishlari uchun majburiy odat bo'lsin.
+- Smartup formalarini debug qilganda avval `.agents/skills/smartup-guide/references/forms/screenshots/<form-slug>/` ichida shu forma uchun screenshot bor-yo'qligini tekshir.
+- Agar kerakli screenshot bo'lmasa yoki UI o'zgargan bo'lsa, formani ochib skill arxiviga saqla: `.agents/skills/smartup-guide/references/forms/screenshots/<form-slug>/<form-slug>__<state>__desktop-1920x1080.png`.
+- `test-results/screens/smartup/` forma/debug screenshot arxivi uchun ishlatilmasin; `test-results/allure-results` faqat pytest/Allure failure attachment outputi.
+- Yangi formaga kirilganda yoki URL/form state o'zgarganda screenshotni skill arxivida yangilab borish keyingi locator/debug ishlari uchun majburiy odat bo'lsin.
 
 ### to_contain_text() da exact parametri yo'q
 - `expect(locator).to_contain_text("text", exact=True)` — **xato**, bu parametr mavjud emas

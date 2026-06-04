@@ -19,13 +19,12 @@ Tags: contract, contract-view, view-form, locator, screenshot, order-preconditio
 
 ## Screenshot Paths
 
-- Current screenshot folder: `test-results/screens/smartup/current/`
-- Baseline screenshot folder: `test-results/screens/smartup/baseline/`
-- Metadata folder: `test-results/screens/smartup/meta/`
+- Screenshot archive folder: `references/forms/screenshots/contract-view/`
+- Metadata folder: `references/forms/screenshots/contract-view/`
 - Expected file naming:
   - `contract-view__default__desktop-1440x783__<contract_code>.png`
   - metadata: `contract-view__default__desktop-1440x783__<contract_code>.json`
-- If screenshot is missing, open contract view in stable UI state, take screenshot, save it to `current/`, save metadata to `meta/`, and update this section with exact file path.
+- If screenshot is missing, open contract view in stable UI state, take screenshot, save it to `references/forms/screenshots/contract-view/`, save metadata in the same folder, and update this section with exact file path.
 - Visual regression note: loader, dropdown, confirm/error modal, and transient notifications must be closed/hidden before taking baseline-ready screenshot.
 
 ## Open Flow

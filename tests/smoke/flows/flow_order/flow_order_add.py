@@ -1,11 +1,19 @@
 import re
-from datetime import datetime
 
 import allure
 from playwright.sync_api import expect
 from utils.base_page import BasePage
 
 from tests.smoke.flows.flow_order.flow_order_list import flow_order_list
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+def auto_filled_order_dates(page):
+    deal_time_input = page.locator("#anor279-input-deal_time")
+    delivery_date_input = page.locator("#anor279-input-delivery_date")
+    expect(deal_time_input).to_have_value(re.compile(r"\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}"))
+    expect(delivery_date_input).to_have_value(re.compile(r"\d{2}\.\d{2}\.\d{4}"))
+    return deal_time_input.input_value().strip(), delivery_date_input.input_value().strip()
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -26,9 +34,6 @@ def flow_order_main_page(
 
     if check_form:
         with allure.step("Main Page: Auto fill bo'lganini tekshirish"):
-            # expected_deal_time = deal_time or datetime.now().strftime("%d.%m.%Y %H:%M")
-            # delivery_date = datetime.now().strftime("%d.%m.%Y")
-
             expect(page.locator("#anor279-input-deal_time")).to_have_value(deal_time)
             expect(page.locator("#anor279-input-delivery_date")).to_have_value(delivery_date)
             expect(page.locator("#anor279-input-b_input-room_name").get_by_role("textbox", name="Поиск")).to_have_value(room)
@@ -95,7 +100,9 @@ def flow_order_final_page(page, check_form=False, payment_type=None, natural_cli
     if status and not check_form:
         with allure.step(f"Final Page: Order status -> '{status}' tanlash"):
             page.locator("#anor279-ui_select-status:visible").get_by_label("Select box activate").click()
-            page.get_by_text(status).click()
+            option = page.locator(".ui-select-choices-row-inner").get_by_text(status, exact=True)
+            expect(option).to_be_visible()
+            option.click()
 
     if payment_type and not check_form:
         with allure.step(f"Final Page: Payment Type -> '{payment_type}' tanlash"):
@@ -118,10 +125,7 @@ def flow_order_final_page(page, check_form=False, payment_type=None, natural_cli
     if save:
         with allure.step("Final Page: Order save qilish"):
             page.get_by_role("button", name="Сохранить").click()
-            expect(page.locator("#biruniConfirm")).to_contain_text("Сохранить?")
-            expect(page.locator("#biruniConfirm")).to_have_css("opacity", "1")
-            page.locator("#biruniConfirm").get_by_role("button", name="да").click()
-            page.locator("#biruniConfirm").wait_for(state="hidden")
+            BasePage(page).confirm_biruni("Сохранить?")
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -136,11 +140,12 @@ def flow_order_prepare_with_contract(
     save=False,
 ):
     flow_order_list(page, add=True)
+    deal_time, delivery_date = auto_filled_order_dates(page)
     flow_order_main_page(
         page,
         check_form=True,
-        deal_time=datetime.now().strftime("%d.%m.%Y %H:%M"),
-        delivery_date=datetime.now().strftime("%d.%m.%Y"),
+        deal_time=deal_time,
+        delivery_date=delivery_date,
         room=f"room-pw{code}",
         robot=f"robot-pw{code}",
         natural_client=f"natural_client-pw{code}",

@@ -6,8 +6,7 @@ pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("Robot
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-@allure.title("Xodim (robot) yaratish")
-def test_robot(page: Page, code) -> None:
+def run_robot(page: Page, code, scope: str = "smoke") -> None:
     with allure.step("1 - Xodimlar ro'yxatiga o'tish"):
         navigate_to(page, tab="Справочники", name="Штат")
         expect(page.get_by_role("heading")).to_contain_text("Штат")
@@ -31,3 +30,7 @@ def test_robot(page: Page, code) -> None:
         expect(page.get_by_text(f"robot-pw{code}", exact=True)).to_be_visible()
 
 # ----------------------------------------------------------------------------------------------------------------------
+
+@allure.title("Xodim (robot) yaratish")
+def test_robot(page: Page, code, test_scope) -> None:
+    run_robot(page, code, scope=test_scope)

@@ -16,6 +16,13 @@ Tags: locator, angular
   - `page.get_by_role(...)`
 - Sabab: UI Angular migratsiya/yangilanishlarida semantik locatorlar barqarorroq.
 
+### Form Field Discovery
+Tags: form, discovery, checkbox, switch, radio
+- Yangi add/edit forma o'rganilganda faqat `input[type=text]`, `textarea`, `select` va `b-input`larni yig'ish yetarli emas.
+- Smartup switchlar ko'pincha styled checkbox sifatida chiqadi; `input[type="checkbox"]`, `input[type="radio"]`, ularning label/group texti, `ng-model`, `checked`, `disabled`, `visible` holati alohida yig'ilsin.
+- Switch yoqilgandan keyin yangi required maydon paydo bo'lishi mumkin; masalan filial add’da `НДС` (`d.vat_enabled`) yoqilganda `Ставка НДС (%)` (`d.vat_percent`) majburiy input bo'ladi.
+- Formani "full" qilishdan oldin field discovery kamida ikki holatni tekshirsin: default state va switch/checkbox yoqilgandan keyingi state.
+
 ### b-input
 Tags: b-input, locator
 - Qoida: `b-input` tanlash uchun umumiy helper ishlatiladi.
@@ -57,13 +64,13 @@ Tags: list, grid, search, column
 Tags: screenshot, debug, url
 - Screenshotlar kelajakdagi visual regression/baseline taqqoslashga tayyor formatda saqlansin.
 - Saqlash joylari:
-  - `test-results/screens/smartup/current/` — test yozish/debug paytidagi hozirgi screenshotlar.
-  - `test-results/screens/smartup/baseline/` — keyinchalik tasdiqlangan release baseline screenshotlar.
-  - `test-results/screens/smartup/meta/` — screenshot metadata JSON fayllari.
+  - `.agents/skills/smartup-guide/references/forms/screenshots/<form-slug>/` — forma bo'yicha doimiy screenshot va metadata arxivi.
+  - `test-results/allure-results/` — faqat pytest/Allure failure attachment outputi; forma bilim arxivi sifatida ishlatilmaydi.
+  - `test-results/screens/smartup/` — ishlatilmasin, chunki run output tozalanishi mumkin va skill bilim manbasi emas.
 - Naming: `<form-slug>__<state>__<viewport>__<stable-id>.png`.
   - Misol: `contract-view__default__desktop-1440x783__contract_code_4986.png`
   - URL asosida saqlash kerak bo'lsa: `<form-slug>__url-<sanitized-url-hash>__<viewport>.png`
-- Metadata: har screenshot bilan bir xil nomdagi `.json` saqlansin:
+- Metadata: har screenshot bilan bir xil arxiv papkasida `.json` saqlansin:
   - URL
   - form slug
   - state
@@ -73,6 +80,6 @@ Tags: screenshot, debug, url
   - created_at
   - browser
   - dynamic areas yoki mask kerak bo'lishi mumkin bo'lgan joylar
-- Qoida: yangi formaga kirilganda yoki URL/form state sezilarli o'zgarganda current screenshot saqlab bor.
+- Qoida: yangi formaga kirilganda yoki URL/form state sezilarli o'zgarganda skill arxividagi screenshotni yangilab bor.
 - Debug tartibi: muammo chiqqanda avval mavjud screenshotlardan qaraladi; kerakli screen yo'q bo'lsa UI ochilib yangi screenshot olinadi.
 - Release visual check qo'shilganda current screenshot baseline bilan solishtiriladi; shuning uchun screenshotlar random modal/loader/dropdown ochiq holda emas, barqaror UI state’da olinishi kerak.

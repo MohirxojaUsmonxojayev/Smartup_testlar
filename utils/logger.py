@@ -60,7 +60,7 @@ class TestLogger:
     def warning(self, message: str) -> None:
         self._logger.warning(f"[WARNING] {message}")
 
-    def fail(self, message: str, exc: BaseException = None) -> None:
+    def fail(self, message: str, exc: BaseException = None, raise_error: bool = False) -> None:
         self.has_failures = True
         self._logger.error(f"[FAIL] {message}")
         if exc is not None:
@@ -68,6 +68,8 @@ class TestLogger:
             tb = traceback.format_exc()
             if tb.strip() != "NoneType: None":
                 self._logger.error(f"[TRACEBACK]\n{tb}")
+        if raise_error:
+            raise AssertionError(message) from exc
 
     def close(self) -> None:
         for handler in self._logger.handlers[:]:

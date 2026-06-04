@@ -2,6 +2,7 @@ import re
 from datetime import datetime, timedelta
 
 from playwright.sync_api import Page, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 
 class BasePage:
@@ -10,10 +11,97 @@ class BasePage:
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    def click_js(self):
+    def _expect_checkbox_state(self, checkbox, checked=True, timeout=10_000):
+        if checked:
+            expect(checkbox).to_be_checked(timeout=timeout)
+        else:
+            expect(checkbox).not_to_be_checked(timeout=timeout)
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def _checkbox_state_matches(self, checkbox, checked=True, timeout=1_000):
+        try:
+            self._expect_checkbox_state(checkbox, checked=checked, timeout=timeout)
+            return True
+        except (AssertionError, PlaywrightTimeoutError):
+            return False
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def _click_grid_checkbox_cell(self, grid_cell, checkbox, checked=True):
+        cell = grid_cell.first
+        cell.scroll_into_view_if_needed()
+        box = cell.bounding_box()
+        if box is None or box["width"] <= 0 or box["height"] <= 0:
+            return False
+
+        y = box["height"] / 2
+        click_x_positions = (
+            min(24, box["width"] / 2),
+            min(12, box["width"] / 2),
+            box["width"] / 2,
+        )
+        for x in click_x_positions:
+            cell.click(position={"x": x, "y": y})
+            if self._checkbox_state_matches(checkbox, checked=checked):
+                return True
+        return False
+
+    def click_first_visible_checkbox(self):
         self.page.wait_for_load_state("networkidle")
-        checkbox = self.page.locator(".checkbox").first
-        checkbox.evaluate("el => el.click()")
+        checkbox = self.page.locator("b-grid:visible input[type='checkbox']").first
+        if checkbox.count() == 0:
+            checkbox = self.page.locator("input[type='checkbox']").first
+        expect(checkbox).to_be_attached()
+        self.set_checkbox(checkbox, checked=True)
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def set_checkbox(self, checkbox, checked=True):
+        """Checkboxni ko'rinadigan control orqali real click bilan kerakli holatga keltiradi."""
+        if checkbox.is_checked() == checked:
+            return
+
+        label = checkbox.locator("xpath=ancestor::label[1]")
+        if label.count() > 0 and label.first.is_visible():
+            label.first.click()
+            self._expect_checkbox_state(checkbox, checked=checked)
+            return
+        if label.count() > 0:
+            label_box = label.first.bounding_box()
+            checkbox_box = checkbox.bounding_box()
+            if label_box is not None and checkbox_box is not None and label_box["width"] > 0:
+                self.page.mouse.click(
+                    label_box["x"] + min(10, label_box["width"] / 2),
+                    checkbox_box["y"] + checkbox_box["height"] / 2,
+                )
+                if self._checkbox_state_matches(checkbox, checked=checked):
+                    return
+
+        grid_cell = checkbox.locator(
+            "xpath=ancestor::*[contains(@class,'tbl-checkbox-cell') or contains(@class,'tbl-header-cell')][1]"
+        )
+        if grid_cell.count() > 0 and grid_cell.first.is_visible():
+            if self._click_grid_checkbox_cell(grid_cell, checkbox, checked=checked):
+                return
+            self._expect_checkbox_state(checkbox, checked=checked)
+            return
+
+        wrapper = checkbox.locator(
+            "xpath=ancestor::*[contains(@class,'checkbox') or contains(@class,'smt-checkbox') or contains(@class,'custom-control')][1]"
+        )
+        if wrapper.count() > 0 and wrapper.first.is_visible():
+            wrapper.first.click()
+        else:
+            expect(checkbox).to_be_visible()
+            checkbox.click()
+
+        self._expect_checkbox_state(checkbox, checked=checked)
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def set_checkall(self, checked=True):
+        self.set_checkbox(self.page.locator("input[bcheckall]").first, checked=checked)
 
     # ------------------------------------------------------------------------------------------------------------------
 
@@ -33,6 +121,33 @@ class BasePage:
         except Exception as e:
             print(f"Xato: Loader {timeout} ms ichida yo'qolmadi: {e}")
             raise
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def confirm_biruni(self, expected_text=None, button_name="да"):
+        """Biruni confirm modalini barqaror tasdiqlaydi."""
+        confirm = self.page.locator("#biruniConfirm")
+        expect(confirm).to_be_visible()
+        if expected_text:
+            expect(confirm).to_contain_text(expected_text)
+        expect(confirm).to_have_css("opacity", "1")
+        confirm.get_by_role("button", name=button_name, exact=True).click()
+        confirm.wait_for(state="hidden")
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def grid_row(self, text, grid_selector="b-grid"):
+        grid = self.page.locator(grid_selector)
+        row = grid.locator(".tbl-row").filter(has_text=text).first
+        expect(row).to_be_visible()
+        return row
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def click_grid_row(self, text, grid_selector="b-grid"):
+        row = self.grid_row(text, grid_selector=grid_selector)
+        row.click()
+        return row
 
     # ------------------------------------------------------------------------------------------------------------------
 

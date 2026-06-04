@@ -48,6 +48,13 @@ Tags: order, contract, payment-type, auto-fill
 - Qoida: User `Тип оплаты` ni boshqa qiymatga o'zgartirishi mumkin; save validation payment typega emas, contract sum limitga bog'liq.
 - Testda ishlatish: auto-fill uchun input value tekshir. Keyin optional ravishda payment type o'zgartirilib ham save ishlashi tekshirilishi mumkin.
 
+### Order Edit Save As New
+Tags: order, edit, a-group, status
+- Qayerda: A-group `A-05` testi `A-04` yaratgan active orderni edit qiladi.
+- Qoida: edit flowda yangi row/mahsulot qo'shilmaydi; main va product sahifalarida faqat `Далее` bosiladi.
+- Qoida: final sahifada mavjud qiymatlar tekshirilib, order statusi `Новый` qilib saqlanadi.
+- Testda ishlatish: edit main/product/final sahifalaridagi room, robot, client, contract, product, warehouse, price type, quantity, payment type va total qiymatlarini tekshir; save'dan keyin viewda order id saqlanganini va status `Новый` bo'lganini assert qil.
+
 ### Consignment Order Case
 Tags: order, consignment, settings, view
 - Qayerda: `Главное > Настройки системы > Заказ`.
