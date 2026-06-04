@@ -1,0 +1,50 @@
+name: Daily Smoke Tests
+
+on:
+  schedule:
+    - cron: "15 9 * * *"
+      timezone: "Asia/Tashkent"
+  workflow_dispatch:
+
+concurrency:
+  group: daily-smoke-tests
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Playwright browser
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run daily smoke tests
+        run: |
+          python scripts/run_tests.py \
+            --url https://smartup.online/ \
+            --company-code "${{ secrets.SMARTUP_COMPANY_CODE }}" \
+            --company-password "${{ secrets.SMARTUP_COMPANY_PASSWORD }}" \
+            --headless
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-smoke-test-results
+          path: test-results/
+          retention-days: 7
