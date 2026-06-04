@@ -48,3 +48,32 @@ jobs:
           name: daily-smoke-test-results
           path: test-results/
           retention-days: 7
+
+      - name: Send Telegram notification
+        if: ${{ always() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram secrets are not configured; skipping notification."
+            exit 0
+          fi
+
+          if [ "$JOB_STATUS" = "success" ]; then
+            STATUS_TEXT="Daily Smoke Tests: PASSED"
+          else
+            STATUS_TEXT="Daily Smoke Tests: FAILED"
+          fi
+
+          MESSAGE=$(printf '%s\nRepository: %s\nBranch: %s\nRun: %s' \
+            "$STATUS_TEXT" "$GITHUB_REPOSITORY" "$BRANCH" "$RUN_URL")
+
+          curl --fail-with-body -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MESSAGE}" \
+            --data-urlencode "disable_web_page_preview=true" \
+            || echo "Telegram notification failed."
