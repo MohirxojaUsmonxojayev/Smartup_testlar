@@ -33,7 +33,7 @@ if (-not $env:DEFAULT_SERVER_URL) {
 }
 
 if (-not $env:ALLOWED_SERVER_URLS) {
-    $env:ALLOWED_SERVER_URLS = "https://smartup.online"
+    $env:ALLOWED_SERVER_URLS = "https://smartup.online,https://app3.greenwhite.uz/xtrade"
 }
 
 $VenvPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"

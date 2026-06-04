@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import os
-import shlex
 import sys
+import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import requests
@@ -13,15 +15,42 @@ import requests
 DEFAULT_REPOSITORY = "turgunovjasur/Playwright"
 DEFAULT_WORKFLOW = "daily-smoke.yml"
 DEFAULT_REF = "main"
-DEFAULT_SCOPE = "smoke"
 DEFAULT_TARGET = "all"
-DEFAULT_SERVER_URL = "https://smartup.online/"
-VALID_SCOPES = {"smoke", "regression"}
-VALID_TARGETS = {"all", "setup", "group-a", "group-b"}
+
+SERVERS = {
+    "smartup": "https://smartup.online",
+    "app3": "https://app3.greenwhite.uz/xtrade",
+}
+SCOPES = {"smoke", "regression"}
 
 
 class ConfigError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class RunRequest:
+    scope: str
+    server_key: str
+    server_url: str
+    target: str = DEFAULT_TARGET
+
+
+@dataclass(frozen=True)
+class WorkflowRun:
+    run_id: int | None
+    html_url: str
+
+
+@dataclass(frozen=True)
+class BotConfig:
+    telegram_token: str
+    allowed_chat_ids: set[str]
+    github_token: str
+    repository: str
+    workflow: str
+    ref: str
+    allowed_server_keys: set[str]
 
 
 def env_required(name: str, *fallbacks: str) -> str:
@@ -37,32 +66,44 @@ def env_value(name: str, default: str) -> str:
     return os.getenv(name, default).strip() or default
 
 
-def normalize_url(value: str) -> str:
-    return value.strip().rstrip("/")
-
-
 def split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-@dataclass(frozen=True)
-class RunRequest:
-    scope: str
-    server_url: str
-    target: str
+def server_keys_from_env(value: str) -> set[str]:
+    if not value:
+        return set(SERVERS)
+    keys: set[str] = set()
+    for item in split_csv(value):
+        lowered = item.lower().rstrip("/")
+        if lowered in SERVERS:
+            keys.add(lowered)
+            continue
+        for key, url in SERVERS.items():
+            if lowered == url.rstrip("/"):
+                keys.add(key)
+                break
+    return keys or set(SERVERS)
 
 
-@dataclass(frozen=True)
-class BotConfig:
-    telegram_token: str
-    allowed_chat_ids: set[str]
-    github_token: str
-    repository: str
-    workflow: str
-    ref: str
-    default_server_url: str
-    allowed_server_urls: set[str]
-    allow_any_server: bool
+def load_config() -> BotConfig:
+    allowed_chat_ids = set(
+        split_csv(os.getenv("TELEGRAM_ALLOWED_CHAT_IDS", "") or os.getenv("TELEGRAM_CHAT_ID", ""))
+    )
+    if not allowed_chat_ids:
+        raise ConfigError("Set TELEGRAM_ALLOWED_CHAT_IDS or TELEGRAM_CHAT_ID to restrict bot access.")
+
+    allowed_server_keys = server_keys_from_env(os.getenv("ALLOWED_SERVER_URLS", ""))
+
+    return BotConfig(
+        telegram_token=env_required("TELEGRAM_BOT_TOKEN"),
+        allowed_chat_ids=allowed_chat_ids,
+        github_token=env_required("GITHUB_TOKEN", "GITHUB_PAT"),
+        repository=env_value("GITHUB_REPOSITORY", DEFAULT_REPOSITORY),
+        workflow=env_value("GITHUB_WORKFLOW_FILE", DEFAULT_WORKFLOW),
+        ref=env_value("GITHUB_REF", DEFAULT_REF),
+        allowed_server_keys=allowed_server_keys,
+    )
 
 
 class TelegramClient:
@@ -79,43 +120,62 @@ class TelegramClient:
         return data
 
     def get_updates(self, offset: int | None) -> list[dict[str, Any]]:
-        payload: dict[str, Any] = {"timeout": 50, "allowed_updates": '["message"]'}
+        payload: dict[str, Any] = {"timeout": 50, "allowed_updates": '["message","callback_query"]'}
         if offset is not None:
             payload["offset"] = offset
         return self.request("getUpdates", payload).get("result", [])
 
-    def send_message(self, chat_id: str, text: str) -> None:
+    def send_message(self, chat_id: str, text: str, reply_markup: dict[str, Any] | None = None) -> None:
+        payload: dict[str, Any] = {
+            "chat_id": chat_id,
+            "text": text,
+            "disable_web_page_preview": "true",
+        }
+        if reply_markup is not None:
+            payload["reply_markup"] = json.dumps(reply_markup)
+        self.request("sendMessage", payload)
+
+    def edit_message(self, chat_id: str, message_id: int, text: str) -> None:
         self.request(
-            "sendMessage",
+            "editMessageText",
             {
                 "chat_id": chat_id,
+                "message_id": str(message_id),
                 "text": text,
                 "disable_web_page_preview": "true",
             },
         )
 
+    def answer_callback(self, callback_id: str, text: str = "") -> None:
+        payload = {"callback_query_id": callback_id}
+        if text:
+            payload["text"] = text
+        self.request("answerCallbackQuery", payload)
+
 
 class GitHubActionsClient:
     def __init__(self, token: str, repository: str, workflow: str, ref: str) -> None:
-        self.token = token
         self.repository = repository
         self.workflow = workflow
         self.ref = ref
         self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {token}",
+                "X-GitHub-Api-Version": "2022-11-28",
+            }
+        )
 
     @property
     def workflow_url(self) -> str:
         return f"https://github.com/{self.repository}/actions/workflows/{self.workflow}"
 
-    def dispatch(self, request: RunRequest) -> str:
+    def dispatch(self, request: RunRequest) -> WorkflowRun:
+        started_at = datetime.now(timezone.utc)
         url = f"https://api.github.com/repos/{self.repository}/actions/workflows/{self.workflow}/dispatches"
         response = self.session.post(
             url,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {self.token}",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
             json={
                 "ref": self.ref,
                 "inputs": {
@@ -126,170 +186,242 @@ class GitHubActionsClient:
             },
             timeout=30,
         )
-        if response.status_code not in {200, 204}:
+        if response.status_code != 204:
             raise RuntimeError(f"GitHub dispatch failed: {response.status_code} {response.text}")
-        if response.status_code == 200:
-            data = response.json()
-            html_url = data.get("html_url")
-            if html_url:
-                return str(html_url)
-        return self.workflow_url
 
+        return self.find_new_run(started_at)
 
-def load_config() -> BotConfig:
-    default_server_url = normalize_url(env_value("DEFAULT_SERVER_URL", DEFAULT_SERVER_URL))
-    allowed_servers_raw = env_value("ALLOWED_SERVER_URLS", default_server_url)
-    allow_any_server = allowed_servers_raw.strip() == "*"
-    allowed_server_urls = {normalize_url(item) for item in split_csv(allowed_servers_raw)}
+    def find_new_run(self, started_at: datetime) -> WorkflowRun:
+        deadline = time.monotonic() + 30
+        earliest = started_at - timedelta(seconds=15)
+        while time.monotonic() < deadline:
+            run = self.latest_matching_run(earliest)
+            if run is not None:
+                return run
+            time.sleep(3)
+        return WorkflowRun(run_id=None, html_url=self.workflow_url)
 
-    allowed_chat_ids = set(
-        split_csv(os.getenv("TELEGRAM_ALLOWED_CHAT_IDS", "") or os.getenv("TELEGRAM_CHAT_ID", ""))
-    )
-    if not allowed_chat_ids:
-        raise ConfigError("Set TELEGRAM_ALLOWED_CHAT_IDS or TELEGRAM_CHAT_ID to restrict bot access.")
-
-    return BotConfig(
-        telegram_token=env_required("TELEGRAM_BOT_TOKEN"),
-        allowed_chat_ids=allowed_chat_ids,
-        github_token=env_required("GITHUB_TOKEN", "GITHUB_PAT"),
-        repository=env_value("GITHUB_REPOSITORY", DEFAULT_REPOSITORY),
-        workflow=env_value("GITHUB_WORKFLOW_FILE", DEFAULT_WORKFLOW),
-        ref=env_value("GITHUB_REF", DEFAULT_REF),
-        default_server_url=default_server_url,
-        allowed_server_urls=allowed_server_urls,
-        allow_any_server=allow_any_server,
-    )
-
-
-def help_text(config: BotConfig) -> str:
-    allowed_servers = "any" if config.allow_any_server else ", ".join(sorted(config.allowed_server_urls))
-    return (
-        "Smartup CI bot commands:\n"
-        "/smoke - run smoke tests on default server\n"
-        "/regression - run regression tests on default server\n"
-        "/run scope=smoke server=https://smartup.online target=all\n"
-        "/run smoke https://smartup.online\n"
-        "/servers - show allowed servers\n\n"
-        f"Default server: {config.default_server_url}\n"
-        f"Allowed servers: {allowed_servers}\n"
-        "Targets: all, setup, group-a, group-b"
-    )
-
-
-def parse_run_request(text: str, config: BotConfig) -> RunRequest:
-    parts = text.strip().split(maxsplit=1)
-    command = parts[0].split("@", 1)[0].lower()
-    args_text = parts[1] if len(parts) > 1 else ""
-
-    scope = DEFAULT_SCOPE
-    target = DEFAULT_TARGET
-    server_url = config.default_server_url
-
-    if command == "/smoke":
-        scope = "smoke"
-    elif command == "/regression":
-        scope = "regression"
-    elif command != "/run":
-        raise ValueError("Unsupported command.")
-
-    for token in shlex.split(args_text):
-        key, sep, value = token.partition("=")
-        key = key.strip().lower()
-        value = value.strip()
-
-        if sep:
-            if key in {"scope", "s"}:
-                scope = value.lower()
-            elif key in {"server", "server_url", "url"}:
-                server_url = value
-            elif key in {"target", "t"}:
-                target = value.lower()
-            else:
-                raise ValueError(f"Unknown option: {key}")
-            continue
-
-        lowered = token.lower()
-        if lowered in VALID_SCOPES:
-            scope = lowered
-        elif lowered in VALID_TARGETS:
-            target = lowered
-        elif lowered.startswith(("http://", "https://")):
-            server_url = token
-        else:
-            raise ValueError(f"Unknown argument: {token}")
-
-    scope = scope.lower()
-    target = target.lower()
-    server_url = normalize_url(server_url)
-
-    if scope not in VALID_SCOPES:
-        raise ValueError("Scope must be smoke or regression.")
-    if target not in VALID_TARGETS:
-        raise ValueError("Target must be one of: all, setup, group-a, group-b.")
-    if not server_url.startswith(("http://", "https://")):
-        raise ValueError("Server URL must start with http:// or https://.")
-    if not config.allow_any_server and server_url not in config.allowed_server_urls:
-        allowed = ", ".join(sorted(config.allowed_server_urls))
-        raise ValueError(f"Server is not allowed. Allowed servers: {allowed}")
-
-    return RunRequest(scope=scope, server_url=server_url, target=target)
-
-
-def extract_message(update: dict[str, Any]) -> tuple[str, str] | None:
-    message = update.get("message") or {}
-    chat = message.get("chat") or {}
-    chat_id = chat.get("id")
-    text = message.get("text")
-    if chat_id is None or not isinstance(text, str):
+    def latest_matching_run(self, earliest: datetime) -> WorkflowRun | None:
+        url = f"https://api.github.com/repos/{self.repository}/actions/workflows/{self.workflow}/runs"
+        response = self.session.get(
+            url,
+            params={"branch": self.ref, "event": "workflow_dispatch", "per_page": "10"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        runs = response.json().get("workflow_runs", [])
+        for item in runs:
+            created_at = parse_github_time(str(item.get("created_at", "")))
+            if created_at is None or created_at < earliest:
+                continue
+            run_id = item.get("id")
+            html_url = item.get("html_url")
+            if isinstance(run_id, int) and isinstance(html_url, str):
+                return WorkflowRun(run_id=run_id, html_url=html_url)
         return None
-    return str(chat_id), text.strip()
+
+    def get_run_status(self, run_id: int) -> tuple[str, str | None, str]:
+        url = f"https://api.github.com/repos/{self.repository}/actions/runs/{run_id}"
+        response = self.session.get(url, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        return str(data.get("status", "")), data.get("conclusion"), str(data.get("html_url", self.workflow_url))
 
 
-def handle_message(
-    telegram: TelegramClient,
-    github: GitHubActionsClient,
-    config: BotConfig,
-    chat_id: str,
-    text: str,
-) -> None:
-    command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
+def parse_github_time(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
+
+def help_text() -> str:
+    return (
+        "Test run qilish uchun /run yuboring.\n\n"
+        "Bot avval serverni so'raydi, keyin scope tanlatadi.\n"
+        "Company code/password GitHub Secrets'dan olinadi."
+    )
+
+
+def server_keyboard(config: BotConfig) -> dict[str, Any]:
+    rows = []
+    if "smartup" in config.allowed_server_keys:
+        rows.append([{"text": "smartup.online", "callback_data": "server:smartup"}])
+    if "app3" in config.allowed_server_keys:
+        rows.append([{"text": "app3.greenwhite.uz/xtrade", "callback_data": "server:app3"}])
+    return {"inline_keyboard": rows}
+
+
+def scope_keyboard(server_key: str) -> dict[str, Any]:
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "smoke", "callback_data": f"scope:{server_key}:smoke"},
+                {"text": "regression", "callback_data": f"scope:{server_key}:regression"},
+            ]
+        ]
+    }
+
+
+def show_run_start(telegram: TelegramClient, chat_id: str, config: BotConfig) -> None:
+    telegram.send_message(chat_id, "Qaysi serverda run qilamiz?", reply_markup=server_keyboard(config))
+
+
+def handle_message(telegram: TelegramClient, config: BotConfig, chat_id: str, text: str) -> None:
     if chat_id not in config.allowed_chat_ids:
         telegram.send_message(chat_id, "This chat is not allowed to run CI.")
         return
 
+    command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
     if command in {"/start", "/help"}:
-        telegram.send_message(chat_id, help_text(config))
+        telegram.send_message(chat_id, help_text())
         return
-
     if command == "/servers":
-        servers = "any" if config.allow_any_server else "\n".join(sorted(config.allowed_server_urls))
-        telegram.send_message(chat_id, f"Allowed servers:\n{servers}")
+        lines = [SERVERS[key] for key in sorted(config.allowed_server_keys)]
+        telegram.send_message(chat_id, "Ruxsat berilgan serverlar:\n" + "\n".join(lines))
+        return
+    if command == "/run":
+        show_run_start(telegram, chat_id, config)
         return
 
-    if command not in {"/run", "/smoke", "/regression"}:
-        telegram.send_message(chat_id, "Unknown command. Send /help.")
+    telegram.send_message(chat_id, "Noto'g'ri command. Test run qilish uchun /run yuboring.")
+
+
+def handle_callback(
+    telegram: TelegramClient,
+    github: GitHubActionsClient,
+    config: BotConfig,
+    callback: dict[str, Any],
+) -> None:
+    callback_id = str(callback.get("id", ""))
+    data = str(callback.get("data", ""))
+    message = callback.get("message") or {}
+    chat = message.get("chat") or {}
+    chat_id = str(chat.get("id", ""))
+    message_id = message.get("message_id")
+
+    if chat_id not in config.allowed_chat_ids:
+        telegram.answer_callback(callback_id, "Not allowed")
+        return
+    if not isinstance(message_id, int):
+        telegram.answer_callback(callback_id)
         return
 
+    if data.startswith("server:"):
+        server_key = data.split(":", 1)[1]
+        if server_key not in config.allowed_server_keys or server_key not in SERVERS:
+            telegram.answer_callback(callback_id, "Server not allowed")
+            return
+        telegram.answer_callback(callback_id, "Server tanlandi")
+        telegram.edit_message(chat_id, message_id, f"Server tanlandi: {SERVERS[server_key]}")
+        telegram.send_message(chat_id, "Qaysi scope bilan run qilamiz?", reply_markup=scope_keyboard(server_key))
+        return
+
+    if data.startswith("scope:"):
+        parts = data.split(":")
+        if len(parts) != 3:
+            telegram.answer_callback(callback_id, "Invalid selection")
+            return
+        _, server_key, scope = parts
+        if server_key not in config.allowed_server_keys or server_key not in SERVERS or scope not in SCOPES:
+            telegram.answer_callback(callback_id, "Invalid selection")
+            return
+        telegram.answer_callback(callback_id, "Run boshlanyapti")
+        request = RunRequest(scope=scope, server_key=server_key, server_url=SERVERS[server_key])
+        start_run(telegram, github, chat_id, message_id, request)
+        return
+
+    telegram.answer_callback(callback_id, "Unknown action")
+
+
+def start_run(
+    telegram: TelegramClient,
+    github: GitHubActionsClient,
+    chat_id: str,
+    message_id: int,
+    request: RunRequest,
+) -> None:
+    telegram.edit_message(
+        chat_id,
+        message_id,
+        (
+            "Test boshlanyapti...\n"
+            f"Server: {request.server_url}\n"
+            f"Scope: {request.scope}\n"
+            "Company: GitHub Secrets"
+        ),
+    )
     try:
-        run_request = parse_run_request(text, config)
-        run_url = github.dispatch(run_request)
+        workflow_run = github.dispatch(request)
     except Exception as exc:
-        telegram.send_message(chat_id, f"Could not start tests:\n{exc}")
+        telegram.send_message(chat_id, f"Testni boshlashda xato:\n{exc}")
         return
 
     telegram.send_message(
         chat_id,
         (
-            "GitHub Actions run started.\n"
-            f"Scope: {run_request.scope}\n"
-            f"Target: {run_request.target}\n"
-            f"Server: {run_request.server_url}\n"
-            f"Branch: {config.ref}\n"
-            f"Run: {run_url}\n\n"
-            "Result will be sent here when CI finishes."
+            "GitHub Actions run boshlandi.\n"
+            f"Server: {request.server_url}\n"
+            f"Scope: {request.scope}\n"
+            f"Run: {workflow_run.html_url}"
         ),
     )
+
+    if workflow_run.run_id is None:
+        telegram.send_message(chat_id, "Run statusini kuzatib bo'lmadi. Natija GitHub Actions linkida ko'rinadi.")
+        return
+
+    thread = threading.Thread(
+        target=monitor_run,
+        args=(telegram, github, chat_id, workflow_run, request),
+        daemon=True,
+    )
+    thread.start()
+
+
+def monitor_run(
+    telegram: TelegramClient,
+    github: GitHubActionsClient,
+    chat_id: str,
+    workflow_run: WorkflowRun,
+    request: RunRequest,
+) -> None:
+    assert workflow_run.run_id is not None
+    started = time.monotonic()
+    sent_two_min = False
+    sent_five_min = False
+
+    while True:
+        elapsed = time.monotonic() - started
+        try:
+            status, conclusion, html_url = github.get_run_status(workflow_run.run_id)
+        except Exception as exc:
+            telegram.send_message(chat_id, f"Run statusini olishda xato:\n{exc}")
+            return
+
+        if status == "completed":
+            result = (conclusion or "unknown").upper()
+            telegram.send_message(
+                chat_id,
+                (
+                    f"Test tugadi: {result}\n"
+                    f"Server: {request.server_url}\n"
+                    f"Scope: {request.scope}\n"
+                    f"Run: {html_url}"
+                ),
+            )
+            return
+
+        if elapsed >= 300 and not sent_five_min:
+            telegram.send_message(chat_id, f"Test hali davom etyapti... 5 daqiqa bo'ldi\nRun: {html_url}")
+            sent_five_min = True
+        elif elapsed >= 120 and not sent_two_min:
+            telegram.send_message(chat_id, f"Test davom etyapti... 2 daqiqa bo'ldi\nRun: {html_url}")
+            sent_two_min = True
+
+        time.sleep(30)
 
 
 def main() -> int:
@@ -312,11 +444,19 @@ def main() -> int:
                 update_id = update.get("update_id")
                 if isinstance(update_id, int):
                     offset = update_id + 1
-                extracted = extract_message(update)
-                if not extracted:
+
+                message = update.get("message")
+                if isinstance(message, dict):
+                    chat = message.get("chat") or {}
+                    chat_id = str(chat.get("id", ""))
+                    text = message.get("text")
+                    if isinstance(text, str):
+                        handle_message(telegram, config, chat_id, text.strip())
                     continue
-                chat_id, text = extracted
-                handle_message(telegram, github, config, chat_id, text)
+
+                callback = update.get("callback_query")
+                if isinstance(callback, dict):
+                    handle_callback(telegram, github, config, callback)
         except KeyboardInterrupt:
             print("Stopping Telegram CI bot.")
             return 0

@@ -1,89 +1,104 @@
 # Telegram CI Bot
 
-This bot listens for Telegram commands and starts the GitHub Actions workflow
-`.github/workflows/daily-smoke.yml` with selected test options.
+Telegram bot GitHub Actions workflow `.github/workflows/daily-smoke.yml`ni
+ishga tushiradi.
+
+## Bot Flow
+
+Telegramda:
+
+```text
+/run
+```
+
+Bot server tanlatadi:
+
+```text
+[smartup.online]
+[app3.greenwhite.uz/xtrade]
+```
+
+Keyin scope tanlatadi:
+
+```text
+[smoke] [regression]
+```
+
+Bot GitHub Actions run boshlaydi. Test jarayonida xabar beradi:
+
+```text
+GitHub Actions run boshlandi.
+Test davom etyapti... 2 daqiqa bo'ldi
+Test hali davom etyapti... 5 daqiqa bo'ldi
+Test tugadi: SUCCESS
+```
+
+Workflow tugagach `.github/workflows/daily-smoke.yml` ham yakuniy test summary
+xabarini Telegramga yuboradi.
 
 ## Commands
 
 ```text
-/smoke
-/regression
-/run scope=smoke server=https://smartup.online target=all
-/run scope=regression server=https://smartup.online target=all
-/run smoke https://smartup.online
+/run
 /servers
 /help
 ```
 
-Supported scopes:
+Company code/password botdan so'ralmaydi. Ular GitHub Actions secrets orqali
+olinadi:
 
 ```text
-smoke
-regression
-```
-
-Supported targets:
-
-```text
-all
-setup
-group-a
-group-b
+SMARTUP_COMPANY_CODE
+SMARTUP_COMPANY_PASSWORD
 ```
 
 ## Required Environment Variables
 
+Windows serverda bot uchun kerak:
+
 ```text
 TELEGRAM_BOT_TOKEN=<telegram bot token>
 TELEGRAM_CHAT_ID=<allowed chat id>
-GITHUB_TOKEN=<github personal access token>
+GITHUB_PAT=<github personal access token>
 ```
 
-Optional environment variables:
+Optional:
 
 ```text
 GITHUB_REPOSITORY=turgunovjasur/Playwright
 GITHUB_WORKFLOW_FILE=daily-smoke.yml
 GITHUB_REF=main
-DEFAULT_SERVER_URL=https://smartup.online/
-ALLOWED_SERVER_URLS=https://smartup.online
-```
-
-Use `TELEGRAM_ALLOWED_CHAT_IDS` instead of `TELEGRAM_CHAT_ID` if multiple chats
-are allowed:
-
-```text
-TELEGRAM_ALLOWED_CHAT_IDS=123456789,-1001234567890
-```
-
-Set `ALLOWED_SERVER_URLS` as a comma-separated allowlist:
-
-```text
 ALLOWED_SERVER_URLS=https://smartup.online,https://app3.greenwhite.uz/xtrade
 ```
 
-Use `ALLOWED_SERVER_URLS=*` only if the bot should accept any server URL.
+`ALLOWED_SERVER_URLS` faqat shu ikki serverga ruxsat beradi:
+
+```text
+https://smartup.online
+https://app3.greenwhite.uz/xtrade
+```
 
 ## GitHub Token Permission
 
-Create a fine-grained GitHub personal access token for this repository with
-Actions write permission. Store it as `GITHUB_TOKEN` in the place where the bot
-runs.
+Fine-grained GitHub personal access token yarating.
 
-Do not put this token in repository files or Telegram messages.
+Repository:
 
-## Local Run
-
-```bash
-python scripts/telegram_ci_bot.py
+```text
+turgunovjasur/Playwright
 ```
 
-The bot must keep running. For real use, deploy it to a small always-on service
-such as Render, Railway, a VPS, or another worker host.
+Permission:
+
+```text
+Actions: Read and write
+```
+
+Tokenni repository fayllariga, Telegramga yoki loglarga yozmang.
 
 ## Windows Local Server Run
 
-Clone the repository on the Windows server, then install dependencies:
+Repositoryni clone qiling, keyin:
 
 ```powershell
 py -3 -m venv .venv
@@ -91,36 +106,19 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Set environment variables in PowerShell:
+CMD ishlatsangiz:
 
-```powershell
-$env:TELEGRAM_BOT_TOKEN = "<telegram_bot_token>"
-$env:TELEGRAM_CHAT_ID = "<telegram_chat_id>"
-$env:GITHUB_PAT = "<github_personal_access_token>"
-$env:GITHUB_REPOSITORY = "turgunovjasur/Playwright"
-$env:GITHUB_WORKFLOW_FILE = "daily-smoke.yml"
-$env:GITHUB_REF = "main"
-$env:DEFAULT_SERVER_URL = "https://smartup.online/"
-$env:ALLOWED_SERVER_URLS = "https://smartup.online"
+```cmd
+set TELEGRAM_BOT_TOKEN=telegram_bot_token
+set TELEGRAM_CHAT_ID=telegram_chat_id
+set GITHUB_PAT=github_pat
+set ALLOWED_SERVER_URLS=https://smartup.online,https://app3.greenwhite.uz/xtrade
 ```
 
-Run the bot:
+Botni ishga tushirish:
 
-```powershell
+```cmd
 powershell -ExecutionPolicy Bypass -File .\scripts\run_telegram_ci_bot.ps1
 ```
 
-Keep this PowerShell process running. If the Windows server restarts or the
-PowerShell window closes, the bot stops.
-
-To allow more than one server:
-
-```powershell
-$env:ALLOWED_SERVER_URLS = "https://smartup.online,https://app3.greenwhite.uz/xtrade"
-```
-
-Use this only if every server URL should be accepted:
-
-```powershell
-$env:ALLOWED_SERVER_URLS = "*"
-```
+PowerShell oynasi ochiq turishi kerak. Oyna yopilsa bot ham to'xtaydi.

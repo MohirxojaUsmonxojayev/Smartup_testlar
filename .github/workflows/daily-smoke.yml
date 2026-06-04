@@ -42,6 +42,8 @@ jobs:
       TEST_SCOPE: ${{ github.event.inputs.scope || 'smoke' }}
       TEST_SERVER_URL: ${{ github.event.inputs.server_url || 'https://smartup.online/' }}
       TEST_TARGET: ${{ github.event.inputs.target || 'all' }}
+      TEST_COMPANY_CODE: ${{ secrets.SMARTUP_COMPANY_CODE }}
+      TEST_COMPANY_PASSWORD: ${{ secrets.SMARTUP_COMPANY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -61,14 +63,19 @@ jobs:
       - name: Install Playwright browser
         run: python -m playwright install --with-deps chromium
 
+      - name: Mask company credentials
+        run: |
+          echo "::add-mask::$TEST_COMPANY_CODE"
+          echo "::add-mask::$TEST_COMPANY_PASSWORD"
+
       - name: Run daily smoke tests
         run: |
           mkdir -p test-results
           set -o pipefail
           python scripts/run_tests.py "$TEST_TARGET" \
             --url "$TEST_SERVER_URL" \
-            --company-code "${{ secrets.SMARTUP_COMPANY_CODE }}" \
-            --company-password "${{ secrets.SMARTUP_COMPANY_PASSWORD }}" \
+            --company-code "$TEST_COMPANY_CODE" \
+            --company-password "$TEST_COMPANY_PASSWORD" \
             --scope "$TEST_SCOPE" \
             --headless 2>&1 | tee test-results/ci-test-output.log
 
