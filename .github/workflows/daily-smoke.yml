@@ -135,14 +135,36 @@ jobs:
             SUMMARY="Pytest summary not found. Open the run link for logs."
           fi
 
+          RUN_CODE=$(python - <<'PY' || true
+          import json
+          from pathlib import Path
+
+          path = Path("test-results/data/data_store.json")
+          if path.exists():
+              try:
+                  data = json.loads(path.read_text(encoding="utf-8"))
+              except json.JSONDecodeError:
+                  data = {}
+              code = data.get("code") if isinstance(data, dict) else None
+              if code not in (None, ""):
+                  print(str(code))
+          PY
+          )
+          COMPANY_SUFFIX="${TEST_COMPANY_CODE#@}"
+          if [ -n "$RUN_CODE" ] && [ -n "$COMPANY_SUFFIX" ]; then
+            USER_LOGIN="user-pw${RUN_CODE}@${COMPANY_SUFFIX}"
+          else
+            USER_LOGIN="not found"
+          fi
+
           FAILED_TESTS=$(grep -E "^(FAILED|ERROR) " test-results/ci-test-output.log 2>/dev/null \
             | head -5 | sed 's/^/- /' || true)
           FAILED_TEST=$(printf '%s' "$FAILED_TESTS" | head -1 | sed -E 's/^- (FAILED|ERROR) //; s/ - .*$//' || true)
           ERROR_LINE=$(printf '%s' "$FAILED_TESTS" | head -1 | sed -E 's/^- (FAILED|ERROR) [^ ]+ - //' || true)
 
           COMMIT_SHORT=$(printf '%s' "$GITHUB_SHA" | cut -c1-7)
-          MESSAGE=$(printf 'Daily Smoke Tests %s\n\nServer: %s\nScope: %s\nTarget: %s\nCompany: %s\nSummary: %s\n\nRun: %s' \
-            "$STATUS_TEXT" "$TEST_SERVER_URL" "$TEST_SCOPE" "$TEST_TARGET" "$TEST_COMPANY_SOURCE" "$SUMMARY" "$RUN_URL")
+          MESSAGE=$(printf 'Daily Smoke Tests %s\n\nServer: %s\nScope: %s\nTarget: %s\nCompany: %s\nUser login: %s\nSummary: %s\n\nRun: %s' \
+            "$STATUS_TEXT" "$TEST_SERVER_URL" "$TEST_SCOPE" "$TEST_TARGET" "$TEST_COMPANY_SOURCE" "$USER_LOGIN" "$SUMMARY" "$RUN_URL")
 
           if [ -n "$FAILED_TEST" ]; then
             MESSAGE=$(printf '%s\n\nFailed test:\n%s' "$MESSAGE" "$FAILED_TEST")

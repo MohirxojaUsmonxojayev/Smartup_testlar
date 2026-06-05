@@ -87,6 +87,7 @@ allure serve test-results/allure-results
 
 ### Telegram CI bot
 - Telegram CI botda bir vaqtning o'zida faqat bitta test run faol bo'ladi; run tugaguncha yangi `/run` bloklanadi.
+- Telegram CI final xabarida `test-results/data/data_store.json` ichidagi `code` va tanlangan company code asosida `User login: user-pw<code>@<company>` ko'rsatiladi; password xabarga chiqarilmaydi.
 
 ## Test dependency modeli
 

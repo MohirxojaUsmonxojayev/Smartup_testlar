@@ -50,6 +50,15 @@ Workflow tugagach `.github/workflows/daily-smoke.yml` yakuniy test summary
 xabarini Telegramga yuboradi. Failed bo'lsa oxirgi screenshot ham yuboriladi,
 screenshot topilmasa artifact linki beriladi.
 
+Final xabarda test yaratgan user login ham chiqadi:
+
+```text
+User login: user-pw4827@autotest
+```
+
+Bu yerda `4827` qiymati `test-results/data/data_store.json` ichidagi `code`
+dan olinadi. Password Telegramga yuborilmaydi.
+
 ## Commands
 
 ```text
