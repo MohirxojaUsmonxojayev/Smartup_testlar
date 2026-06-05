@@ -55,6 +55,7 @@ Tags: legal-person, tabs, note, leadership
 ### Legal person list
 Tags: legal-person, list, grid, assert
 - List URL/search: `Справочники` -> `Юридические лица`, global `Поиск`ga `legal_person_code` yoziladi.
+- Regression setupda director natural person yaratilgandan keyin `Физические лица` listida ham global `Поиск`ga director code yozib tekshiriladi; listda ko'p qator bo'lsa Faker first name (`Платон` kabi) birinchi 50 visible row ichida bo'lmasligi mumkin.
 - Default grid ustunlari ichida `Код`, `Название`, `Альтернативное название`, `Статус` ko'rinadi.
 - Smoke mode: listda faqat `code`, `name`, `Активный` ni tekshiriladi.
 - Regression mode: listda `short_name` ham tekshiriladi.

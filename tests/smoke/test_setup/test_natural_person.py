@@ -11,10 +11,22 @@ pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("Natur
 
 
 def _assert_natural_person_list_row(page: Page, person_name: str) -> None:
+    page.get_by_role("searchbox", name="Поиск").fill(person_name)
+    page.get_by_role("searchbox", name="Поиск").press("Enter")
+    BasePage(page).wait_for_loader()
     row = page.locator("b-grid .tbl-row").filter(has_text=person_name).first
     expect(row).to_be_visible()
     expect(row).to_contain_text(person_name)
     expect(row).to_contain_text("Активный")
+
+
+def _assert_list_row_by_search(page: Page, text: str) -> None:
+    page.get_by_role("searchbox", name="Поиск").fill(text)
+    page.get_by_role("searchbox", name="Поиск").press("Enter")
+    BasePage(page).wait_for_loader()
+    row = page.locator("b-grid .tbl-row").filter(has_text=text).first
+    expect(row).to_be_visible()
+    expect(row).to_contain_text(text)
 
 
 def _open_natural_person_view(page: Page, person_name: str) -> None:
@@ -99,7 +111,7 @@ def run_natural_person_for_client_1(page: Page, code, scope: str = "smoke") -> N
     with allure.step("5 - Mijozlar ro'yxatida ko'rinishini tekshirish"):
         navigate_to(page, tab="Справочники", name="Клиенты")
         expect(page.get_by_role("heading")).to_contain_text("Клиенты")
-        expect(page.locator("b-grid")).to_contain_text(person_name)
+        _assert_list_row_by_search(page, person_name)
 
 # ----------------------------------------------------------------------------------------------------------------------
 

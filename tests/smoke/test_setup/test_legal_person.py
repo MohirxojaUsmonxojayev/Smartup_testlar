@@ -339,6 +339,17 @@ def _assert_legal_person_list_row(page: Page, values: dict[str, str], scope: str
     expect(row).to_contain_text("Активный")
 
 
+def _assert_director_natural_person_list_row(page: Page, values: dict[str, str]) -> None:
+    page.get_by_role("searchbox", name="Поиск").fill(values["code"])
+    page.get_by_role("searchbox", name="Поиск").press("Enter")
+    BasePage(page).wait_for_loader()
+    row = page.locator("b-grid .tbl-row").first
+    expect(row).to_be_visible()
+    expect(row).to_contain_text(values["first_name"])
+    expect(row).to_contain_text(values["last_name"])
+    expect(row).to_contain_text("Активный")
+
+
 def _open_selected_legal_person_view(page: Page, values: dict[str, str]) -> None:
     row = page.locator("b-grid .tbl-row").filter(has_text=values["code"]).first
     expect(row).to_be_visible()
@@ -455,7 +466,7 @@ def _create_director_natural_person(page: Page, values: dict[str, str]) -> None:
     _fill_input(page, "d.web", values["web"])
 
     _save_add_form(page, list_heading="Физические лица", confirm_text=None)
-    expect(page.locator("b-grid")).to_contain_text(values["first_name"])
+    _assert_director_natural_person_list_row(page, values)
 
 
 def _create_contact_position(page: Page, values: dict[str, str]) -> None:
