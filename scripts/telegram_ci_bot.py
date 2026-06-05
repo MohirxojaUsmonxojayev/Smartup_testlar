@@ -16,6 +16,8 @@ DEFAULT_REPOSITORY = "turgunovjasur/Playwright"
 DEFAULT_WORKFLOW = "daily-smoke.yml"
 DEFAULT_REF = "main"
 DEFAULT_TARGET = "all"
+STATUS_POLL_INTERVAL_SECONDS = 30
+STATUS_POLL_ERROR_LIMIT = 5
 
 SERVERS = {
     "smartup": "https://smartup.online",
@@ -484,15 +486,33 @@ def monitor_run(
     started = time.monotonic()
     sent_two_min = False
     sent_five_min = False
+    status_errors = 0
 
     while True:
         elapsed = time.monotonic() - started
         try:
             status, conclusion, html_url = github.get_run_status(workflow_run.run_id)
         except Exception as exc:
-            active_store.clear(workflow_run.run_id)
-            telegram.send_message(chat_id, f"Run statusini olishda xato:\n{exc}")
-            return
+            status_errors += 1
+            print(
+                f"Temporary GitHub status polling error for run {workflow_run.run_id}: {exc}",
+                file=sys.stderr,
+            )
+            if status_errors >= STATUS_POLL_ERROR_LIMIT:
+                active_store.clear(workflow_run.run_id)
+                telegram.send_message(
+                    chat_id,
+                    (
+                        f"Run statusini {STATUS_POLL_ERROR_LIMIT} marta olishda xato bo'ldi.\n"
+                        "Test GitHub Actionsda davom etayotgan bo'lishi mumkin.\n"
+                        f"Run: {workflow_run.html_url}"
+                    ),
+                )
+                return
+            time.sleep(STATUS_POLL_INTERVAL_SECONDS)
+            continue
+
+        status_errors = 0
 
         if status == "completed":
             active_store.clear(workflow_run.run_id)
@@ -515,7 +535,7 @@ def monitor_run(
             telegram.send_message(chat_id, f"Test davom etyapti... 2 daqiqa bo'ldi\nRun: {html_url}")
             sent_two_min = True
 
-        time.sleep(30)
+        time.sleep(STATUS_POLL_INTERVAL_SECONDS)
 
 
 def main() -> int:
