@@ -8,3 +8,4 @@
 ### Company Add
 Tags: company, setup, locator, wait
 - `Создать` bosilgandan keyin `Компания (создание)` headeri `#companyForm` mount bo'lishidan oldin ko'rinishi mumkin; required fieldlarni to'ldirishdan oldin `#companyForm` va kamida bitta `smt-control` ko'rinishini kutish kerak.
+- `Шаблоны` card ichidagi `Маркировка` inputidan `UZ Marking` optioni tanlanadi; company setupda `План счетов=UZ COA`, `Банки=UZ BANK`, `Маркировка=UZ Marking` shablonlari majburiy.

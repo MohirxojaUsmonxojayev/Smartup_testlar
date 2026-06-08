@@ -189,6 +189,7 @@ def _select_data_option_by_label(page: Page, label: str, option_text: str) -> No
 
 
 def _select_required_templates(page: Page) -> None:
+    _select_data_option_by_label(page, "Маркировка", "UZ Marking")
     _select_data_option_by_label(page, "План счетов", "UZ COA")
     _select_data_option_by_label(page, "Банки", "UZ BANK")
 
