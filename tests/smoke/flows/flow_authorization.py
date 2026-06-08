@@ -29,7 +29,7 @@ def company_password() -> str:
     value = os.getenv("COMPANY_PASSWORD", "").strip()
     if not value:
         raise AssertionError(
-            "--company-password majburiy. Mavjud company bilan run qilinganda password flag orqali beriladi."
+            "--company-password majburiy yoki --create-company orqali yangi company admin paroli set qilingan bo'lishi kerak."
         )
     return value
 

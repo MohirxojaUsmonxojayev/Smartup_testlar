@@ -51,10 +51,10 @@ def main() -> None:
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
     from tests.smoke.test_setup.test_company import (  # noqa: E402
-        HEAD_ADMIN_EMAIL,
-        HEAD_ADMIN_PASSWORD,
         _company_code_text_pattern,
         _open_company_list,
+        head_admin_email,
+        head_admin_password,
     )
     from tests.smoke.flows.flow_authorization import login  # noqa: E402
     from utils.base_page import BasePage  # noqa: E402
@@ -74,7 +74,7 @@ def main() -> None:
         context.set_default_timeout(15_000)
         page = context.new_page()
 
-        login(page, email=HEAD_ADMIN_EMAIL, password=HEAD_ADMIN_PASSWORD)
+        login(page, email=head_admin_email(), password=head_admin_password())
         _open_company_list(page)
         search = page.get_by_role("searchbox", name="Поиск")
         search.fill(company_code)

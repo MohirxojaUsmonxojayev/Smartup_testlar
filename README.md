@@ -17,10 +17,10 @@ Playwright + pytest asosida yozilgan smoke test suite. Allure hisoboti va trace 
 - [Talablar](#talablar)
 - [O'rnatish](#ornatish)
 - [Testlarni Run Qilish](#testlarni-run-qilish)
-  - [Majburiy Tanlov](#majburiy-tanlov)
-  - [Eng Ko'p Ishlatiladigan Buyruqlar](#eng-kop-ishlatiladigan-buyruqlar)
+  - [Buyruqlar nima qiladi](#buyruqlar-nima-qiladi)
+  - [Asosiy run yo'llari](#asosiy-run-yollari)
+  - [Qo'shimcha buyruqlar](#qoshimcha-buyruqlar)
   - [Targetlar](#targetlar)
-  - [Mac/Linux Wrapper](#mac-linux-wrapper)
   - [Pytest Orqali Debug](#pytest-orqali-debug)
 - [Test qamrovi](#test-qamrovi)
   - [Setup runner](#setup-runner)
@@ -119,10 +119,23 @@ python -m playwright install chromium
 
 ### <a id="test-credentiallari"></a>6. Test credentiallarini tayyorlash
 
-`.env` ishlatilmaydi. Test run qilishda `--url` har doim majburiy, keyin ikki mode'dan biri tanlanadi:
+`.env` ishlatilmaydi. Har bir run uchun server URL kerak: `--url <server_url>`.
 
-- Mavjud company bilan: `--company-code` va `--company-password`
-- Yangi company bilan: `--create-company`
+Mavjud company bilan ishlaganda:
+
+```bash
+--company-code <company_code> --company-password <company_password>
+```
+
+Bu login pagega `admin@<company_code>` va `<company_password>` bilan kiradi.
+
+Yangi company yaratganda:
+
+```bash
+--create-company --head-email <head_email> --head-password <head_password>
+```
+
+Bu avval head profilga kiradi, keyin company code ni `autotest<test_code>` ko'rinishida test ichida yaratadi. Yangi company admin paroli test ichidagi default qiymat.
 
 ### <a id="testlarni-ishga-tushirish"></a>7. Testlarni ishga tushirish va hisobotni ochish
 
@@ -140,7 +153,11 @@ macOS / Linuxda qisqa wrapper ham bor:
 
 Bu bitta buyruq: eski natijalarni tozalaydi → smoke testlarni o'tkazadi → Allure hisobotini yaratadi → brauzerda ochadi.
 
-> Yangi company yaratish kerak bo'lsa `--create-company` ishlating. Yangi company admin paroli kod ichida belgilangan default qiymat bo'ladi.
+Yangi company yaratish kerak bo'lsa shu command ishlatiladi:
+
+```bash
+python scripts/run_tests.py --url <server_url> --create-company --head-email <head_email> --head-password <head_password> --open-report
+```
 
 ✅ Tayyor — hisobot brauzerda ochiladi. Keyinroq hisobotni qayta ochish uchun: `allure open test-results/allure-report`.
 
@@ -164,7 +181,7 @@ python -m playwright install chromium
 
 ## <a id="testlarni-run-qilish"></a>Testlarni Run Qilish
 
-Asosiy runner:
+Asosiy runner shu:
 
 ```bash
 python scripts/run_tests.py [target] --url <server_url> [company mode] [options]
@@ -172,73 +189,135 @@ python scripts/run_tests.py [target] --url <server_url> [company mode] [options]
 
 Bu buyruq macOS, Linux va Windowsda ishlaydi. `.env` ishlatilmaydi.
 
-### <a id="majburiy-tanlov"></a>Majburiy Tanlov
+### <a id="buyruqlar-nima-qiladi"></a>Buyruqlar nima qiladi
 
-Har bir run uchun `--url` majburiy. Keyin ikki company mode'dan bittasi tanlanadi:
+| Buyruq/flag | Nima qiladi |
+|-------------|-------------|
+| `--url <server_url>` | Test ishlaydigan Smartup server URL. Har doim kerak. |
+| `--company-code <code>` | Mavjud company code. Test loginni `admin@<code>` qilib yasaydi. |
+| `--company-password <password>` | Mavjud company admin paroli. |
+| `--create-company` | Test boshida yangi company yaratadi. |
+| `--head-email <email>` | Yangi company yaratish uchun head profil login emaili. |
+| `--head-password <password>` | Yangi company yaratish uchun head profil paroli. |
+| `--disable-license-policy` | Yangi companyda license policy ni off qiladi. |
+| `--open-report` | Testdan keyin Allure reportni generate qilib ochadi. |
+| `--headless` | Browserni ko'rsatmasdan ishlatadi. |
+| `--regression` | Testlarni regression scope bilan ishlatadi. |
+| `--show-trace` | Testdan keyin oxirgi Playwright trace viewerini ochadi. |
+| `--dry-run` | Testni ishga tushirmaydi, faqat pytest commandni ko'rsatadi. |
+| `all` | Default target. Setup + A group + B group ishlaydi. |
+| `setup` | Faqat setup runner ishlaydi. |
+| `company` | Faqat yangi company yaratish testi ishlaydi. |
+| `group-a` | Faqat A group ishlaydi. |
+| `group-b` | Faqat B group ishlaydi. |
 
-| Mode | Buyruq | Nima bo'ladi |
-|------|--------|--------------|
-| Mavjud company | `--company-code <code> --company-password <password>` | Company yaratilmaydi, testlar berilgan company bilan ishlaydi |
-| Yangi company | `--create-company` | Suite boshida `00 - Company` ishlaydi, yangi company yaratiladi |
+### <a id="asosiy-run-yollari"></a>Asosiy run yo'llari
 
-Qoidalar:
-
-- `--create-company` bilan `--company-code` va `--company-password` berilmaydi.
-- `--create-company` mode'da yangi company admin password kod ichida belgilangan default qiymat bo'ladi.
-- Test user password ham kod ichida belgilangan.
-- `--disable-license-policy` faqat `--create-company` bilan ishlaydi.
-- `--disable-license-policy` berilsa company viewda `Политика лицензирования` off qilinadi va license testlari skip bo'ladi.
-- `--disable-license-policy` berilmasa license policy off qilinmaydi va license testlari skip qilinmaydi.
-
-### <a id="eng-kop-ishlatiladigan-buyruqlar"></a>Eng Ko'p Ishlatiladigan Buyruqlar
-
-Mavjud company bilan full smoke:
+#### Mavjud company bilan full smoke
 
 ```bash
 python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password>
 ```
 
-Yangi company yaratib full smoke:
+Nima qiladi: mavjud companyga `admin@<company_code>` login va `<company_password>` parol bilan kiradi, setup, A group va B group testlarini ishlatadi.
+
+#### Yangi company yaratib full smoke
 
 ```bash
-python scripts/run_tests.py --url <server_url> --create-company
+python scripts/run_tests.py --url <server_url> --create-company --head-email <head_email> --head-password <head_password>
 ```
 
-Yangi company yaratib, license policy off qilish:
+Nima qiladi: head profilga kiradi, `autotest<test_code>` code bilan yangi company yaratadi, admin loginni `admin@autotest<test_code>` qilib ishlatadi, keyin full smoke testlarni shu companyda davom ettiradi.
+
+#### Faqat yangi company yaratish
 
 ```bash
-python scripts/run_tests.py --url <server_url> --create-company --disable-license-policy
+python scripts/run_tests.py company --url <server_url> --create-company --head-email <head_email> --head-password <head_password>
 ```
 
-Reportni testdan keyin ochish:
+Nima qiladi: faqat `00 - Company` testini ishlatadi va company code ni `test-results/data/data_store.json` ga saqlaydi.
+
+#### Faqat setup runner
+
+```bash
+python scripts/run_tests.py setup --url <server_url> --company-code <company_code> --company-password <company_password>
+```
+
+Nima qiladi: faqat user setup zanjirini ishlatadi.
+
+#### Faqat A group
+
+```bash
+python scripts/run_tests.py group-a --url <server_url> --company-code <company_code> --company-password <company_password>
+```
+
+Nima qiladi: saqlangan setup data bilan A group testlarini ishlatadi.
+
+#### Faqat B group
+
+```bash
+python scripts/run_tests.py group-b --url <server_url> --company-code <company_code> --company-password <company_password>
+```
+
+Nima qiladi: saqlangan setup data bilan B group testlarini ishlatadi.
+
+### <a id="qoshimcha-buyruqlar"></a>Qo'shimcha buyruqlar
+
+#### Allure reportni testdan keyin ochish
 
 ```bash
 python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password> --open-report
 ```
 
-Headless rejim:
+Nima qiladi: test tugagandan keyin Allure reportni generate qilib ochadi.
+
+#### Browserni ko'rsatmasdan ishlatish
 
 ```bash
 python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password> --headless
 ```
 
-Regression scope:
+Nima qiladi: Chromium headless rejimda ishlaydi.
+
+#### Regression scope
 
 ```bash
 python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password> --regression
 ```
 
-Trace viewer ochish:
+Nima qiladi: testlarni regression mode bilan ishlatadi.
+
+#### Oxirgi trace ni ochish
 
 ```bash
 python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password> --show-trace
 ```
 
-Buyruqni ishga tushirmasdan ko'rish:
+Nima qiladi: testdan keyin oxirgi Playwright trace viewerini ochadi.
+
+#### Commandni faqat ko'rish
 
 ```bash
-python scripts/run_tests.py --url <server_url> --create-company --disable-license-policy --dry-run
+python scripts/run_tests.py --url <server_url> --create-company --head-email <head_email> --head-password <head_password> --dry-run
 ```
+
+Nima qiladi: pytest commandni chiqaradi, lekin testlarni ishga tushirmaydi.
+
+#### Yangi company yaratib license policy ni o'chirish
+
+```bash
+python scripts/run_tests.py --url <server_url> --create-company --head-email <head_email> --head-password <head_password> --disable-license-policy
+```
+
+Nima qiladi: yangi company yaratadi, company Security tabida `Политика лицензирования` ni off qiladi, license sotib olish va ulash qadamlari skip bo'ladi.
+
+#### macOS/Linux wrapper
+
+```bash
+./run_tests.sh --url <server_url> --company-code <company_code> --company-password <company_password>
+```
+
+Nima qiladi: `python scripts/run_tests.py ...` ni qisqa wrapper orqali ishlatadi.
 
 ### <a id="targetlar"></a>Targetlar
 
@@ -248,19 +327,11 @@ Default target `all`, ya'ni full suite.
 |--------|------------------|---------------|
 | `all` | `python scripts/run_tests.py --url <url> --company-code <code> --company-password <pass>` | Setup + A group + B group |
 | `setup` | `python scripts/run_tests.py setup --url <url> --company-code <code> --company-password <pass>` | Faqat user setup |
-| `company` | `python scripts/run_tests.py company --url <url> --create-company` | Faqat company yaratish testi |
+| `company` | `python scripts/run_tests.py company --url <url> --create-company --head-email <email> --head-password <pass>` | Faqat company yaratish testi |
 | `group-a` | `python scripts/run_tests.py group-a --url <url> --company-code <code> --company-password <pass>` | Faqat A group |
 | `group-b` | `python scripts/run_tests.py group-b --url <url> --company-code <code> --company-password <pass>` | Faqat B group |
 
 `--create-company` faqat `all`, `setup`, `company` targetlari bilan ishlatiladi. `group-a` yoki `group-b` uchun avval mavjud company va setup data kerak.
-
-### <a id="mac-linux-wrapper"></a>Mac/Linux Wrapper
-
-macOS va Linuxda `./run_tests.sh` ham ishlaydi, argumentlar `python scripts/run_tests.py` bilan bir xil:
-
-```bash
-./run_tests.sh --url <server_url> --company-code <company_code> --company-password <company_password>
-```
 
 ### <a id="pytest-orqali-debug"></a>Pytest Orqali Debug
 
@@ -273,7 +344,7 @@ Asosiy run uchun `scripts/run_tests.py` ishlatish tavsiya qilinadi. Debug uchun 
 Yangi company bilan:
 
 ```bash
-./.venv/bin/pytest tests/smoke/test_all_runner.py --new-code --url <server_url> --create-company -v
+./.venv/bin/pytest tests/smoke/test_all_runner.py --new-code --url <server_url> --create-company --head-email <head_email> --head-password <head_password> -v
 ```
 
 ---

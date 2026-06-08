@@ -95,3 +95,10 @@ Tags: order, view, data-store
 - Qayerda: order view.
 - Locator: `ИД заказа` label textidan yaqin view value olinadi; yangi testlarda raw XPath yozilmaydi.
 - Data: keyingi testlar uchun `a_group_order_id` yoki casega xos key bilan `data_store.json` ga saqla.
+
+### Order List Накладные Reports
+Tags: order, invoice, report, b-group, locator
+- Qayerda: `Продажа > Заказы` listida kerakli row ochilgandan keyin row menu ichidagi `Накладные` dropdown; order view ichida emas.
+- Locator: bitta order uchun row-level button `#trade81-button-report_one`. Reportni ochish uchun `a.dropdown-item` markaziga emas, option nomi yozilgan `span[ng-click*="reportOne"]` yoki `span[ng-click*="chequeOne"]` elementiga click qilish kerak.
+- Qoida: `Счет-фактура с наценкой` va `Экспортировать заказ` dropdownda ko'rinadi, lekin HTML report popup sikliga qo'shilmaydi; ularni visible option sifatida tekshir.
+- B-group case: B-02 draft orderni listda qoldiradi; B-03 shu sessiyadan foydalanib `Накладные` optionlarini tekshiradi va asosiy reportlarda client/product/summa/order id ko'rinishini assert qiladi.

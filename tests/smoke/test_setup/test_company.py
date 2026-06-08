@@ -11,8 +11,6 @@ from utils.base_page import BasePage
 
 pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("Company")]
 
-HEAD_ADMIN_EMAIL = "admin@head"
-HEAD_ADMIN_PASSWORD = "greenwhite"
 TRADE_CHILD_PRODUCTS = (
     "Call center",
     "Equipment",
@@ -37,6 +35,20 @@ COMPANY_FORM_TIMEOUT = 60_000
 
 def _env_flag(name: str) -> bool:
     return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def head_admin_email() -> str:
+    value = os.getenv("HEAD_ADMIN_EMAIL", "").strip()
+    if not value:
+        raise AssertionError("--head-email majburiy: company yaratish uchun head profil emailini bering")
+    return value
+
+
+def head_admin_password() -> str:
+    value = os.getenv("HEAD_ADMIN_PASSWORD", "").strip()
+    if not value:
+        raise AssertionError("--head-password majburiy: company yaratish uchun head profil parolini bering")
+    return value
 
 
 def company_code_for(code: str) -> str:
@@ -426,7 +438,7 @@ def run_company(page: Page, code, save_data=None, company_code: str | None = Non
     company_code = company_code or company_code_for(code)
 
     with allure.step("1 - Head profilga kirish"):
-        login(page, email=HEAD_ADMIN_EMAIL, password=HEAD_ADMIN_PASSWORD)
+        login(page, email=head_admin_email(), password=head_admin_password())
         expect(page.locator("a.menu-link.menu-toggle", has_text="Главное")).to_be_visible(timeout=120_000)
 
     with allure.step("2 - Company ro'yxatiga o'tish"):
@@ -469,7 +481,7 @@ def run_company(page: Page, code, save_data=None, company_code: str | None = Non
 @allure.title("Company yaratish")
 def test_company(page: Page, code, save_data, company_setup_enabled) -> None:
     """
-    1. admin@head bilan head profilga kirish.
+    1. --head-email/--head-password bilan head profilga kirish.
     2. Главное -> Компании ro'yxatida yangi company yaratish.
     3. Код сервера, majburiy maydonlar va trade productlarini to'ldirib saqlash.
     4. Company ro'yxatida code bo'yicha tekshirish va data storega company_code saqlash.

@@ -27,7 +27,7 @@ python scripts/run_tests.py --url <server_url> --company-code <company_code> --c
 
 Yangi company yaratish:
 ```bash
-python scripts/run_tests.py --url <server_url> --create-company
+python scripts/run_tests.py --url <server_url> --create-company --head-email <head_email> --head-password <head_password>
 ```
 
 Debug uchun setup yoki group:
@@ -56,7 +56,7 @@ allure serve test-results/allure-results
 
 ## Ish tartibi
 
-1. `$ARGUMENTS` bo'sh bo'lsa — to'liq `python scripts/run_tests.py --url <server_url> --company-code <code> --company-password <password>` yoki `--create-company` bilan ishga tushir
+1. `$ARGUMENTS` bo'sh bo'lsa — to'liq `python scripts/run_tests.py --url <server_url> --company-code <code> --company-password <password>` yoki `--create-company --head-email <email> --head-password <password>` bilan ishga tushir
 2. `$ARGUMENTS` fayl nomi bo'lsa — faqat shu faylni ishga tushir
 3. `$ARGUMENTS` test nomi bo'lsa — faqat shu testni ishga tushir
 4. Natijalarni tahlil qil:
@@ -70,9 +70,9 @@ allure serve test-results/allure-results
 - Asosiy runner cross-platform: `python scripts/run_tests.py --url <server_url> --company-code <code> --company-password <password>`; Mac/Linux uchun `./run_tests.sh ...` wrapper ham bor.
 - `.env` ishlatilmaydi; `--url` majburiy.
 - Mavjud company bilan run qilish uchun `--company-code` va `--company-password` majburiy.
-- Yangi company yaratish uchun `--create-company` beriladi; yangi company admin paroli kod ichidagi default qiymat bo'ladi.
-- `--create-company` bilan `--company-code` va `--company-password` berilmaydi; company code test yaratgan qiymatdan olinadi.
-- Company setupda Security tabdagi `Политика лицензирования`ni off qilish kerak bo'lsa `--create-company --disable-license-policy` ishlatiladi.
+- Yangi company yaratish uchun `--create-company`, `--head-email` va `--head-password` majburiy.
+- `--create-company` bilan `--company-code` va `--company-password` berilmaydi; company code test ichida `autotest<code>` ko'rinishida yaratiladi.
+- Company setupda Security tabdagi `Политика лицензирования`ni off qilish kerak bo'lsa `--create-company --head-email <email> --head-password <password> --disable-license-policy` ishlatiladi.
 - `--disable-license-policy` ishlatilsa `Buy License` va `Attach License` qadamlari o'tkazib yuboriladi.
 - `scripts/run_tests.py` default scope `smoke`; `--regression` berilsa pytestga `--scope regression` uzatiladi.
 - Bevosita pytest runlarda scope shunday beriladi: `./.venv/bin/pytest tests/smoke/test_setup/test_setup_runner.py::test_02_legal_person --scope=regression`.

@@ -60,7 +60,7 @@ def test_XX_<nomi>(session_page: Page, code):
 
 ### Runner config va dinamik qiymatlar
 - `.env` ishlatilmaydi; test run konfiguratsiyasi `scripts/run_tests.py` yoki pytest optionlari orqali keladi.
-- Har bir run uchun `--url` va company mode majburiy: mavjud company uchun `--company-code/--company-password`, yangi company uchun `--create-company`.
+- Har bir run uchun `--url` va company mode majburiy: mavjud company uchun `--company-code/--company-password`, yangi company uchun `--create-company --head-email/--head-password`.
 - Dinamik email va shunga o'xshash qiymatlar test/flow ichida active company code bilan quriladi:
   ```python
   user_email = f"user-pw{code}@{active_company_code}"
@@ -108,7 +108,7 @@ def test_XX_<nomi>(session_page: Page, code):
 - Foydalanuvchi “shu testni regression qilamiz” desa, bu avtomatik ravishda add formani full to'ldirish, list check, view check, viewdagi mos card/tab/module holatlarini check qilish degani.
 - Fieldlarni taxmin qilma. Har yangi regression forma uchun avval browserda add/view ochib screenshot/field state ol, screenshotlarni `smartup-guide/references/forms/screenshots/<form-slug>/` ichiga arxivla va forma bilimini `smartup-guide/references/forms/<form-slug>.md` ga yoz.
 - Regression-only qiymatlar `data_store.json` da eski runlardan qolib ketmasin: smoke branch ularni `None`/null qilib tozalasin, regression branch esa view/list assert uchun kerak hamma muhim qiymatlarni saqlasin.
-- Scope bilan yozilgan testni yakunda ikki mode bilan tekshir: smoke minimal path, regression full path. Cross-platform runnerda mavjud company uchun `python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password>` va `python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password> --regression` ishlatiladi; yangi company kerak bo'lsa `--create-company` mode ishlatiladi.
+- Scope bilan yozilgan testni yakunda ikki mode bilan tekshir: smoke minimal path, regression full path. Cross-platform runnerda mavjud company uchun `python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password>` va `python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password> --regression` ishlatiladi; yangi company kerak bo'lsa `--create-company --head-email <head_email> --head-password <head_password>` mode ishlatiladi.
 
 ### Setup va Group test dependency modeli
 - Yangi testlar har doim yangi server/baza holatida ham ishlashi kerak; lokal debugda oldingi rerunlardan data ko'paygan bo'lsa ham, testni mavjud dataga suyanib yozma.

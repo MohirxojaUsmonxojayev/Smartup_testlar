@@ -100,6 +100,16 @@ def pytest_addoption(parser):
         help="Mavjud company admin paroli. --create-company bo'lmasa majburiy.",
     )
     smoke.addoption(
+        "--head-email",
+        default="",
+        help="--create-company bilan head profil emaili.",
+    )
+    smoke.addoption(
+        "--head-password",
+        default="",
+        help="--create-company bilan head profil paroli.",
+    )
+    smoke.addoption(
         "--create-company",
         action="store_true",
         default=False,
@@ -226,18 +236,30 @@ def pytest_configure(config):
     create_company = _company_setup_enabled(config)
     company_code = str(config.getoption("--company-code") or "").strip().lstrip("@")
     company_password = str(config.getoption("--company-password") or "").strip()
+    head_email = str(config.getoption("--head-email") or "").strip()
+    head_password = str(config.getoption("--head-password") or "").strip()
 
     if not company_url:
         raise pytest.UsageError("--url majburiy. Masalan: --url https://app3.greenwhite.uz/xtrade")
     os.environ["COMPANY_URL"] = company_url
 
     if create_company:
-        if company_code or company_password:
-            raise pytest.UsageError("--create-company bilan --company-code/--company-password berilmaydi")
+        if company_code:
+            raise pytest.UsageError("--create-company bilan --company-code berilmaydi")
+        if company_password:
+            raise pytest.UsageError("--company-password --create-company bilan berilmaydi; yangi company admin paroli test ichidagi default qiymat")
+        if not head_email:
+            raise pytest.UsageError("--head-email majburiy: --create-company uchun head profil emailini bering")
+        if not head_password:
+            raise pytest.UsageError("--head-password majburiy: --create-company uchun head profil parolini bering")
         os.environ["CREATE_COMPANY"] = "1"
         os.environ["COMPANY_PASSWORD"] = CREATED_COMPANY_PASSWORD
+        os.environ["HEAD_ADMIN_EMAIL"] = head_email
+        os.environ["HEAD_ADMIN_PASSWORD"] = head_password
         os.environ.pop("COMPANY_CODE", None)
     else:
+        if head_email or head_password:
+            raise pytest.UsageError("--head-email/--head-password faqat --create-company bilan ishlaydi")
         if not company_code:
             raise pytest.UsageError("--company-code majburiy yoki --create-company flagini bering")
         if not company_password:
@@ -245,6 +267,8 @@ def pytest_configure(config):
         os.environ.pop("CREATE_COMPANY", None)
         os.environ["COMPANY_CODE"] = company_code
         os.environ["COMPANY_PASSWORD"] = company_password
+        os.environ.pop("HEAD_ADMIN_EMAIL", None)
+        os.environ.pop("HEAD_ADMIN_PASSWORD", None)
 
     if config.getoption("--disable-license-policy"):
         if not create_company:

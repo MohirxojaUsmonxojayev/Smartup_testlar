@@ -20,8 +20,8 @@ Tags: smoke, setup, dependency, data-store
 - `tests/smoke/test_setup/test_setup_runner.py` ichidagi testlar bitta `session_page` bilan ketma-ket ishlaydi; UI state va login holati testlar orasida saqlanadi.
 - `.env` ishlatilmaydi; `--url` har doim majburiy.
 - Mavjud company bilan run qilish uchun `--url <server_url> --company-code <code> --company-password <password>` beriladi; company testi suitega qo'shilmaydi.
-- Yangi company bilan run qilish uchun `--url <server_url> --create-company` beriladi; yangi company admin paroli kod ichidagi default qiymat bo'ladi.
-- `--create-company` bilan `--company-code` va `--company-password` berilmaydi; company code test tomonidan yaratiladi.
+- Yangi company bilan run qilish uchun `--url <server_url> --create-company --head-email <email> --head-password <password>` beriladi; head profil credentiallari flag orqali majburiy beriladi.
+- `--create-company` bilan `--company-code` va `--company-password` berilmaydi; company code test tomonidan `autotest<code>` ko'rinishida yaratiladi.
 - Test user paroli kod ichida hardcode; head/company admin paroli bilan aralashtirilmaydi.
 - `00 - Company` suitega URLga qarab emas, explicit yangi company yaratish flagi orqali qo'shiladi.
 - Company testi run bo'lsa, `data_store.json`ga saqlangan `company_code` keyingi loginlarda `--company-code` o'rniga ishlatiladi; company testi run bo'lmasa stale `company_code` tozalanadi.
@@ -34,12 +34,17 @@ Tags: smoke, setup, dependency, data-store
 - `code` fixture full/setup runnerda yoki `--new-code` bilan yangi random 4 xonali qiymat beradi; yakka/group debugda `--reuse-code` yoki default orqali `test-results/data/data_store.json` dan o'qiladi.
 - `test_01_authorization` `save_data("code", code)` orqali yangi code ni keyingi yakka/debug testlar uchun saqlaydi.
 - Smoke runner `data_store.json` ni tozalab qayta yaratmaydi; faqat `code` yozadi. Shu sabab group testlardan qolgan eski `contract_*` yoki `order_id` qiymatlarini smoke setupning hozirgi code qiymati bilan bir xil deb qabul qilmaslik kerak.
+
 - Setup zanjiri buzilsa keyingi testlar ham precondition yo'qligi sabab yiqilishi mumkin; yakka testdan oldin to'liq runner yoki mos precondition ma'lumotlari kerak.
 - Directory/default collection duplicate business flow yurmasligi uchun default holatda faqat mos runner fayllarini qoldiradi; leaf testlarni collect qilish kerak bo'lsa `--include-leaf-tests` ishlatiladi.
-- Cross-platform asosiy run: `python scripts/run_tests.py --url {server_url} --company-code {code} --company-password {password}` yoki `python scripts/run_tests.py --url {server_url} --create-company`; Mac/Linux wrapper: `./run_tests.sh ...`.
+- Cross-platform asosiy run: `python scripts/run_tests.py --url {server_url} --company-code {code} --company-password {password}` yoki `python scripts/run_tests.py --url {server_url} --create-company --head-email {email} --head-password {password}`; Mac/Linux wrapper: `./run_tests.sh ...`.
 - Runner debug mode'lari: `all`, `setup`, `company`, `group-a`, `group-b`; foydalanuvchi odatda bo'laklarga bo'lib run qilmaydi, normal run doim full suite.
 - Test scope mode global bo'ladi: all/setup/group runnerlar smoke yoki regression mode bilan yuradi va bu mode `run_*_chain` -> `run_*` flowlarga uzatiladi.
 - Yangi testlar bitta biznes flow ichida ikki scope bilan yoziladi: smoke branch minimal data va asosiy list/assertlar, regression branch optional data, kengroq tab/view assertlar va edge case tekshiruvlarni bajaradi.
+
+### Smoke Credentiallari Majburiy
+Tags: setup, runner, credential
+- Qoida: mavjud company uchun `--company-code/--company-password` majburiy; yangi company yaratish uchun `--create-company --head-email/--head-password` majburiy. Yangi company code `autotest<code>`, admin login `admin@autotest<code>`, admin password test ichidagi default qiymat.
 
 ### Smoke/Regression Scope Arxitekturasi
 Tags: smoke, regression, scope, runner, write-test, data-store
@@ -79,7 +84,7 @@ Tags: company, setup, head, data-store
 - Fayl: `tests/smoke/test_setup/test_company.py`.
 - Ishga tushirish: faqat explicit yangi company yaratish flagi berilganda suitega qo'shiladi.
 - Guard: company yaratish URLga qarab avtomatik qo'shilmaydi; flag yo'q bo'lsa skip/deselect qilinadi.
-- Login: `admin@head` / kod ichidagi head admin default paroli.
+- Login: `--head-email` / `--head-password` orqali majburiy berilgan head profil credentiallari.
 - Navigation: `Главное` -> `Компании`.
 - Nima qiladi: `Код сервера` sifatida `autotest{code}` kiritadi, visible required maydonlarni minimal to'ldiradi, Products card ichida `trade` va child productlarni yoqadi, saqlaydi va listda code bo'yicha tekshiradi.
 - License activation: yangi company uchun license sotib olishdan oldin `Активация для лицензии` talab qilinmaydi; test bu tabni majburiy precondition sifatida ishlatmasin.

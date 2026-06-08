@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import allure
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError, expect
 
 from tests.smoke.flows.flow_authorization import authorization_user
 from tests.smoke.flows.flow_navigate import navigate_to
@@ -21,6 +21,178 @@ pytestmark = [
     allure.feature("Order"),
     allure.story("Consignment"),
 ]
+
+B_GROUP_ORDER_INVOICE_REPORT_OPTIONS = [
+    "Акт приёма-передачи ТМЦ для доставки",
+    "Загрузочный лист",
+    "Загрузочный лист для SAP",
+    "Заявка на покупку запасных частей",
+    "Лист заказов № 3",
+    "Лист заказов № 6",
+    "Лист заказов №1",
+    "Накладная счет-фактура (2003)",
+    "Накладная №3(2007)",
+    "Накладная №4(2012)",
+    "Накладная №5 (2018)",
+    "Накладная №7",
+    "Общая сумма",
+    "Общая сумма возврата",
+    "Перечень форма 1",
+    "Счет на оплату",
+    "Счет-фактура с НДС",
+    "Счет-фактура №1(2004)",
+    "ТТН",
+    "Требование на отпуск форма 1",
+    "Чек-лист (80 мм)",
+]
+B_GROUP_ORDER_INVOICE_DROPDOWN_ONLY_OPTIONS = ["Счет-фактура с наценкой", "Экспортировать заказ"]
+B_GROUP_ORDER_INVOICE_SMOKE_REPORT_OPTIONS = [
+    "Акт приёма-передачи ТМЦ для доставки",
+    "Загрузочный лист",
+    "Накладная №7",
+    "Счет на оплату",
+    "ТТН",
+    "Чек-лист (80 мм)",
+]
+B_GROUP_ORDER_INVOICE_REPORT_DATA_CHECKS = {
+    "Акт приёма-передачи ТМЦ для доставки": ("client", "product", "total"),
+    "Загрузочный лист": ("product", "total"),
+    "Накладная №7": ("product", "total"),
+    "Счет на оплату": ("client", "product", "total"),
+    "ТТН": ("product", "total"),
+    "Чек-лист (80 мм)": ("client", "product", "order_id", "total"),
+}
+B_GROUP_ORDER_INVOICE_REPORT_CONTROL_RE = re.compile(r"(печать|распечатать|excel)", re.IGNORECASE)
+
+
+def _normalize_report_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value.replace("\xa0", " ")).strip()
+
+
+def _contains_amount(value: str, amount: str) -> bool:
+    expected_digits = re.sub(r"\D", "", amount)
+    actual_digits = re.sub(r"\D", "", value)
+    return bool(expected_digits and expected_digits in actual_digits)
+
+
+def _invoice_dropdown_option_names(page: Page) -> list[str]:
+    return page.locator(".dropdown-menu:visible a.dropdown-item").evaluate_all(
+        """elements => elements
+            .map(element => (element.innerText || element.textContent || "").replace(/\\s+/g, " ").trim())
+            .filter(Boolean)
+        """
+    )
+
+
+def _open_order_invoice_dropdown(page: Page, client: str) -> None:
+    flow_open_order_list(page)
+    expect(page.locator("#kt_content")).to_contain_text(client, timeout=120_000)
+    flow_order_list(page, find_row=client)
+    invoice_button = page.locator("#trade81-button-report_one").first
+    expect(invoice_button).to_be_visible()
+    invoice_button.click()
+    expect(page.locator(".dropdown-menu:visible a.dropdown-item").first).to_be_visible()
+
+
+def _assert_invoice_dropdown_options(page: Page) -> None:
+    expected_options = B_GROUP_ORDER_INVOICE_REPORT_OPTIONS + B_GROUP_ORDER_INVOICE_DROPDOWN_ONLY_OPTIONS
+    actual_options = _invoice_dropdown_option_names(page)
+    missing = [option for option in expected_options if option not in actual_options]
+    if missing:
+        allure.attach(
+            json.dumps(actual_options, ensure_ascii=False, indent=2),
+            name="actual-invoice-dropdown-options",
+            attachment_type=allure.attachment_type.JSON,
+        )
+        raise AssertionError(f"Накладные dropdown optionlari topilmadi: {', '.join(missing)}")
+
+
+def _report_options_for_scope(scope: str) -> list[str]:
+    if scope == "regression":
+        return B_GROUP_ORDER_INVOICE_REPORT_OPTIONS
+    return B_GROUP_ORDER_INVOICE_SMOKE_REPORT_OPTIONS
+
+
+def _assert_report_loaded(report_page: Page, option_name: str) -> str:
+    expect(report_page.locator("body")).to_contain_text(B_GROUP_ORDER_INVOICE_REPORT_CONTROL_RE, timeout=60_000)
+    report_text = report_page.locator("body").inner_text(timeout=60_000)
+    normalized_text = _normalize_report_text(report_text)
+    normalized_lower = normalized_text.lower()
+    if not any(marker in normalized_lower for marker in ("печать", "распечатать", "excel")):
+        allure.attach(
+            report_text[:4_000],
+            name=f"{option_name}-report-text",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+        raise AssertionError(f"{option_name} report sahifasi ochildi, lekin print/export control ko'rinmadi")
+    return normalized_text
+
+
+def _assert_report_contains_expected_data(option_name: str, report_text: str, expected_data: dict[str, str]) -> None:
+    missing = []
+    for check_name in B_GROUP_ORDER_INVOICE_REPORT_DATA_CHECKS.get(option_name, ()):
+        expected_value = expected_data.get(check_name, "")
+        if not expected_value:
+            continue
+        if check_name == "total":
+            if not _contains_amount(report_text, expected_value):
+                missing.append(f"{check_name}={expected_value}")
+        elif expected_value not in report_text:
+            missing.append(f"{check_name}={expected_value}")
+
+    if missing:
+        allure.attach(
+            report_text[:6_000],
+            name=f"{option_name}-report-text",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+        raise AssertionError(f"{option_name} reportida kutilgan order data topilmadi: {', '.join(missing)}")
+
+
+def _invoice_report_option_locator(page: Page, option_name: str):
+    exact_option_re = re.compile(rf"^\s*{re.escape(option_name)}\s*$")
+    span_option = page.locator(".dropdown-menu:visible span").filter(has_text=exact_option_re).first
+    if span_option.count() > 0:
+        return span_option
+    return page.locator(".dropdown-menu:visible a.dropdown-item").filter(has_text=exact_option_re).first
+
+
+def _open_invoice_report_and_assert(page: Page, client: str, option_name: str, expected_data: dict[str, str]) -> str:
+    _open_order_invoice_dropdown(page, client)
+    option = _invoice_report_option_locator(page, option_name)
+    expect(option).to_be_visible()
+
+    report_page = None
+    try:
+        with page.context.expect_page(timeout=30_000) as report_info:
+            option.click()
+        report_page = report_info.value
+        report_page.wait_for_load_state("domcontentloaded", timeout=60_000)
+        report_page.bring_to_front()
+        try:
+            report_page.wait_for_load_state("networkidle", timeout=10_000)
+        except PlaywrightTimeoutError:
+            pass
+        report_text = _assert_report_loaded(report_page, option_name)
+        _assert_report_contains_expected_data(option_name, report_text, expected_data)
+        return report_page.url
+    except PlaywrightTimeoutError as exc:
+        raise AssertionError(f"{option_name} report popup oynasi ochilmadi") from exc
+    except Exception:
+        if report_page and not report_page.is_closed():
+            try:
+                allure.attach(report_page.url, name=f"{option_name}-report-url", attachment_type=allure.attachment_type.TEXT)
+                allure.attach(
+                    report_page.screenshot(full_page=True),
+                    name=f"{option_name}-report-screenshot",
+                    attachment_type=allure.attachment_type.PNG,
+                )
+            except Exception as attach_exc:
+                allure.attach(str(attach_exc), name="report-attach-error", attachment_type=allure.attachment_type.TEXT)
+        raise
+    finally:
+        if report_page and not report_page.is_closed():
+            report_page.close()
 
 
 def _save_visible_confirm_if_open(page: Page) -> None:
@@ -470,6 +642,58 @@ def run_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_da
         save_data("b_group_consignment_order_split_second_date", limit_date)
         page.get_by_role("button", name="Закрыть").click()
         expect(page).to_have_url(re.compile(r".*/order_list"))
+
+
+def run_b_group_order_invoice_reports(page: Page, code: str, load_data, scope: str = "smoke") -> None:
+    """
+    Testcase:
+    1. B-group sessiyasida oldingi test yaratgan draft order listdan topiladi.
+    2. Order row menu ichidagi Накладные dropdown ochiladi.
+    3. Dropdowndagi kutilgan report optionlari ko'rinishi tekshiriladi.
+    4. Scope bo'yicha report optionlar birma-bir ochilib, report sahifasi va asosiy order ma'lumotlari tekshiriladi.
+    """
+    created_order_client = load_data("b_group_consignment_order_client") or f"natural_client-pw{code}"
+    created_order_id = str(load_data("b_group_consignment_order_id") or "")
+    expected_data = {
+        "client": created_order_client,
+        "product": f"product-pw{code}",
+        "order_id": created_order_id,
+        "total": "28 000",
+    }
+    opened_reports: dict[str, str] = {}
+
+    with allure.step("1 - B-group draft order listda topiladi"):
+        flow_open_order_list(page)
+        if not _page_text_is_present(page, created_order_client, timeout=10_000):
+            raise AssertionError(
+                "B-group draft order listda topilmadi. "
+                "Avval B-01 va B-02 testlari shu group sessiyada muvaffaqiyatli yurishi kerak."
+            )
+        _expect_text_visible(page, "Черновик")
+        _expect_text_visible(page, "28 000")
+
+    with allure.step("2 - Order row menu ichida Накладные dropdown optionlari tekshiriladi"):
+        _open_order_invoice_dropdown(page, created_order_client)
+        _assert_invoice_dropdown_options(page)
+
+    with allure.step("3 - Накладные report optionlari ochilishi va order datasi tekshiriladi"):
+        for option_name in _report_options_for_scope(scope):
+            with allure.step(f"Накладные: {option_name} reporti ochiladi"):
+                opened_reports[option_name] = _open_invoice_report_and_assert(
+                    page,
+                    created_order_client,
+                    option_name,
+                    expected_data,
+                )
+
+    with allure.step("4 - Ochilgan report URLlari Allurega yoziladi"):
+        allure.attach(
+            json.dumps(opened_reports, ensure_ascii=False, indent=2),
+            name="b-group-invoice-report-urls",
+            attachment_type=allure.attachment_type.JSON,
+        )
+        flow_open_order_list(page)
+        expect(page.locator("#kt_content")).to_contain_text(created_order_client, timeout=120_000)
 
 
 @allure.title("B Group: Konsignatsiya limiti bilan zakaz yaratish")

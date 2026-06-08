@@ -54,8 +54,6 @@ def main() -> None:
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
     from tests.smoke.test_setup.test_company import (  # noqa: E402
-        HEAD_ADMIN_EMAIL,
-        HEAD_ADMIN_PASSWORD,
         _click_trade_product,
         _fill_company_required_fields,
         _open_company_add,
@@ -63,6 +61,8 @@ def main() -> None:
         _products_card,
         _select_required_templates,
         company_code_for,
+        head_admin_email,
+        head_admin_password,
     )
     from tests.smoke.flows.flow_authorization import login  # noqa: E402
 
@@ -78,7 +78,7 @@ def main() -> None:
         context.set_default_timeout(15_000)
         page = context.new_page()
 
-        login(page, email=HEAD_ADMIN_EMAIL, password=HEAD_ADMIN_PASSWORD)
+        login(page, email=head_admin_email(), password=head_admin_password())
         _open_company_list(page)
         _open_company_add(page)
         _fill_company_required_fields(page, args.code, company_code_for(args.code))

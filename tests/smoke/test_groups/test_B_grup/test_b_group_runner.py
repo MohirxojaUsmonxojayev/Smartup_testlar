@@ -6,6 +6,7 @@ from tests.smoke.flows.flow_authorization import authorization_user
 from tests.smoke.test_groups.test_B_grup.test_order import (
     run_b_group_create_order_with_consignment_limit,
     run_b_group_edit_order_with_consignment_limit,
+    run_b_group_order_invoice_reports,
 )
 
 pytestmark = [
@@ -27,6 +28,8 @@ B Group test ssenariysi:
 8. Eski konsignatsiya summasi totaldan katta bo'lganda error va clear bo'lishi tekshiriladi.
 9. 30 kundan katta konsignatsiya sanasi save confirm ochmasligi tekshiriladi.
 10. Konsignatsiya ikkita sanaga 14 000 + 14 000 qilib bo'linadi va viewda tekshiriladi.
+11. Editdan keyin draft order listda qolgan holatda Накладные dropdown optionlari tekshiriladi.
+12. Накладные reportlari B-group order datasi bilan ochilishi tekshiriladi.
 """
 
 
@@ -40,6 +43,8 @@ def run_b_group_chain(group_page: Page, code: str, save_data, load_data, scope: 
         run_b_group_create_order_with_consignment_limit(group_page, code, save_data, scope=scope, login=False)
     with allure.step("B-02 - Konsignatsiyali zakazni edit qilish va split qilish"):
         run_b_group_edit_order_with_consignment_limit(group_page, code, load_data, save_data, scope=scope, login=False)
+    with allure.step("B-03 - Draft zakaz Накладные reportlarini tekshirish"):
+        run_b_group_order_invoice_reports(group_page, code, load_data, scope=scope)
 
 
 @allure.title("B-01 - Konsignatsiya limiti bilan zakaz yaratish")
@@ -56,3 +61,8 @@ def test_b_02_edit_order_with_consignment_limit(
     test_scope,
 ) -> None:
     run_b_group_edit_order_with_consignment_limit(group_user_page, code, load_data, save_data, scope=test_scope, login=False)
+
+
+@allure.title("B-03 - Draft zakaz Накладные reportlarini tekshirish")
+def test_b_03_order_invoice_reports(group_user_page: Page, code: str, load_data, test_scope) -> None:
+    run_b_group_order_invoice_reports(group_user_page, code, load_data, scope=test_scope)
