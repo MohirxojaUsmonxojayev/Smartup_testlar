@@ -5,9 +5,11 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -15,8 +17,21 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 STATE_FILE = ROOT / "test-results" / "telegram-progress.json"
 SYSTEM_SUMMARY_JSON = ROOT / "test-results" / "system-summary.json"
+AI_SUMMARY_JSON = ROOT / "test-results" / "ai-summary.json"
 EVENT_PREFIX = "SMARTUP_PROGRESS "
 MAX_MESSAGE_LENGTH = 3900
+
+TASHKENT_TZ = timezone(timedelta(hours=5))
+SCOPE_LABELS = {"smoke": "Smoke", "regression": "Regression"}
+TARGET_LABELS = {
+    "all": "All",
+    "setup": "Setup",
+    "company": "Company",
+    "group-a": "Group A",
+    "group-b": "Group B",
+}
+GROUP_ORDER = ["Setup", "A group", "B group"]
+STATUS_MARK = {"PASSED": "✅", "FAILED": "❌"}
 
 
 def env_value(name: str) -> str:
@@ -64,17 +79,44 @@ def save_state(state: dict[str, Any]) -> None:
     STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def scope_line(scope: str) -> str:
-    clean_scope = (scope or "smoke").strip().lower()
-    if clean_scope == "regression":
-        return "Regression scope tanlangan"
-    return "Smoke scope tanlangan"
+def now_tashkent() -> datetime:
+    return datetime.now(TASHKENT_TZ)
 
 
-def result_line(item: dict[str, Any]) -> str:
-    display = str(item.get("display") or item.get("test_id") or "unknown")
-    status = str(item.get("status") or "UNKNOWN").upper()
-    return f"{display} [{status}]"
+def format_duration(seconds: float) -> str:
+    total = max(0, int(seconds))
+    minutes, secs = divmod(total, 60)
+    if minutes:
+        return f"{minutes}m {secs}s"
+    return f"{secs}s"
+
+
+def server_host(server: str) -> str:
+    value = (server or "").strip()
+    for prefix in ("https://", "http://"):
+        if value.startswith(prefix):
+            value = value[len(prefix):]
+            break
+    return value.rstrip("/") or "unknown"
+
+
+def scope_label(scope: str) -> str:
+    return SCOPE_LABELS.get((scope or "smoke").strip().lower(), "Smoke")
+
+
+def target_label(target: str) -> str:
+    key = (target or "all").strip().lower()
+    return TARGET_LABELS.get(key, key.title() if key else "All")
+
+
+def title_line(state: dict[str, Any]) -> str:
+    name = f"{scope_label(str(state.get('scope') or 'smoke'))} CI"
+    result = str(state.get("result") or "").upper()
+    if result == "PASSED":
+        return f"✅ {name} — PASSED"
+    if result == "FAILED":
+        return f"❌ {name} — FAILED"
+    return f"🟡 {name} — RUNNING"
 
 
 def first_failed_result(state: dict[str, Any]) -> dict[str, Any]:
@@ -93,61 +135,116 @@ def truncate_message(text: str) -> str:
     return "\n".join(lines) + "\n..."
 
 
-def render_message(state: dict[str, Any]) -> str:
-    header_lines = [
-        "Test boshlandi",
-        scope_line(str(state.get("scope") or "smoke")),
-    ]
-    status = str(state.get("status") or "").strip()
-    if status:
-        header_lines.append(f"Status: {status}")
+def grouped_result_lines(state: dict[str, Any]) -> list[str]:
+    results = [item for item in state.get("results", []) if isinstance(item, dict)]
     current = str(state.get("current") or "").strip()
-    if current:
-        header_lines.append(f"Hozir: {current}")
+    current_group = str(state.get("current_group") or "").strip()
+    finished = bool(state.get("result"))
 
-    passed = [
-        item for item in state.get("results", [])
-        if isinstance(item, dict) and item.get("status") == "PASSED"
-    ]
+    groups: dict[str, list[str]] = {}
+    seen_order: list[str] = []
+
+    def bucket(name: str) -> list[str]:
+        if name not in groups:
+            groups[name] = []
+            seen_order.append(name)
+        return groups[name]
+
+    for item in results:
+        group = str(item.get("group") or "Other").strip() or "Other"
+        mark = STATUS_MARK.get(str(item.get("status") or "").upper(), "•")
+        display = str(item.get("display") or item.get("test_id") or "unknown")
+        bucket(group).append(f"{mark} {display}")
+
+    if not finished and current:
+        bucket(current_group or "Other").append(f"⏳ {current}")
+
+    ordered = [g for g in GROUP_ORDER if g in groups]
+    ordered += [g for g in seen_order if g not in GROUP_ORDER]
+
+    lines: list[str] = []
+    for name in ordered:
+        lines.append("")
+        lines.append(name)
+        lines.extend(groups[name])
+    return lines
+
+
+def failed_block(state: dict[str, Any]) -> list[str]:
     failed = first_failed_result(state)
+    if not failed:
+        return []
+    pairs = [
+        ("Group", failed.get("group")),
+        ("Runner", failed.get("runner")),
+        ("Test", failed.get("inner_test") or failed.get("display") or failed.get("title")),
+        ("Step", failed.get("failed_step") or failed.get("step")),
+        ("Error", failed.get("error_type")),
+        ("Reason", failed.get("message") or failed.get("reason")),
+    ]
+    lines = ["", "❌ Failed:"]
+    for label, value in pairs:
+        text = str(value or "").strip()
+        if text:
+            lines.append(f"{label}: {text}")
+    return lines
 
-    passed_lines = [result_line(item) for item in passed]
-    failed_lines: list[str] = []
-    if failed:
-        group = str(failed.get("group") or "").strip()
-        runner = str(failed.get("runner") or "").strip()
-        inner_test = str(failed.get("inner_test") or failed.get("display") or failed.get("title") or "").strip()
-        step = str(failed.get("failed_step") or failed.get("step") or "").strip()
-        error_type = str(failed.get("error_type") or "").strip()
-        if group:
-            failed_lines.append(f"Group: {group}")
-        if runner:
-            failed_lines.append(f"Runner test: {runner}")
-        if inner_test:
-            failed_lines.append(f"Ichki test: {inner_test}")
-        if step:
-            failed_lines.append(f"Step: {step}")
-        if error_type:
-            failed_lines.append(f"Error turi: {error_type}")
 
-    def compose(current_passed: list[str]) -> str:
-        lines = list(header_lines)
-        if current_passed:
-            lines.extend(["", "Passed:"])
-            lines.extend(current_passed)
-        if failed_lines:
-            lines.extend(["", "Failed:"])
-            lines.extend(failed_lines)
-        return "\n".join(lines)
+def render_message(state: dict[str, Any]) -> str:
+    finished = bool(state.get("result"))
+    lines = [title_line(state)]
 
-    message = compose(passed_lines)
-    hidden_count = 0
-    while len(message) > MAX_MESSAGE_LENGTH and len(passed_lines) > 5:
-        passed_lines.pop(0)
-        hidden_count += 1
-        message = compose([f"... {hidden_count} ta oldingi passed test yashirildi", *passed_lines])
+    started_at = str(state.get("started_at") or "").strip()
+    if finished:
+        start_clock = str(state.get("started_clock") or "").strip()
+        finish_clock = str(state.get("finished_clock") or "").strip()
+        duration = str(state.get("duration") or "").strip()
+        bits: list[str] = []
+        if start_clock and finish_clock:
+            bits.append(f"{start_clock}–{finish_clock}")
+        elif started_at:
+            bits.append(started_at)
+        if duration:
+            bits.append(duration)
+        if bits:
+            lines.append("🕒 " + " · ".join(bits) + " (+5)")
+    elif started_at:
+        lines.append(f"🕒 Started: {started_at} (+5)")
 
-    return truncate_message(message)
+    lines.append(
+        f"🖥 {server_host(str(state.get('server') or ''))}"
+        f" · {scope_label(str(state.get('scope') or 'smoke'))}"
+        f" · {target_label(str(state.get('target') or 'all'))}"
+    )
+
+    if finished:
+        summary = str(state.get("summary") or "").strip()
+        if summary:
+            lines.append(f"📊 {summary}")
+    else:
+        status = str(state.get("status") or "").strip()
+        if status:
+            lines.append(f"Status: {status}")
+
+    lines.extend(grouped_result_lines(state))
+    lines.extend(failed_block(state))
+
+    if finished:
+        footer: list[str] = []
+        user_login = str(state.get("user_login") or "").strip()
+        run_url = str(state.get("run_url") or "").strip()
+        if user_login and user_login != "not found":
+            footer.append(f"👤 {user_login}")
+        if run_url:
+            footer.append(f"🔗 {run_url}")
+        if footer:
+            lines.append("")
+            lines.extend(footer)
+        ai = str(state.get("ai_conclusion") or "").strip()
+        if ai:
+            lines.extend(["", "🤖 AI:", ai])
+
+    return truncate_message("\n".join(lines))
 
 
 def edit_progress(state: dict[str, Any]) -> None:
@@ -166,13 +263,19 @@ def edit_progress(state: dict[str, Any]) -> None:
 
 
 def command_start(args: argparse.Namespace) -> int:
+    now = now_tashkent()
     state = {
         "scope": args.scope,
         "server": args.server,
         "target": args.target,
         "status": args.status,
         "current": "",
+        "current_group": "",
         "results": [],
+        "result": "",
+        "started_at": now.strftime("%Y-%m-%d %H:%M"),
+        "started_clock": now.strftime("%H:%M"),
+        "started_epoch": time.time(),
     }
     if not telegram_enabled():
         save_state(state)
@@ -214,8 +317,9 @@ def update_from_event(state: dict[str, Any], event: dict[str, Any]) -> None:
     event_name = str(event.get("event") or "")
     display = str(event.get("display") or event.get("title") or event.get("test_id") or "unknown")
     if event_name == "started":
-        state["status"] = "testlar ishlayapti"
+        state["status"] = "Tests running"
         state["current"] = display
+        state["current_group"] = str(event.get("group") or "")
         return
 
     if event_name not in {"passed", "failed"}:
@@ -233,7 +337,11 @@ def update_from_event(state: dict[str, Any], event: dict[str, Any]) -> None:
         "error_type": event.get("error_type") or "",
     }
     state.setdefault("results", []).append(result)
-    state["current"] = "" if event_name == "passed" else display
+    if event_name == "passed":
+        state["current"] = ""
+        state["current_group"] = ""
+    else:
+        state["current"] = display
 
 
 def failed_details_from_system_summary() -> dict[str, str]:
@@ -280,7 +388,7 @@ def command_run(args: argparse.Namespace) -> int:
         return 2
 
     state = load_state()
-    state["status"] = "testlar boshlanyapti"
+    state["status"] = "Starting tests"
     save_state(state)
     edit_progress(state)
     process = subprocess.Popen(
@@ -314,6 +422,67 @@ def command_run(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def read_ai_conclusion() -> str:
+    if not AI_SUMMARY_JSON.exists():
+        return ""
+    try:
+        data = json.loads(AI_SUMMARY_JSON.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if not isinstance(data, dict):
+        return ""
+    return str(data.get("summary") or "").strip()[:600]
+
+
+def derive_summary(state: dict[str, Any]) -> str:
+    results = [item for item in state.get("results", []) if isinstance(item, dict)]
+    passed = sum(1 for item in results if str(item.get("status")).upper() == "PASSED")
+    failed = sum(1 for item in results if str(item.get("status")).upper() == "FAILED")
+    parts = [f"{passed} passed"]
+    if failed:
+        parts.append(f"{failed} failed")
+    return ", ".join(parts)
+
+
+def command_finish(args: argparse.Namespace) -> int:
+    state = load_state()
+    if not state:
+        return 0
+
+    passed_values = {"success", "passed", "pass", "ok"}
+    result = "PASSED" if str(args.result or "").strip().lower() in passed_values else "FAILED"
+    state["result"] = result
+    state["status"] = ""
+    state["current"] = ""
+    state["current_group"] = ""
+
+    now = now_tashkent()
+    state["finished_at"] = now.strftime("%Y-%m-%d %H:%M")
+    state["finished_clock"] = now.strftime("%H:%M")
+    started_epoch = state.get("started_epoch")
+    if isinstance(started_epoch, (int, float)):
+        state["duration"] = format_duration(time.time() - started_epoch)
+
+    if args.run_url:
+        state["run_url"] = args.run_url
+    if args.user_login:
+        state["user_login"] = args.user_login
+
+    summary = (args.summary or "").strip() or derive_summary(state)
+    state["summary"] = summary
+
+    if result == "FAILED":
+        enrich_failed_result_from_summary(state)
+
+    ai_conclusion = read_ai_conclusion()
+    if ai_conclusion:
+        state["ai_conclusion"] = ai_conclusion
+
+    save_state(state)
+    edit_progress(state)
+    return 0
+
+
 def command_delete(_args: argparse.Namespace) -> int:
     state = load_state()
     message_id = state.get("message_id")
@@ -337,7 +506,7 @@ def parse_args() -> argparse.Namespace:
     start.add_argument("--scope", required=True)
     start.add_argument("--server", required=True)
     start.add_argument("--target", required=True)
-    start.add_argument("--status", default="requirements o'rnatilyapti")
+    start.add_argument("--status", default="Installing requirements")
     start.add_argument("--message-id", default="")
 
     update = subparsers.add_parser("update")
@@ -346,6 +515,12 @@ def parse_args() -> argparse.Namespace:
 
     run = subparsers.add_parser("run")
     run.add_argument("command", nargs=argparse.REMAINDER)
+
+    finish = subparsers.add_parser("finish")
+    finish.add_argument("--result", required=True)
+    finish.add_argument("--run-url", default="")
+    finish.add_argument("--user-login", default="")
+    finish.add_argument("--summary", default="")
 
     subparsers.add_parser("delete")
     return parser.parse_args()
@@ -361,6 +536,8 @@ def main() -> int:
         if args.command and args.command[0] == "--":
             args.command = args.command[1:]
         return command_run(args)
+    if args.action == "finish":
+        return command_finish(args)
     if args.action == "delete":
         return command_delete(args)
     return 2

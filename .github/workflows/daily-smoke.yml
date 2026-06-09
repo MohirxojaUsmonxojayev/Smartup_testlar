@@ -80,7 +80,7 @@ jobs:
             --server "$TEST_SERVER_URL" \
             --target "$TEST_TARGET" \
             --message-id "$TEST_TELEGRAM_PROGRESS_MESSAGE_ID" \
-            --status "requirements o'rnatilyapti"
+            --status "Installing requirements"
 
       - name: Install dependencies
         run: |
@@ -92,14 +92,14 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scripts/telegram_progress.py update --status "requirements o'rnatildi"
+        run: python scripts/telegram_progress.py update --status "Requirements installed"
 
       - name: Mark browser install started
         if: ${{ success() }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scripts/telegram_progress.py update --status "browser o'rnatilyapti"
+        run: python scripts/telegram_progress.py update --status "Installing browser"
 
       - name: Install Playwright browser
         run: python -m playwright install --with-deps chromium
@@ -109,7 +109,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scripts/telegram_progress.py update --status "browser o'rnatildi"
+        run: python scripts/telegram_progress.py update --status "Browser installed"
 
       - name: Select and mask company credentials
         run: |
@@ -163,33 +163,21 @@ jobs:
           path: test-results/
           retention-days: 7
 
-      - name: Send Telegram notification
+      - name: Finalize Telegram progress
         if: ${{ always() }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          BRANCH: ${{ github.ref_name }}
-          EVENT_NAME: ${{ github.event_name }}
-          ACTOR: ${{ github.actor }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
             echo "Telegram secrets are not configured; skipping notification."
             exit 0
           fi
 
-          if [ "$JOB_STATUS" = "success" ]; then
-            STATUS_TEXT="[PASSED]"
-          else
-            STATUS_TEXT="[FAILED]"
-          fi
-
           SUMMARY=$(grep -E "={2,} .* (passed|failed|errors?|skipped|xfailed|xpassed).* in .* ={2,}" \
             test-results/ci-test-output.log 2>/dev/null | tail -1 | sed -E 's/^=+ //; s/ =+$//' || true)
-          if [ -z "$SUMMARY" ]; then
-            SUMMARY="Pytest summary not found. Open the run link for logs."
-          fi
 
           RUN_CODE=$(python - <<'PY' || true
           import json
@@ -213,100 +201,11 @@ jobs:
             USER_LOGIN="not found"
           fi
 
-          FAILED_TESTS=$(grep -E "^(FAILED|ERROR) " test-results/ci-test-output.log 2>/dev/null \
-            | head -5 | sed 's/^/- /' || true)
-          FAILED_TEST=$(printf '%s' "$FAILED_TESTS" | head -1 | sed -E 's/^- (FAILED|ERROR) //; s/ - .*$//' || true)
-          ERROR_LINE=$(printf '%s' "$FAILED_TESTS" | head -1 | sed -E 's/^- (FAILED|ERROR) [^ ]+ - //' || true)
-          SYSTEM_SUMMARY_TEXT=$(python - <<'PY' || true
-          import json
-          from pathlib import Path
-
-          path = Path("test-results/system-summary.json")
-          if not path.exists():
-              raise SystemExit
-          try:
-              data = json.loads(path.read_text(encoding="utf-8"))
-          except json.JSONDecodeError:
-              raise SystemExit
-          if not isinstance(data, dict):
-              raise SystemExit
-
-          lines = []
-          failed_tests = data.get("failed_tests")
-          if isinstance(failed_tests, list) and failed_tests:
-              first = failed_tests[0] if isinstance(failed_tests[0], dict) else {}
-              group = first.get("group")
-              runner_test = first.get("runner_test")
-              inner_test = first.get("inner_test")
-              failed_step = first.get("failed_step")
-              source = first.get("source") or first.get("location")
-              error_type = first.get("error_type")
-              reason = first.get("reason") or first.get("message")
-              impact = first.get("impact")
-              if group:
-                  lines.append(f"Group: {group}")
-              if runner_test:
-                  lines.append(f"Runner test: {runner_test}")
-              if inner_test:
-                  lines.append(f"Ichki test: {inner_test}")
-              if failed_step:
-                  lines.append(f"Step: {failed_step}")
-              if source:
-                  lines.append(f"Kod joyi: {source}")
-              if error_type:
-                  lines.append(f"Error turi: {error_type}")
-              if reason:
-                  lines.append(f"Sabab: {reason}")
-              if impact:
-                  lines.append(f"Ta'sir: {impact}")
-              extra_count = len(failed_tests) - 1
-              if extra_count > 0:
-                  lines.append(f"Yana {extra_count} ta failed test bor.")
-
-          print("\n".join(line for line in lines if line).strip()[:1200])
-          PY
-          )
-          AI_CONCLUSION_TEXT=$(python - <<'PY' || true
-          import json
-          from pathlib import Path
-
-          path = Path("test-results/ai-summary.json")
-          if not path.exists():
-              raise SystemExit
-          try:
-              data = json.loads(path.read_text(encoding="utf-8"))
-          except json.JSONDecodeError:
-              raise SystemExit
-          if not isinstance(data, dict):
-              raise SystemExit
-
-          summary = str(data.get("summary") or "").strip()
-          print(summary[:700])
-          PY
-          )
-
-          COMMIT_SHORT=$(printf '%s' "$GITHUB_SHA" | cut -c1-7)
-          MESSAGE=$(printf 'Daily Smoke Tests %s\n\nServer: %s\nScope: %s\nTarget: %s\nCompany: %s\nUser login: %s\nSummary: %s\n\nRun: %s' \
-            "$STATUS_TEXT" "$TEST_SERVER_URL" "$TEST_SCOPE" "$TEST_TARGET" "$TEST_COMPANY_SOURCE" "$USER_LOGIN" "$SUMMARY" "$RUN_URL")
-
-          if [ -n "$SYSTEM_SUMMARY_TEXT" ]; then
-            MESSAGE=$(printf '%s\n\nFailed:\n%s' "$MESSAGE" "$SYSTEM_SUMMARY_TEXT")
-          elif [ -n "$FAILED_TEST" ]; then
-            MESSAGE=$(printf '%s\n\nFailed test:\n%s' "$MESSAGE" "$FAILED_TEST")
-          fi
-          if [ -z "$SYSTEM_SUMMARY_TEXT" ] && [ -n "$ERROR_LINE" ]; then
-            MESSAGE=$(printf '%s\n\nTechnical error:\n%s' "$MESSAGE" "$ERROR_LINE")
-          fi
-          if [ -n "$AI_CONCLUSION_TEXT" ]; then
-            MESSAGE=$(printf '%s\n\nAI xulosa:\n%s' "$MESSAGE" "$AI_CONCLUSION_TEXT")
-          fi
-          MESSAGE=$(printf '%s\n\nArtifacts:\nOpen run link -> daily-smoke-test-results' "$MESSAGE")
-
-          curl --fail-with-body -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
-            --data-urlencode "text=${MESSAGE}" \
-            --data-urlencode "disable_web_page_preview=true" \
-            || echo "Telegram notification failed."
+          python scripts/telegram_progress.py finish \
+            --result "$JOB_STATUS" \
+            --run-url "$RUN_URL" \
+            --user-login "$USER_LOGIN" \
+            --summary "$SUMMARY"
 
           if [ "$JOB_STATUS" != "success" ]; then
             SCREENSHOT=$(find test-results -type f -name "*.png" 2>/dev/null | sort | tail -1 || true)
@@ -317,17 +216,6 @@ jobs:
                 -F "photo=@${SCREENSHOT}" \
                 || echo "Telegram screenshot upload failed."
             else
-              curl --fail-with-body -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-                --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
-                --data-urlencode "text=Failed screenshot topilmadi. Trace/log artifact ichida bo'lishi mumkin." \
-                --data-urlencode "disable_web_page_preview=true" \
-                || echo "Telegram screenshot-missing notification failed."
+              echo "Failed screenshot not found; trace/log is in the artifact."
             fi
           fi
-
-      - name: Delete Telegram progress
-        if: ${{ always() }}
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scripts/telegram_progress.py delete
