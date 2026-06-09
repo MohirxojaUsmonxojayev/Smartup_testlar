@@ -195,9 +195,12 @@ def _browser_launch_options(config) -> dict[str, Any]:
 
 
 def _browser_context_options(config) -> dict[str, Any]:
+    options: dict[str, Any] = {"accept_downloads": True}
     if _is_headless(config):
-        return {"viewport": {"width": 1920, "height": 1080}}
-    return {"no_viewport": True}
+        options["viewport"] = {"width": 1920, "height": 1080}
+    else:
+        options["no_viewport"] = True
+    return options
 
 
 def _data_file(file_name="data_store") -> Path:

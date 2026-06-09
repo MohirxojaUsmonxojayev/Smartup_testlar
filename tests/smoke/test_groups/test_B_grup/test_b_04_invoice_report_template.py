@@ -1,6 +1,8 @@
 import json
 import re
+import time
 from pathlib import Path
+from typing import Any
 
 import allure
 import pytest
@@ -17,6 +19,10 @@ pytestmark = [
     allure.feature("Invoice Report Template"),
     allure.story("B-04 Custom Invoice Report"),
 ]
+
+
+CUSTOM_REPORT_DOWNLOAD_TIMEOUT = 180_000
+DOWNLOAD_POLL_INTERVAL = 500
 
 
 def _search_grid(page: Page, text: str) -> None:
@@ -38,6 +44,22 @@ def _grid_row_is_visible(page: Page, text: str, timeout: int = 2_000) -> bool:
         return False
 
 
+def _safe_download_filename(filename: str) -> str:
+    safe_name = Path(filename).name.strip()
+    safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", safe_name).strip(" .")
+    return safe_name or "custom_invoice_report.xlsx"
+
+
+def _unique_download_path(download_dir: Path, filename: str) -> Path:
+    target_path = download_dir / _safe_download_filename(filename)
+    if not target_path.exists():
+        return target_path
+
+    suffix = target_path.suffix
+    stem = target_path.stem or "custom_invoice_report"
+    return download_dir / f"{stem}-{int(time.time() * 1000)}{suffix}"
+
+
 def _save_downloaded_report(download) -> str:
     failure = download.failure()
     if failure:
@@ -49,17 +71,156 @@ def _save_downloaded_report(download) -> str:
 
     download_dir = Path("test-results/downloads")
     download_dir.mkdir(parents=True, exist_ok=True)
-    target_path = download_dir / suggested_filename
+    target_path = _unique_download_path(download_dir, suggested_filename)
     download.save_as(target_path)
     if not target_path.exists() or target_path.stat().st_size == 0:
         raise AssertionError(f"Custom invoice report fayli bo'sh yoki saqlanmadi: {target_path}")
 
     allure.attach(
-        json.dumps({"filename": suggested_filename, "path": str(target_path)}, ensure_ascii=False, indent=2),
+        json.dumps(
+            {
+                "suggested_filename": suggested_filename,
+                "saved_filename": target_path.name,
+                "path": str(target_path),
+                "size": target_path.stat().st_size,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         name="custom-invoice-report-download",
         attachment_type=allure.attachment_type.JSON,
     )
     return suggested_filename
+
+
+def _remove_event_listener(emitter: Any, event_name: str, handler) -> None:
+    remove_listener = getattr(emitter, "remove_listener", None)
+    if remove_listener is None:
+        return
+    try:
+        remove_listener(event_name, handler)
+    except Exception:
+        pass
+
+
+def _visible_error_texts(page: Page) -> list[str]:
+    selectors = [
+        "[role='alert']:visible",
+        ".alert-danger:visible",
+        ".toast-message:visible",
+        ".toast:visible",
+        ".swal2-popup:visible",
+        ".text-danger:visible",
+        ".invalid-feedback:visible",
+    ]
+    texts: list[str] = []
+    for selector in selectors:
+        locator = page.locator(selector)
+        try:
+            count = min(locator.count(), 3)
+        except Exception:
+            continue
+        for index in range(count):
+            try:
+                text = locator.nth(index).inner_text(timeout=1_000).strip()
+            except Exception:
+                continue
+            if text and text not in texts:
+                texts.append(text[:500])
+    return texts
+
+
+def _attach_download_timeout_diagnostics(page: Page, template_name: str, popups: list[Page]) -> None:
+    popup_data = []
+    for popup in popups:
+        try:
+            popup_data.append({"url": popup.url, "closed": popup.is_closed()})
+        except Exception:
+            popup_data.append({"url": "<unavailable>", "closed": True})
+
+    try:
+        body_text = page.locator("body").inner_text(timeout=1_000)
+    except Exception:
+        body_text = ""
+
+    allure.attach(
+        json.dumps(
+            {
+                "template_name": template_name,
+                "page_url": page.url,
+                "popup_pages": popup_data,
+                "visible_errors": _visible_error_texts(page),
+                "body_excerpt": body_text[:1500],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        name="custom-invoice-report-download-timeout",
+        attachment_type=allure.attachment_type.JSON,
+    )
+
+    try:
+        allure.attach(
+            page.screenshot(full_page=True),
+            name="custom-invoice-report-download-timeout-screenshot",
+            attachment_type=allure.attachment_type.PNG,
+        )
+    except Exception:
+        pass
+
+
+def _clickable_dropdown_option(option):
+    clickable = option.locator(
+        "xpath=ancestor-or-self::a | ancestor-or-self::button | ancestor-or-self::*[@role='menuitem']"
+    )
+    try:
+        if clickable.count() > 0:
+            return clickable.first
+    except Exception:
+        pass
+    return option
+
+
+def _click_custom_report_and_save_download(page: Page, report_option, template_name: str) -> str:
+    downloads = []
+    popups: list[Page] = []
+
+    def on_download(download) -> None:
+        downloads.append(download)
+
+    def on_page(new_page: Page) -> None:
+        if new_page == page:
+            return
+        popups.append(new_page)
+        new_page.on("download", on_download)
+
+    page.on("download", on_download)
+    page.context.on("page", on_page)
+
+    try:
+        _clickable_dropdown_option(report_option).click(timeout=30_000)
+        deadline = time.monotonic() + (CUSTOM_REPORT_DOWNLOAD_TIMEOUT / 1000)
+        while time.monotonic() < deadline:
+            if downloads:
+                return _save_downloaded_report(downloads[0])
+
+            for popup in list(popups):
+                if popup.is_closed():
+                    continue
+                try:
+                    popup.wait_for_load_state("domcontentloaded", timeout=250)
+                except PlaywrightTimeoutError:
+                    pass
+
+            page.wait_for_timeout(DOWNLOAD_POLL_INTERVAL)
+
+        _attach_download_timeout_diagnostics(page, template_name, popups)
+        raise AssertionError(
+            f"{template_name} bosildi, lekin {CUSTOM_REPORT_DOWNLOAD_TIMEOUT // 1000} sekund ichida download boshlanmadi"
+        )
+    finally:
+        _remove_event_listener(page, "download", on_download)
+        _remove_event_listener(page.context, "page", on_page)
 
 
 def run_b_group_create_custom_invoice_report_template(
@@ -216,13 +377,16 @@ def run_b_group_create_custom_invoice_report_template(
         expect(dropdown).to_be_visible()
         expect(dropdown).to_contain_text(template_name)
 
-        report_option = page.locator(".dropdown-menu:visible a, .dropdown-menu:visible span").filter(
+        report_option = page.locator(
+            ".dropdown-menu:visible a:visible, "
+            ".dropdown-menu:visible button:visible, "
+            ".dropdown-menu:visible [role='menuitem']:visible, "
+            ".dropdown-menu:visible span:visible"
+        ).filter(
             has_text=re.compile(rf"^\s*{re.escape(template_name)}\s*$")
         ).first
         expect(report_option).to_be_visible()
-        with page.expect_download(timeout=60_000) as download_info:
-            report_option.click()
-        _save_downloaded_report(download_info.value)
+        _click_custom_report_and_save_download(page, report_option, template_name)
 
 
 @allure.title("B-04 - Custom invoice report template yaratish va orderda tekshirish")
