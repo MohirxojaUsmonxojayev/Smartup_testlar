@@ -16,22 +16,26 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR = ROOT / "test-results" / "allure-results"
 LOG_DIR = ROOT / "test-results" / "logs"
-SUMMARY_MD = ROOT / "test-results" / "ai-summary.md"
-SUMMARY_JSON = ROOT / "test-results" / "ai-summary.json"
+SYSTEM_SUMMARY_MD = ROOT / "test-results" / "system-summary.md"
+SYSTEM_SUMMARY_JSON = ROOT / "test-results" / "system-summary.json"
+AI_SUMMARY_MD = ROOT / "test-results" / "ai-summary.md"
+AI_SUMMARY_JSON = ROOT / "test-results" / "ai-summary.json"
 DEFAULT_MODEL = "gemini-2.5-flash"
 FAILED_STATUSES = {"failed", "broken"}
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Pytest/Allure natijasini Gemini bilan qisqa tahlil qiladi.")
+    parser = argparse.ArgumentParser(description="Pytest/Allure natijasidan system summary va ixtiyoriy AI xulosa yaratadi.")
     parser.add_argument("--exit-code", type=int, required=True, help="pytest exit code")
     parser.add_argument("--command", default="", help="Maskalangan pytest command")
     parser.add_argument("--started-at", type=float, default=0.0, help="Run boshlanish vaqti: time.time()")
-    parser.add_argument("--model", default=os.getenv("GEMINI_MODEL", DEFAULT_MODEL), help="Gemini model id")
+    parser.add_argument("--ai-summary", action="store_true", help="Gemini orqali faqat qisqa AI xulosa yaratadi.")
     parser.add_argument("--results-dir", type=Path, default=RESULTS_DIR)
     parser.add_argument("--logs-dir", type=Path, default=LOG_DIR)
-    parser.add_argument("--output-md", type=Path, default=SUMMARY_MD)
-    parser.add_argument("--output-json", type=Path, default=SUMMARY_JSON)
+    parser.add_argument("--system-output-md", type=Path, default=SYSTEM_SUMMARY_MD)
+    parser.add_argument("--system-output-json", type=Path, default=SYSTEM_SUMMARY_JSON)
+    parser.add_argument("--ai-output-md", type=Path, default=AI_SUMMARY_MD)
+    parser.add_argument("--ai-output-json", type=Path, default=AI_SUMMARY_JSON)
     return parser.parse_args()
 
 
@@ -286,7 +290,7 @@ def collect_allure_results(results_dir: Path, started_at: float) -> list[dict[st
         data = _read_json(path)
         if not data:
             continue
-        if data.get("fullName") == "ai.test.summary":
+        if data.get("fullName") in {"ai.test.summary", "system.test.summary"}:
             continue
         status_details = data.get("statusDetails") if isinstance(data.get("statusDetails"), dict) else {}
         trace = str(status_details.get("trace") or "")
@@ -345,11 +349,7 @@ def build_deterministic_summary(exit_code: int, results: list[dict[str, Any]]) -
     }
 
 
-def build_local_summary(
-    deterministic: dict[str, Any],
-    provider_note: str = "",
-    provider_error: str = "",
-) -> dict[str, Any]:
+def build_local_summary(deterministic: dict[str, Any]) -> dict[str, Any]:
     result = str(deterministic.get("result") or "UNKNOWN")
     failed_tests = deterministic.get("failed_tests")
     skipped_count = int(deterministic.get("skipped_count") or 0)
@@ -379,62 +379,19 @@ def build_local_summary(
         "failed_tests": failed_tests if isinstance(failed_tests, list) else [],
         "skipped": {"count": skipped_count, "reason": "Oldingi xato sabab skip bo'lishi mumkin." if skipped_count else ""},
         "confidence": confidence,
-        "provider_status": "fallback" if provider_note or provider_error else "local",
-        "provider_note": provider_note,
-        "provider_error": _truncate(provider_error, 1000),
+        "provider_status": "system",
         "deterministic_summary": deterministic,
     }
 
 
 def enrich_ai_summary(summary: dict[str, Any], deterministic: dict[str, Any]) -> dict[str, Any]:
-    """AI javobiga deterministik Allure step va source ma'lumotlarini qo'shadi."""
-    summary["result"] = deterministic.get("result", summary.get("result", "UNKNOWN"))
-
-    deterministic_failed = deterministic.get("failed_tests")
-    ai_failed = summary.get("failed_tests")
-    if not isinstance(deterministic_failed, list):
-        deterministic_failed = []
-    if not isinstance(ai_failed, list):
-        ai_failed = []
-
-    enriched: list[dict[str, Any]] = []
-    max_len = max(len(ai_failed), len(deterministic_failed))
-    detail_keys = (
-        "name",
-        "inner_test",
-        "failed_step",
-        "failed_step_short",
-        "source",
-        "source_function",
-        "location",
-        "error_type",
-        "impact",
-        "next_action",
-    )
-
-    for index in range(max_len):
-        ai_item = ai_failed[index] if index < len(ai_failed) and isinstance(ai_failed[index], dict) else {}
-        det_item = (
-            deterministic_failed[index]
-            if index < len(deterministic_failed) and isinstance(deterministic_failed[index], dict)
-            else {}
-        )
-        merged = dict(ai_item)
-        for key in detail_keys:
-            if not merged.get(key) and det_item.get(key):
-                merged[key] = det_item[key]
-        if not merged.get("reason") and det_item.get("reason"):
-            merged["reason"] = det_item["reason"]
-        enriched.append(merged)
-
-    summary["failed_tests"] = enriched
-    if not isinstance(summary.get("skipped"), dict):
-        summary["skipped"] = {
-            "count": deterministic.get("skipped_count", 0),
-            "reason": "Oldingi xato sabab skip bo'lishi mumkin." if deterministic.get("skipped_count") else "",
-        }
-    summary["deterministic_summary"] = deterministic
-    return summary
+    """AI faylida faqat AI yozgan qisqa xulosa qoladi."""
+    return {
+        "result": deterministic.get("result", summary.get("result", "UNKNOWN")),
+        "summary": str(summary.get("summary") or "").strip(),
+        "confidence": summary.get("confidence", "unknown"),
+        "provider_status": "ai",
+    }
 
 
 def build_prompt(command: str, deterministic: dict[str, Any], results: list[dict[str, Any]], logs: list[dict[str, str]]) -> str:
@@ -445,21 +402,19 @@ def build_prompt(command: str, deterministic: dict[str, Any], results: list[dict
         "failure_logs": logs,
     }
     return (
-        "Smartup Playwright + pytest smoke test natijasini tahlil qil.\n"
+        "Smartup Playwright + pytest smoke test natijasiga qisqa AI xulosa yoz.\n"
         "Qoidalar:\n"
         "- Pass/fail statusni faqat deterministic_summary.exit_code va resultlardan ol; o'zing taxmin qilib statusni o'zgartirma.\n"
-        "- Sababni log va stacktrace asosida ayt. Ishonching past bo'lsa confidence=low qil.\n"
+        "- Failed test, ichki step, kod joyi, skipped soni kabi faktlarni tizim o'zi chiqaradi; ularni qaytarma.\n"
+        "- Sen faqat 1-2 gaplik odam tushunadigan umumiy xulosa yoz.\n"
+        "- Xulosa root cause ehtimoli va nimani tekshirish kerakligini qisqa aytsin.\n"
+        "- Ishonching past bo'lsa confidence=low qil.\n"
         "- Javob Uzbek tilida bo'lsin.\n"
-        "- Juda uzun yozma, eng muhim sabab va keyingi qadamni ber.\n"
         "- Faqat JSON qaytar.\n\n"
         "JSON schema:\n"
         "{\n"
         '  "result": "PASSED|FAILED",\n'
-        '  "summary": "1-2 gaplik umumiy xulosa",\n'
-        '  "failed_tests": [\n'
-        '    {"name": "...", "inner_test": "...", "failed_step": "...", "error_type": "...", "location": "...", "reason": "...", "impact": "...", "next_action": "..."}\n'
-        "  ],\n"
-        '  "skipped": {"count": 0, "reason": "..."},\n'
+        '  "summary": "1-2 gaplik umumiy AI xulosa",\n'
         '  "confidence": "low|medium|high"\n'
         "}\n\n"
         f"INPUT:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
@@ -529,16 +484,21 @@ def parse_ai_json(text: str) -> dict[str, Any]:
     return data
 
 
-def render_markdown(summary: dict[str, Any], model: str, skipped_reason: str = "") -> str:
+def render_markdown(
+    summary: dict[str, Any],
+    title: str,
+    model: str = "",
+    note: str = "",
+) -> str:
     lines = [
-        "# AI Test Summary",
+        f"# {title}",
         "",
-        f"- Model: `{model}`",
         f"- Result: `{summary.get('result', 'UNKNOWN')}`",
         f"- Confidence: `{summary.get('confidence', 'unknown')}`",
-        "",
-        str(summary.get("summary") or "AI xulosa mavjud emas."),
     ]
+    if model:
+        lines.insert(2, f"- Model: `{model}`")
+    lines.extend(["", str(summary.get("summary") or "Xulosa mavjud emas.")])
     failed_tests = summary.get("failed_tests")
     if isinstance(failed_tests, list) and failed_tests:
         lines.extend(["", "## Failed Tests"])
@@ -561,53 +521,72 @@ def render_markdown(summary: dict[str, Any], model: str, skipped_reason: str = "
     skipped = summary.get("skipped")
     if isinstance(skipped, dict) and skipped.get("count"):
         lines.extend(["", "## Skipped", f"- Count: `{skipped.get('count')}`", f"- Reason: {skipped.get('reason', '')}"])
-    if skipped_reason:
-        lines.extend(["", "## Note", skipped_reason])
+    if note:
+        lines.extend(["", "## Note", note])
     lines.append("")
     return "\n".join(lines)
 
 
-def write_outputs(summary: dict[str, Any], output_md: Path, output_json: Path, model: str, note: str = "") -> None:
+def write_outputs(
+    summary: dict[str, Any],
+    output_md: Path,
+    output_json: Path,
+    title: str,
+    model: str = "",
+    note: str = "",
+) -> None:
     output_md.parent.mkdir(parents=True, exist_ok=True)
     output_json.parent.mkdir(parents=True, exist_ok=True)
     output_json.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-    output_md.write_text(render_markdown(summary, model=model, skipped_reason=note), encoding="utf-8")
+    output_md.write_text(render_markdown(summary, title=title, model=model, note=note), encoding="utf-8")
 
 
-def write_allure_summary(summary: dict[str, Any], output_md: Path, output_json: Path, results_dir: Path) -> None:
+def write_allure_summary(
+    summary: dict[str, Any],
+    output_md: Path,
+    output_json: Path,
+    results_dir: Path,
+    *,
+    title: str,
+    full_name: str,
+    epic: str,
+    feature: str,
+    story: str,
+) -> None:
     results_dir.mkdir(parents=True, exist_ok=True)
     result_uuid = str(uuid.uuid4())
-    md_source = f"{result_uuid}-ai-summary.md"
-    json_source = f"{result_uuid}-ai-summary.json"
+    slug = full_name.replace(".", "-")
+    md_source = f"{result_uuid}-{slug}.md"
+    json_source = f"{result_uuid}-{slug}.json"
     (results_dir / md_source).write_text(output_md.read_text(encoding="utf-8"), encoding="utf-8")
     (results_dir / json_source).write_text(output_json.read_text(encoding="utf-8"), encoding="utf-8")
 
     now_ms = int(time.time() * 1000)
     result = {
-        "name": "AI Test Summary",
+        "name": title,
         "status": "passed",
-        "description": str(summary.get("summary") or "Gemini AI test xulosasi."),
+        "description": str(summary.get("summary") or title),
         "attachments": [
-            {"name": "AI Summary", "source": md_source, "type": "text/markdown"},
-            {"name": "AI Summary JSON", "source": json_source, "type": "application/json"},
+            {"name": title, "source": md_source, "type": "text/markdown"},
+            {"name": f"{title} JSON", "source": json_source, "type": "application/json"},
         ],
         "start": now_ms,
         "stop": now_ms,
         "uuid": result_uuid,
-        "historyId": "ai-test-summary",
-        "testCaseId": "ai-test-summary",
-        "fullName": "ai.test.summary",
+        "historyId": full_name,
+        "testCaseId": full_name,
+        "fullName": full_name,
         "labels": [
-            {"name": "epic", "value": "AI"},
-            {"name": "feature", "value": "Test Summary"},
-            {"name": "story", "value": "Gemini"},
-            {"name": "parentSuite", "value": "AI"},
-            {"name": "suite", "value": "Test Summary"},
+            {"name": "epic", "value": epic},
+            {"name": "feature", "value": feature},
+            {"name": "story", "value": story},
+            {"name": "parentSuite", "value": epic},
+            {"name": "suite", "value": feature},
             {"name": "framework", "value": "pytest"},
             {"name": "language", "value": "python"},
-            {"name": "package", "value": "ai"},
+            {"name": "package", "value": full_name.rsplit(".", 1)[0]},
         ],
-        "titlePath": ["AI", "Test Summary"],
+        "titlePath": [epic, feature],
     }
     (results_dir / f"{result_uuid}-result.json").write_text(
         json.dumps(result, ensure_ascii=False),
@@ -621,37 +600,67 @@ def main() -> int:
     results = collect_allure_results(args.results_dir, args.started_at)
     logs = collect_failure_logs(args.logs_dir, args.started_at)
     deterministic = build_deterministic_summary(args.exit_code, results)
+    model = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
+
+    args.ai_output_md.unlink(missing_ok=True)
+    args.ai_output_json.unlink(missing_ok=True)
+
+    system_summary = build_local_summary(deterministic)
+    write_outputs(
+        system_summary,
+        args.system_output_md,
+        args.system_output_json,
+        title="System Test Summary",
+    )
+    write_allure_summary(
+        system_summary,
+        args.system_output_md,
+        args.system_output_json,
+        args.results_dir,
+        title="System Test Summary",
+        full_name="system.test.summary",
+        epic="System",
+        feature="Test Summary",
+        story="Deterministic",
+    )
+    print(f"System summary yozildi: {args.system_output_md}")
+
+    if not args.ai_summary:
+        return 0
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
-        skipped = build_local_summary(
-            deterministic,
-            provider_note="Gemini API key topilmadi, shuning uchun log asosidagi avtomatik xulosa berildi.",
-        )
-        write_outputs(skipped, args.output_md, args.output_json, model=args.model, note="GEMINI_API_KEY yo'q.")
-        write_allure_summary(skipped, args.output_md, args.output_json, args.results_dir)
-        print(f"AI summary skipped: GEMINI_API_KEY set qilinmagan ({args.output_md})")
+        print("AI summary skipped: GEMINI_API_KEY set qilinmagan", file=sys.stderr)
         return 0
 
     prompt = build_prompt(command, deterministic, results, logs)
     try:
-        raw = call_gemini(prompt, model=args.model, api_key=api_key)
+        raw = call_gemini(prompt, model=model, api_key=api_key)
         summary = parse_ai_json(raw)
     except Exception as exc:
-        summary = build_local_summary(
-            deterministic,
-            provider_note="Gemini hozir javob bermadi, shuning uchun log asosidagi avtomatik xulosa berildi.",
-            provider_error=str(exc),
-        )
-        write_outputs(summary, args.output_md, args.output_json, model=args.model)
-        write_allure_summary(summary, args.output_md, args.output_json, args.results_dir)
         print(f"AI summary xato bilan tugadi, test exit code o'zgarmaydi: {exc}", file=sys.stderr)
         return 0
 
     summary = enrich_ai_summary(summary, deterministic)
-    write_outputs(summary, args.output_md, args.output_json, model=args.model)
-    write_allure_summary(summary, args.output_md, args.output_json, args.results_dir)
-    print(f"AI summary yozildi: {args.output_md}")
+    write_outputs(
+        summary,
+        args.ai_output_md,
+        args.ai_output_json,
+        title="AI Test Summary",
+        model=model,
+    )
+    write_allure_summary(
+        summary,
+        args.ai_output_md,
+        args.ai_output_json,
+        args.results_dir,
+        title="AI Test Summary",
+        full_name="ai.test.summary",
+        epic="AI",
+        feature="Test Summary",
+        story="Gemini",
+    )
+    print(f"AI summary yozildi: {args.ai_output_md}")
     return 0
 
 

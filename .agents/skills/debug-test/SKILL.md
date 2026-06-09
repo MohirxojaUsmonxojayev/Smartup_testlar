@@ -100,7 +100,8 @@ Yechim: <nima qilish kerak>
 
 ### AI test summary
 - Test run tugagandan keyingi xulosa uchun OpenAI emas, Gemini API ishlatiladi; default model `gemini-2.5-flash`, key esa faqat `GEMINI_API_KEY` environment variable orqali olinadi va repo/chat/logga yozilmaydi.
-- AI summary default holatda off; faqat `scripts/run_tests.py ... --ai-summary` flagi berilganda ishlaydi.
+- `System summary` AI emas va har doim yoziladi: `test-results/system-summary.md/json`, Allure ichida `System Test Summary`; failed test, ichki Allure step, kod joyi, error turi, sabab va ta'sirni tizim o'zi chiqaradi.
+- AI summary default holatda off; faqat `scripts/run_tests.py ... --ai-summary` flagi berilganda ishlaydi va faqat 1-2 gaplik qo'shimcha xulosa yozadi.
 - AI xulosa `test-results/ai-summary.md/json` fayllariga yoziladi va Allure report ichida alohida `AI Test Summary` card sifatida attachment qilinadi; bu card test pass/fail statusini o'zgartirmaydi.
-- Telegramdagi AI summary odam tushunadigan bo'lishi shart: xom Gemini API error, uzun stacktrace yoki locator logini asosiy xabar sifatida yuborma; Gemini 503/no-key bo'lsa log asosidagi fallback xulosa `sabab + ta'sir + keyingi qadam` formatida chiqsin.
+- Telegramdagi asosiy natija xabari AIga bog'liq bo'lmasin; xom Gemini API error, uzun stacktrace yoki locator logini asosiy xabar sifatida yuborma.
 - `test_all_runner.py` kabi outer runner fail bo'lsa, Telegram xabarda faqat outer test nomi yetarli emas; Allure `steps` ichidan aynan qaysi ichki test/step yiqilganini (`inner_test`, `failed_step`, `source`) ko'rsatish shart.

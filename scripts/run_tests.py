@@ -13,6 +13,12 @@ ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR = ROOT / "test-results" / "allure-results"
 REPORT_DIR = ROOT / "test-results" / "allure-report"
 TRACE_DIR = ROOT / "test-results" / "traces"
+SUMMARY_FILES = (
+    ROOT / "test-results" / "system-summary.md",
+    ROOT / "test-results" / "system-summary.json",
+    ROOT / "test-results" / "ai-summary.md",
+    ROOT / "test-results" / "ai-summary.json",
+)
 CREATED_COMPANY_PASSWORD = "greenwhite"
 
 TARGETS = {
@@ -37,6 +43,8 @@ def clean_allure_results() -> None:
             shutil.rmtree(item, ignore_errors=True)
         else:
             item.unlink(missing_ok=True)
+    for item in SUMMARY_FILES:
+        item.unlink(missing_ok=True)
 
 
 def command_text(command: list[str]) -> str:
@@ -82,18 +90,12 @@ def show_trace(env: dict[str, str], dry_run: bool) -> None:
         run([playwright, "show-trace", str(traces[0])], env, dry_run=dry_run)
 
 
-def should_run_ai_summary(args: argparse.Namespace, env: dict[str, str]) -> bool:
-    if args.no_ai_summary:
-        return False
-    return args.ai_summary
-
-
-def generate_ai_summary(
+def generate_test_summary(
     env: dict[str, str],
     test_exit: int,
     pytest_command: list[str],
     started_at: float,
-    model: str,
+    ai_summary: bool,
     dry_run: bool,
 ) -> None:
     command = [
@@ -105,9 +107,9 @@ def generate_ai_summary(
         command_text(pytest_command),
         "--started-at",
         str(started_at),
-        "--model",
-        model,
     ]
+    if ai_summary:
+        command.append("--ai-summary")
     run(command, env, dry_run=dry_run)
 
 
@@ -144,17 +146,7 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser.add_argument(
         "--ai-summary",
         action="store_true",
-        help="Test tugagach Gemini orqali test-results/ai-summary.md/json yozadi.",
-    )
-    parser.add_argument(
-        "--no-ai-summary",
-        action="store_true",
-        help="AI summary yaratmaydi.",
-    )
-    parser.add_argument(
-        "--ai-model",
-        default=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        help="AI summary uchun Gemini model id. Default: gemini-2.5-flash",
+        help="Test tugagach Gemini orqali faqat qo'shimcha AI xulosa yozadi. Default: off.",
     )
     parser.add_argument("--dry-run", action="store_true", help="Commandni ko'rsatadi, lekin ishga tushirmaydi.")
     return parser.parse_known_args()
@@ -163,6 +155,11 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
 def main() -> int:
     args, pytest_extra = parse_args()
     env = os.environ.copy()
+
+    unsupported_ai_flags = [item for item in pytest_extra if item == "--no-ai-summary" or item.startswith("--ai-model")]
+    if unsupported_ai_flags:
+        print("--no-ai-summary va --ai-model kerak emas; AI default off, kerak bo'lsa faqat --ai-summary ishlating", file=sys.stderr)
+        return 2
 
     company_url_arg = normalized_url(args.url)
     if not company_url_arg:
@@ -261,15 +258,14 @@ def main() -> int:
     run_started_at = time.time()
     test_exit = run(pytest_command, env, dry_run=args.dry_run)
 
-    if should_run_ai_summary(args, env):
-        generate_ai_summary(
-            env,
-            test_exit=test_exit,
-            pytest_command=pytest_command,
-            started_at=run_started_at,
-            model=args.ai_model,
-            dry_run=args.dry_run,
-        )
+    generate_test_summary(
+        env,
+        test_exit=test_exit,
+        pytest_command=pytest_command,
+        started_at=run_started_at,
+        ai_summary=args.ai_summary,
+        dry_run=args.dry_run,
+    )
 
     generate_report(env, open_report=args.open_report, dry_run=args.dry_run)
     if args.show_trace:

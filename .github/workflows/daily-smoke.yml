@@ -29,6 +29,11 @@ on:
           - setup
           - group-a
           - group-b
+      ai_summary:
+        description: Add Gemini AI conclusion
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: daily-smoke-tests
@@ -42,6 +47,7 @@ jobs:
       TEST_SCOPE: ${{ github.event.inputs.scope || 'smoke' }}
       TEST_SERVER_URL: ${{ github.event.inputs.server_url || 'https://smartup.online/' }}
       TEST_TARGET: ${{ github.event.inputs.target || 'all' }}
+      TEST_AI_SUMMARY: ${{ github.event.inputs.ai_summary || 'false' }}
       SMARTUP_COMPANY_CODE: ${{ secrets.SMARTUP_COMPANY_CODE }}
       SMARTUP_COMPANY_PASSWORD: ${{ secrets.SMARTUP_COMPANY_PASSWORD }}
       APP3_COMPANY_CODE: ${{ secrets.APP3_COMPANY_CODE }}
@@ -93,6 +99,10 @@ jobs:
       - name: Run daily smoke tests
         run: |
           mkdir -p test-results
+          AI_SUMMARY_ARGS=()
+          if [ "$TEST_AI_SUMMARY" = "true" ]; then
+            AI_SUMMARY_ARGS+=(--ai-summary)
+          fi
           set -o pipefail
           python scripts/run_tests.py "$TEST_TARGET" \
             --url "$TEST_SERVER_URL" \
@@ -100,7 +110,7 @@ jobs:
             --company-password "$TEST_COMPANY_PASSWORD" \
             --scope "$TEST_SCOPE" \
             --headless \
-            --ai-summary 2>&1 | tee test-results/ci-test-output.log
+            "${AI_SUMMARY_ARGS[@]}" 2>&1 | tee test-results/ci-test-output.log
 
       - name: Upload test results
         if: ${{ always() }}
@@ -164,7 +174,53 @@ jobs:
             | head -5 | sed 's/^/- /' || true)
           FAILED_TEST=$(printf '%s' "$FAILED_TESTS" | head -1 | sed -E 's/^- (FAILED|ERROR) //; s/ - .*$//' || true)
           ERROR_LINE=$(printf '%s' "$FAILED_TESTS" | head -1 | sed -E 's/^- (FAILED|ERROR) [^ ]+ - //' || true)
-          AI_SUMMARY_TEXT=$(python - <<'PY' || true
+          SYSTEM_SUMMARY_TEXT=$(python - <<'PY' || true
+          import json
+          from pathlib import Path
+
+          path = Path("test-results/system-summary.json")
+          if not path.exists():
+              raise SystemExit
+          try:
+              data = json.loads(path.read_text(encoding="utf-8"))
+          except json.JSONDecodeError:
+              raise SystemExit
+          if not isinstance(data, dict):
+              raise SystemExit
+
+          lines = []
+          summary = data.get("summary")
+          failed_tests = data.get("failed_tests")
+          if isinstance(failed_tests, list) and failed_tests:
+              first = failed_tests[0] if isinstance(failed_tests[0], dict) else {}
+              inner_test = first.get("inner_test")
+              failed_step = first.get("failed_step")
+              source = first.get("source") or first.get("location")
+              error_type = first.get("error_type")
+              reason = first.get("reason") or first.get("message")
+              impact = first.get("impact")
+              if inner_test:
+                  lines.append(f"Ichki test: {inner_test}")
+              if failed_step:
+                  lines.append(f"Allure step: {failed_step}")
+              if source:
+                  lines.append(f"Kod joyi: {source}")
+              if error_type:
+                  lines.append(f"Error turi: {error_type}")
+              if reason:
+                  lines.append(f"Sabab: {reason}")
+              if impact:
+                  lines.append(f"Ta'sir: {impact}")
+              extra_count = len(failed_tests) - 1
+              if extra_count > 0:
+                  lines.append(f"Yana {extra_count} ta failed test bor.")
+          elif summary:
+              lines.append(f"Xulosa: {summary}")
+
+          print("\n".join(line for line in lines if line).strip()[:1200])
+          PY
+          )
+          AI_CONCLUSION_TEXT=$(python - <<'PY' || true
           import json
           from pathlib import Path
 
@@ -178,40 +234,8 @@ jobs:
           if not isinstance(data, dict):
               raise SystemExit
 
-          lines = []
-          provider_note = data.get("provider_note")
-          summary = data.get("summary")
-          if provider_note:
-              lines.append(f"Izoh: {provider_note}")
-          if summary:
-              lines.append(f"Xulosa: {summary}")
-
-          failed_tests = data.get("failed_tests")
-          if isinstance(failed_tests, list) and failed_tests:
-              first = failed_tests[0] if isinstance(failed_tests[0], dict) else {}
-              inner_test = first.get("inner_test")
-              failed_step = first.get("failed_step")
-              source = first.get("source") or first.get("location")
-              reason = first.get("reason") or first.get("message")
-              impact = first.get("impact")
-              next_action = first.get("next_action")
-              if inner_test:
-                  lines.append(f"Ichki test: {inner_test}")
-              if failed_step:
-                  lines.append(f"Allure step: {failed_step}")
-              if source:
-                  lines.append(f"Kod joyi: {source}")
-              if reason:
-                  lines.append(f"Sabab: {reason}")
-              if impact:
-                  lines.append(f"Ta'sir: {impact}")
-              if next_action:
-                  lines.append(f"Keyingi qadam: {next_action}")
-              extra_count = len(failed_tests) - 1
-              if extra_count > 0:
-                  lines.append(f"Yana {extra_count} ta failed test bor.")
-
-          print("\n".join(line for line in lines if line).strip()[:1200])
+          summary = str(data.get("summary") or "").strip()
+          print(summary[:700])
           PY
           )
 
@@ -222,11 +246,13 @@ jobs:
           if [ -n "$FAILED_TEST" ]; then
             MESSAGE=$(printf '%s\n\nFailed test:\n%s' "$MESSAGE" "$FAILED_TEST")
           fi
-          if [ -n "$ERROR_LINE" ] && [ -z "$AI_SUMMARY_TEXT" ]; then
+          if [ -n "$SYSTEM_SUMMARY_TEXT" ]; then
+            MESSAGE=$(printf '%s\n\nSystem summary:\n%s' "$MESSAGE" "$SYSTEM_SUMMARY_TEXT")
+          elif [ -n "$ERROR_LINE" ]; then
             MESSAGE=$(printf '%s\n\nTechnical error:\n%s' "$MESSAGE" "$ERROR_LINE")
           fi
-          if [ -n "$AI_SUMMARY_TEXT" ]; then
-            MESSAGE=$(printf '%s\n\nAI summary:\n%s' "$MESSAGE" "$AI_SUMMARY_TEXT")
+          if [ -n "$AI_CONCLUSION_TEXT" ]; then
+            MESSAGE=$(printf '%s\n\nAI xulosa:\n%s' "$MESSAGE" "$AI_CONCLUSION_TEXT")
           fi
           MESSAGE=$(printf '%s\n\nArtifacts:\nOpen run link -> daily-smoke-test-results' "$MESSAGE")
 

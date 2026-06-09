@@ -47,12 +47,16 @@ Test tugagach /run yana ishlaydi.
 ```
 
 Workflow tugagach `.github/workflows/daily-smoke.yml` yakuniy test summary
-xabarini Telegramga yuboradi. Xabarda Gemini AI yozgan qisqa, odam
-tushunadigan xulosa ham chiqadi: qaysi ichki test/Allure step yiqilgani,
-sabab, ta'sir va keyingi qadam.
-Gemini vaqtincha javob bermasa ham xom API xato yuborilmaydi, log asosidagi
-fallback xulosa yuboriladi. Failed bo'lsa oxirgi screenshot ham yuboriladi,
-screenshot topilmasa artifact linki beriladi.
+xabarini Telegramga yuboradi. `System summary` har doim chiqadi: qaysi ichki
+test/Allure step yiqilgani, kod joyi, error turi, sabab va ta'sir.
+
+Gemini AI default holatda off. Workflow manual run qilinganda `ai_summary=true`
+tanlansa yoki runner `--ai-summary` bilan yursa, Telegram xabarda qo'shimcha
+`AI xulosa` chiqadi. AI faqat 1-2 gaplik umumiy xulosa yozadi; failed step,
+kod joyi va error turini tizim o'zi chiqaradi.
+
+Failed bo'lsa oxirgi screenshot ham yuboriladi, screenshot topilmasa artifact
+linki beriladi.
 
 Final xabarda test yaratgan user login ham chiqadi:
 
@@ -86,9 +90,10 @@ GEMINI_API_KEY
 ```
 
 Bu key bot ishlayotgan Windows serverda emas, GitHub Actions secrets ichida
-turadi. Key bo'lmasa test baribir ishlaydi, lekin AI xulosa skipped bo'ladi.
-To'liq AI xulosa `daily-smoke-test-results` artifact ichida va Allure reportda
-`AI Test Summary` sifatida saqlanadi.
+turadi. Key bo'lmasa test baribir ishlaydi va `System summary` chiqadi.
+To'liq tizim xulosasi `daily-smoke-test-results` artifact ichida va Allure
+reportda `System Test Summary` sifatida saqlanadi. `AI Test Summary` faqat AI
+yoqilgan va Gemini javob bergan runlarda saqlanadi.
 
 ## Required Environment Variables
 
