@@ -47,9 +47,11 @@ Test tugagach /run yana ishlaydi.
 ```
 
 Workflow tugagach `.github/workflows/daily-smoke.yml` yakuniy test summary
-xabarini Telegramga yuboradi. Xabarda Gemini AI yozgan qisqa xulosa ham
-chiqadi. Failed bo'lsa oxirgi screenshot ham yuboriladi, screenshot topilmasa
-artifact linki beriladi.
+xabarini Telegramga yuboradi. Xabarda Gemini AI yozgan qisqa, odam
+tushunadigan xulosa ham chiqadi: natija, sabab, ta'sir va keyingi qadam.
+Gemini vaqtincha javob bermasa ham xom API xato yuborilmaydi, log asosidagi
+fallback xulosa yuboriladi. Failed bo'lsa oxirgi screenshot ham yuboriladi,
+screenshot topilmasa artifact linki beriladi.
 
 Final xabarda test yaratgan user login ham chiqadi:
 

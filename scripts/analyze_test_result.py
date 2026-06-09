@@ -64,6 +64,117 @@ def _truncate(text: str, limit: int) -> str:
     return text[:limit] + "\n...[truncated]..."
 
 
+def _first_non_empty_line(text: str) -> str:
+    for line in text.splitlines():
+        clean = line.strip()
+        if clean:
+            return clean
+    return ""
+
+
+def _timeout_text(message: str) -> str:
+    match = re.search(r"Timeout\s+(\d+)ms", message)
+    if not match:
+        return "berilgan vaqt"
+    milliseconds = int(match.group(1))
+    seconds = milliseconds // 1000
+    if seconds:
+        return f"{seconds} sekund"
+    return f"{milliseconds} ms"
+
+
+def _waited_target(message: str) -> str:
+    for pattern in (r"- waiting for (.+)", r"waiting for (.+)"):
+        match = re.search(pattern, message)
+        if match:
+            return _truncate(match.group(1).strip(), 220)
+    locator = re.search(r"(locator\(.+?\)(?:\.\w+\(.+?\))?)", message)
+    if locator:
+        return _truncate(locator.group(1).strip(), 220)
+    return ""
+
+
+def _error_type(message: str) -> str:
+    if "TimeoutError" in message:
+        return "TimeoutError"
+    if "AssertionError" in message:
+        return "AssertionError"
+    if "StrictModeViolation" in message:
+        return "StrictModeViolation"
+    if "Error:" in message:
+        return _first_non_empty_line(message).split(":", 1)[0]
+    return "unknown"
+
+
+def _location(item: dict[str, Any]) -> str:
+    full_name = str(item.get("fullName") or "").strip()
+    return full_name or str(item.get("name") or "unknown")
+
+
+def _human_reason(message: str) -> str:
+    timeout = _timeout_text(message)
+    target = _waited_target(message)
+    target_text = f" Kutgan element: {target}." if target else ""
+    if "Locator.click: Timeout" in message:
+        return (
+            f"Test sahifadagi elementni {timeout} ichida bosa olmadi."
+            f"{target_text} Bu odatda sahifa kerakli holatga kelmaganini yoki locator eskirganini bildiradi."
+        )
+    if "Locator.fill: Timeout" in message:
+        return (
+            f"Test input maydonini {timeout} ichida topib to'ldirolmadi."
+            f"{target_text} Forma to'liq ochilmagan yoki locator UI bilan mos emas."
+        )
+    if "Locator" in message and "Timeout" in message:
+        return (
+            f"Test kerakli elementni {timeout} ichida topa olmadi."
+            f"{target_text} Sahifa holati, data yoki locator tekshirilishi kerak."
+        )
+    if "Page.goto: Timeout" in message:
+        return (
+            f"Sahifa {timeout} ichida yuklanmadi. Server sekin javob bergan, URL ochilmagan yoki tarmoq muammosi bo'lishi mumkin."
+        )
+    if "AssertionError" in message:
+        return "Test kutgan natija bilan haqiqiy natija mos kelmadi. Expected/actual qiymatlarni Allure logdan solishtirish kerak."
+    first_line = _first_non_empty_line(message)
+    if first_line:
+        return _truncate(first_line, 350)
+    return "Xato sababi logda aniq ko'rinmadi. Allure trace va screenshotni tekshirish kerak."
+
+
+def _human_next_action(message: str) -> str:
+    if "Timeout" in message and "Locator" in message:
+        return "Allure screenshot/trace orqali sahifa to'g'ri ochilganini tekshir; element nomi o'zgargan bo'lsa locatorni yangila yoki kerakli kutishni qo'sh."
+    if "Page.goto: Timeout" in message:
+        return "Server URL ochilishini va GitHub Actions runnerdan serverga ulanish borligini tekshir."
+    if "AssertionError" in message:
+        return "Testdagi expected qiymat va UI/API qaytargan actual qiymatni solishtir."
+    return "Failure log va trace artifactni ochib, shu qadamdagi UI holatini tekshir."
+
+
+def _human_impact(item: dict[str, Any], skipped_count: int) -> str:
+    name = f"{item.get('name', '')} {item.get('fullName', '')}".lower()
+    if "setup" in name and skipped_count:
+        return f"Setup tugamagani uchun keyingi {skipped_count} ta test skip bo'lgan."
+    if skipped_count:
+        return f"Bu xatodan keyin {skipped_count} ta test skip bo'lgan."
+    return "Shu test shu qadamda to'xtagan."
+
+
+def _humanize_failure(item: dict[str, Any], skipped_count: int) -> dict[str, Any]:
+    message = str(item.get("message") or "")
+    return {
+        "name": item.get("name") or item.get("fullName") or "unknown",
+        "status": item.get("status") or "unknown",
+        "message": _truncate(message, 700),
+        "error_type": _error_type(message),
+        "location": _location(item),
+        "reason": _human_reason(message),
+        "impact": _human_impact(item, skipped_count),
+        "next_action": _human_next_action(message),
+    }
+
+
 def collect_allure_results(results_dir: Path, started_at: float) -> list[dict[str, Any]]:
     if not results_dir.exists():
         return []
@@ -122,20 +233,54 @@ def build_deterministic_summary(exit_code: int, results: list[dict[str, Any]]) -
     result = "PASSED" if exit_code == 0 else "FAILED"
     failed = [item for item in results if item.get("status") in {"failed", "broken"}]
     skipped = [item for item in results if item.get("status") == "skipped"]
+    skipped_count = len(skipped)
     return {
         "result": result,
         "exit_code": exit_code,
         "counts": counts,
         "failed_count": len(failed),
-        "skipped_count": len(skipped),
-        "failed_tests": [
-            {
-                "name": item.get("name") or item.get("fullName") or "unknown",
-                "status": item.get("status") or "unknown",
-                "message": _truncate(str(item.get("message") or ""), 700),
-            }
-            for item in failed
-        ],
+        "skipped_count": skipped_count,
+        "failed_tests": [_humanize_failure(item, skipped_count) for item in failed],
+    }
+
+
+def build_local_summary(
+    deterministic: dict[str, Any],
+    provider_note: str = "",
+    provider_error: str = "",
+) -> dict[str, Any]:
+    result = str(deterministic.get("result") or "UNKNOWN")
+    failed_tests = deterministic.get("failed_tests")
+    skipped_count = int(deterministic.get("skipped_count") or 0)
+    failed_count = int(deterministic.get("failed_count") or 0)
+
+    if result == "PASSED":
+        summary = "Barcha testlar muvaffaqiyatli o'tdi."
+        confidence = "high"
+    elif isinstance(failed_tests, list) and failed_tests:
+        first = failed_tests[0] if isinstance(failed_tests[0], dict) else {}
+        reason = str(first.get("reason") or "Xato sababi logdan aniq ajratilmadi.")
+        summary = f"{first.get('name', 'Test')} failed bo'ldi. {reason}"
+        if skipped_count:
+            summary += f" {skipped_count} ta keyingi test skip bo'lgan."
+        confidence = "medium"
+    elif failed_count:
+        summary = f"{failed_count} ta test failed bo'lgan, lekin Allure logdan aniq xato ajratilmadi."
+        confidence = "low"
+    else:
+        summary = "Test run failed bo'lgan, lekin failure detali topilmadi. GitHub Actions log va Allure artifactni ochish kerak."
+        confidence = "low"
+
+    return {
+        "result": result,
+        "summary": summary,
+        "failed_tests": failed_tests if isinstance(failed_tests, list) else [],
+        "skipped": {"count": skipped_count, "reason": "Oldingi xato sabab skip bo'lishi mumkin." if skipped_count else ""},
+        "confidence": confidence,
+        "provider_status": "fallback" if provider_note or provider_error else "local",
+        "provider_note": provider_note,
+        "provider_error": _truncate(provider_error, 1000),
+        "deterministic_summary": deterministic,
     }
 
 
@@ -324,14 +469,10 @@ def main() -> int:
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
-        skipped = {
-            "result": deterministic["result"],
-            "summary": "AI summary skipped: GEMINI_API_KEY set qilinmagan.",
-            "failed_tests": deterministic["failed_tests"],
-            "skipped": {"count": deterministic["skipped_count"], "reason": ""},
-            "confidence": "low",
-            "deterministic_summary": deterministic,
-        }
+        skipped = build_local_summary(
+            deterministic,
+            provider_note="Gemini API key topilmadi, shuning uchun log asosidagi avtomatik xulosa berildi.",
+        )
         write_outputs(skipped, args.output_md, args.output_json, model=args.model, note="GEMINI_API_KEY yo'q.")
         write_allure_summary(skipped, args.output_md, args.output_json, args.results_dir)
         print(f"AI summary skipped: GEMINI_API_KEY set qilinmagan ({args.output_md})")
@@ -342,14 +483,11 @@ def main() -> int:
         raw = call_gemini(prompt, model=args.model, api_key=api_key)
         summary = parse_ai_json(raw)
     except Exception as exc:
-        summary = {
-            "result": deterministic["result"],
-            "summary": f"AI summary yaratishda xato: {exc}",
-            "failed_tests": deterministic["failed_tests"],
-            "skipped": {"count": deterministic["skipped_count"], "reason": ""},
-            "confidence": "low",
-            "deterministic_summary": deterministic,
-        }
+        summary = build_local_summary(
+            deterministic,
+            provider_note="Gemini hozir javob bermadi, shuning uchun log asosidagi avtomatik xulosa berildi.",
+            provider_error=str(exc),
+        )
         write_outputs(summary, args.output_md, args.output_json, model=args.model)
         write_allure_summary(summary, args.output_md, args.output_json, args.results_dir)
         print(f"AI summary xato bilan tugadi, test exit code o'zgarmaydi: {exc}", file=sys.stderr)

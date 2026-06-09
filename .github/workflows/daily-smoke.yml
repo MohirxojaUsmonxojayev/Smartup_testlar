@@ -180,27 +180,30 @@ jobs:
 
           lines = []
           result = data.get("result")
-          confidence = data.get("confidence")
+          provider_note = data.get("provider_note")
           summary = data.get("summary")
           if result:
-              lines.append(f"Result: {result}")
-          if confidence:
-              lines.append(f"Confidence: {confidence}")
+              lines.append(f"Natija: {result}")
+          if provider_note:
+              lines.append(f"Izoh: {provider_note}")
           if summary:
-              lines.append(str(summary))
+              lines.append(f"Xulosa: {summary}")
 
           failed_tests = data.get("failed_tests")
           if isinstance(failed_tests, list) and failed_tests:
               first = failed_tests[0] if isinstance(failed_tests[0], dict) else {}
               name = first.get("name")
               reason = first.get("reason") or first.get("message")
+              impact = first.get("impact")
               next_action = first.get("next_action")
               if name:
-                  lines.append(f"Failed: {name}")
+                  lines.append(f"Fail bo'lgan test: {name}")
               if reason:
-                  lines.append(f"Reason: {reason}")
+                  lines.append(f"Sabab: {reason}")
+              if impact:
+                  lines.append(f"Ta'sir: {impact}")
               if next_action:
-                  lines.append(f"Next: {next_action}")
+                  lines.append(f"Keyingi qadam: {next_action}")
               extra_count = len(failed_tests) - 1
               if extra_count > 0:
                   lines.append(f"Yana {extra_count} ta failed test bor.")
@@ -216,8 +219,8 @@ jobs:
           if [ -n "$FAILED_TEST" ]; then
             MESSAGE=$(printf '%s\n\nFailed test:\n%s' "$MESSAGE" "$FAILED_TEST")
           fi
-          if [ -n "$ERROR_LINE" ]; then
-            MESSAGE=$(printf '%s\n\nError:\n%s' "$MESSAGE" "$ERROR_LINE")
+          if [ -n "$ERROR_LINE" ] && [ -z "$AI_SUMMARY_TEXT" ]; then
+            MESSAGE=$(printf '%s\n\nTechnical error:\n%s' "$MESSAGE" "$ERROR_LINE")
           fi
           if [ -n "$AI_SUMMARY_TEXT" ]; then
             MESSAGE=$(printf '%s\n\nAI summary:\n%s' "$MESSAGE" "$AI_SUMMARY_TEXT")
