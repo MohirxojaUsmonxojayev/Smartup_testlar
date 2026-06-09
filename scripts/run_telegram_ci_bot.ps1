@@ -36,6 +36,27 @@ if (-not $env:ALLOWED_SERVER_URLS) {
     $env:ALLOWED_SERVER_URLS = "https://smartup.online,https://app3.greenwhite.uz/xtrade"
 }
 
+# Soatlik avto-run. O'chirish uchun AUTO_RUN_ENABLED=false. Interval/parametrlarni o'zgartirsa boladi.
+if (-not $env:AUTO_RUN_ENABLED) {
+    $env:AUTO_RUN_ENABLED = "true"
+}
+
+if (-not $env:AUTO_RUN_INTERVAL_SECONDS) {
+    $env:AUTO_RUN_INTERVAL_SECONDS = "3600"
+}
+
+if (-not $env:AUTO_RUN_SERVER) {
+    $env:AUTO_RUN_SERVER = "smartup"
+}
+
+if (-not $env:AUTO_RUN_SCOPE) {
+    $env:AUTO_RUN_SCOPE = "smoke"
+}
+
+if (-not $env:AUTO_RUN_TARGET) {
+    $env:AUTO_RUN_TARGET = "all"
+}
+
 $VenvPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"
 if (Test-Path $VenvPython) {
     & $VenvPython "scripts\telegram_ci_bot.py"

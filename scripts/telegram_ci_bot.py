@@ -109,6 +109,10 @@ class BotConfig:
     workflow: str
     ref: str
     allowed_server_keys: set[str]
+    auto_run_enabled: bool
+    auto_run_interval_seconds: int
+    auto_run_chat_id: str
+    auto_run_request: RunRequest
 
 
 def env_required(name: str, *fallbacks: str) -> str:
@@ -122,6 +126,34 @@ def env_required(name: str, *fallbacks: str) -> str:
 
 def env_value(name: str, default: str) -> str:
     return os.getenv(name, default).strip() or default
+
+
+def env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
+
+
+def env_int(name: str, default: int) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+def resolve_server_key(value: str, default: str = "smartup") -> str:
+    lowered = value.strip().lower().rstrip("/")
+    if lowered in SERVERS:
+        return lowered
+    for key, url in SERVERS.items():
+        if lowered == url.rstrip("/"):
+            return key
+    return default
 
 
 def split_csv(value: str) -> list[str]:
@@ -153,6 +185,21 @@ def load_config() -> BotConfig:
 
     allowed_server_keys = server_keys_from_env(os.getenv("ALLOWED_SERVER_URLS", ""))
 
+    auto_run_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not auto_run_chat_id:
+        auto_run_chat_id = sorted(allowed_chat_ids)[0] if allowed_chat_ids else ""
+
+    auto_run_server_key = resolve_server_key(env_value("AUTO_RUN_SERVER", "smartup"))
+    auto_run_scope = env_value("AUTO_RUN_SCOPE", "smoke").lower()
+    if auto_run_scope not in SCOPES:
+        auto_run_scope = "smoke"
+    auto_run_request = RunRequest(
+        scope=auto_run_scope,
+        server_key=auto_run_server_key,
+        server_url=SERVERS[auto_run_server_key],
+        target=env_value("AUTO_RUN_TARGET", DEFAULT_TARGET),
+    )
+
     return BotConfig(
         telegram_token=env_required("TELEGRAM_BOT_TOKEN"),
         allowed_chat_ids=allowed_chat_ids,
@@ -161,6 +208,10 @@ def load_config() -> BotConfig:
         workflow=env_value("GITHUB_WORKFLOW_FILE", DEFAULT_WORKFLOW),
         ref=env_value("GITHUB_REF", DEFAULT_REF),
         allowed_server_keys=allowed_server_keys,
+        auto_run_enabled=env_bool("AUTO_RUN_ENABLED", True),
+        auto_run_interval_seconds=env_int("AUTO_RUN_INTERVAL_SECONDS", 3600),
+        auto_run_chat_id=auto_run_chat_id,
+        auto_run_request=auto_run_request,
     )
 
 
@@ -319,7 +370,8 @@ def help_text() -> str:
         "Bot avval serverni so'raydi, keyin scope tanlatadi.\n"
         "Company code/password GitHub Secrets'dan olinadi.\n"
         "Yakuniy test natijasini GitHub Actions workflow yuboradi.\n"
-        "Test jarayonda bo'lsa yangi /run bloklanadi."
+        "Test jarayonda bo'lsa yangi /run bloklanadi.\n"
+        "Avto-run har soatda mustaqil ishga tushadi (run ketayotgan bo'lsa o'tkazib yuboriladi)."
     )
 
 
@@ -562,6 +614,49 @@ def monitor_run(
         time.sleep(STATUS_POLL_INTERVAL_SECONDS)
 
 
+def auto_run_label(request: RunRequest) -> str:
+    return f"{request.server_key} / {request.scope} / {request.target}"
+
+
+def trigger_auto_run(
+    telegram: TelegramClient,
+    github: GitHubActionsClient,
+    config: BotConfig,
+    active_store: ActiveRunStore,
+) -> None:
+    if not config.auto_run_chat_id:
+        return
+    if active_store.get() is not None:
+        print("Auto-run skipped: a run is already active.", file=sys.stderr)
+        return
+
+    request = config.auto_run_request
+    chat_id = config.auto_run_chat_id
+    message_id = telegram.send_message(
+        chat_id,
+        f"Soatlik avto-test ({auto_run_label(request)}) boshlanyapti...",
+    )
+    if message_id is None:
+        return
+    start_run(telegram, github, chat_id, message_id, request, active_store)
+
+
+def auto_run_loop(
+    telegram: TelegramClient,
+    github: GitHubActionsClient,
+    config: BotConfig,
+    active_store: ActiveRunStore,
+) -> None:
+    interval = config.auto_run_interval_seconds
+    while True:
+        # Align to the interval boundary (top of the hour for 3600s, in UTC == local for whole-hour offsets).
+        time.sleep(interval - (time.time() % interval))
+        try:
+            trigger_auto_run(telegram, github, config, active_store)
+        except Exception as exc:
+            print(f"Auto-run trigger error: {exc}", file=sys.stderr)
+
+
 def main() -> int:
     try:
         config = load_config()
@@ -575,6 +670,19 @@ def main() -> int:
 
     offset: int | None = None
     print(f"Telegram CI bot started for {config.repository}/{config.workflow} on {config.ref}")
+
+    if config.auto_run_enabled and config.auto_run_chat_id:
+        threading.Thread(
+            target=auto_run_loop,
+            args=(telegram, github, config, active_store),
+            daemon=True,
+        ).start()
+        print(
+            f"Auto-run enabled: every {config.auto_run_interval_seconds}s "
+            f"-> {auto_run_label(config.auto_run_request)} in chat {config.auto_run_chat_id}"
+        )
+    else:
+        print("Auto-run disabled.")
 
     while True:
         try:
