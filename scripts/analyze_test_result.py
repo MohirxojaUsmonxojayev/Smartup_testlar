@@ -19,6 +19,7 @@ LOG_DIR = ROOT / "test-results" / "logs"
 SUMMARY_MD = ROOT / "test-results" / "ai-summary.md"
 SUMMARY_JSON = ROOT / "test-results" / "ai-summary.json"
 DEFAULT_MODEL = "gemini-2.5-flash"
+FAILED_STATUSES = {"failed", "broken"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -94,6 +95,10 @@ def _waited_target(message: str) -> str:
     return ""
 
 
+def _is_technical_target(target: str) -> bool:
+    return target.startswith(("locator(", "get_by_", "page.", "expect("))
+
+
 def _error_type(message: str) -> str:
     if "TimeoutError" in message:
         return "TimeoutError"
@@ -107,14 +112,101 @@ def _error_type(message: str) -> str:
 
 
 def _location(item: dict[str, Any]) -> str:
+    source = str(item.get("source") or "").strip()
+    if source:
+        return source
     full_name = str(item.get("fullName") or "").strip()
     return full_name or str(item.get("name") or "unknown")
+
+
+def _trace_locations(trace: str) -> list[dict[str, str]]:
+    locations: list[dict[str, str]] = []
+    pattern = re.compile(
+        r"(?P<path>(?:[A-Za-z]:)?[/\\]?.*?tests[/\\]smoke[/\\][^:\n]+?\.py):"
+        r"(?P<line>\d+)(?::\s+in\s+(?P<func>[A-Za-z_]\w*))?"
+    )
+    for line in trace.splitlines():
+        match = pattern.search(line)
+        if not match:
+            continue
+        path = match.group("path").replace("\\", "/")
+        tests_index = path.find("tests/smoke/")
+        if tests_index >= 0:
+            path = path[tests_index:]
+        locations.append(
+            {
+                "path": path,
+                "line": match.group("line"),
+                "function": match.group("func") or "",
+                "source": f"{path}:{match.group('line')}",
+            }
+        )
+    return locations
+
+
+def _inner_source_from_trace(trace: str) -> dict[str, str]:
+    locations = _trace_locations(trace)
+    if not locations:
+        return {}
+    non_runner = [item for item in locations if not item["path"].endswith("test_all_runner.py")]
+    return (non_runner or locations)[-1]
+
+
+def _failed_step_entries(steps: Any, parent: tuple[str, ...] = ()) -> list[dict[str, Any]]:
+    if not isinstance(steps, list):
+        return []
+
+    entries: list[dict[str, Any]] = []
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        name = str(step.get("name") or "").strip()
+        path = parent + ((name or "unknown"),)
+        child_entries = _failed_step_entries(step.get("steps"), path)
+        if child_entries:
+            entries.extend(child_entries)
+            continue
+        status = str(step.get("status") or "")
+        if status in FAILED_STATUSES:
+            status_details = step.get("statusDetails") if isinstance(step.get("statusDetails"), dict) else {}
+            entries.append(
+                {
+                    "path": list(path),
+                    "name": name or "unknown",
+                    "status": status,
+                    "message": status_details.get("message") or "",
+                }
+            )
+    return entries
+
+
+def _step_path_text(path: list[str]) -> str:
+    return " -> ".join(item for item in path if item)
+
+
+def _failed_step_info(item: dict[str, Any]) -> dict[str, Any]:
+    failed_steps = item.get("failed_steps")
+    if isinstance(failed_steps, list) and failed_steps:
+        first = failed_steps[0] if isinstance(failed_steps[0], dict) else {}
+        path = first.get("path") if isinstance(first.get("path"), list) else []
+        clean_path = [str(part) for part in path if str(part).strip()]
+        return {
+            "inner_test": clean_path[0] if clean_path else "",
+            "failed_step": _step_path_text(clean_path),
+            "failed_step_short": clean_path[-1] if clean_path else str(first.get("name") or ""),
+        }
+    return {"inner_test": "", "failed_step": "", "failed_step_short": ""}
 
 
 def _human_reason(message: str) -> str:
     timeout = _timeout_text(message)
     target = _waited_target(message)
-    target_text = f" Kutgan element: {target}." if target else ""
+    if target and not _is_technical_target(target):
+        target_text = f" Kutgan element: {target}."
+    elif target:
+        target_text = " Kutgan element topilmadi."
+    else:
+        target_text = ""
     if "Locator.click: Timeout" in message:
         return (
             f"Test sahifadagi elementni {timeout} ichida bosa olmadi."
@@ -163,12 +255,19 @@ def _human_impact(item: dict[str, Any], skipped_count: int) -> str:
 
 def _humanize_failure(item: dict[str, Any], skipped_count: int) -> dict[str, Any]:
     message = str(item.get("message") or "")
+    trace_source = _inner_source_from_trace(str(item.get("trace") or ""))
+    step_info = _failed_step_info(item)
     return {
         "name": item.get("name") or item.get("fullName") or "unknown",
         "status": item.get("status") or "unknown",
         "message": _truncate(message, 700),
         "error_type": _error_type(message),
-        "location": _location(item),
+        "location": trace_source.get("source") or _location(item),
+        "source": trace_source.get("source") or "",
+        "source_function": trace_source.get("function") or "",
+        "inner_test": step_info.get("inner_test") or "",
+        "failed_step": step_info.get("failed_step") or "",
+        "failed_step_short": step_info.get("failed_step_short") or "",
         "reason": _human_reason(message),
         "impact": _human_impact(item, skipped_count),
         "next_action": _human_next_action(message),
@@ -190,13 +289,15 @@ def collect_allure_results(results_dir: Path, started_at: float) -> list[dict[st
         if data.get("fullName") == "ai.test.summary":
             continue
         status_details = data.get("statusDetails") if isinstance(data.get("statusDetails"), dict) else {}
+        trace = str(status_details.get("trace") or "")
         rows.append(
             {
                 "name": data.get("name") or "",
                 "fullName": data.get("fullName") or "",
                 "status": data.get("status") or "unknown",
                 "message": status_details.get("message") or "",
-                "trace": _truncate(status_details.get("trace") or "", 3500),
+                "trace": _truncate(trace, 5000),
+                "failed_steps": _failed_step_entries(data.get("steps")),
                 "start": data.get("start"),
                 "stop": data.get("stop"),
             }
@@ -260,7 +361,8 @@ def build_local_summary(
     elif isinstance(failed_tests, list) and failed_tests:
         first = failed_tests[0] if isinstance(failed_tests[0], dict) else {}
         reason = str(first.get("reason") or "Xato sababi logdan aniq ajratilmadi.")
-        summary = f"{first.get('name', 'Test')} failed bo'ldi. {reason}"
+        failed_place = first.get("inner_test") or first.get("name") or "Test"
+        summary = f"{failed_place} stepida xato bo'ldi. {reason}"
         if skipped_count:
             summary += f" {skipped_count} ta keyingi test skip bo'lgan."
         confidence = "medium"
@@ -284,6 +386,57 @@ def build_local_summary(
     }
 
 
+def enrich_ai_summary(summary: dict[str, Any], deterministic: dict[str, Any]) -> dict[str, Any]:
+    """AI javobiga deterministik Allure step va source ma'lumotlarini qo'shadi."""
+    summary["result"] = deterministic.get("result", summary.get("result", "UNKNOWN"))
+
+    deterministic_failed = deterministic.get("failed_tests")
+    ai_failed = summary.get("failed_tests")
+    if not isinstance(deterministic_failed, list):
+        deterministic_failed = []
+    if not isinstance(ai_failed, list):
+        ai_failed = []
+
+    enriched: list[dict[str, Any]] = []
+    max_len = max(len(ai_failed), len(deterministic_failed))
+    detail_keys = (
+        "name",
+        "inner_test",
+        "failed_step",
+        "failed_step_short",
+        "source",
+        "source_function",
+        "location",
+        "error_type",
+        "impact",
+        "next_action",
+    )
+
+    for index in range(max_len):
+        ai_item = ai_failed[index] if index < len(ai_failed) and isinstance(ai_failed[index], dict) else {}
+        det_item = (
+            deterministic_failed[index]
+            if index < len(deterministic_failed) and isinstance(deterministic_failed[index], dict)
+            else {}
+        )
+        merged = dict(ai_item)
+        for key in detail_keys:
+            if not merged.get(key) and det_item.get(key):
+                merged[key] = det_item[key]
+        if not merged.get("reason") and det_item.get("reason"):
+            merged["reason"] = det_item["reason"]
+        enriched.append(merged)
+
+    summary["failed_tests"] = enriched
+    if not isinstance(summary.get("skipped"), dict):
+        summary["skipped"] = {
+            "count": deterministic.get("skipped_count", 0),
+            "reason": "Oldingi xato sabab skip bo'lishi mumkin." if deterministic.get("skipped_count") else "",
+        }
+    summary["deterministic_summary"] = deterministic
+    return summary
+
+
 def build_prompt(command: str, deterministic: dict[str, Any], results: list[dict[str, Any]], logs: list[dict[str, str]]) -> str:
     payload = {
         "command": command,
@@ -304,7 +457,7 @@ def build_prompt(command: str, deterministic: dict[str, Any], results: list[dict
         '  "result": "PASSED|FAILED",\n'
         '  "summary": "1-2 gaplik umumiy xulosa",\n'
         '  "failed_tests": [\n'
-        '    {"name": "...", "error_type": "...", "location": "...", "reason": "...", "impact": "...", "next_action": "..."}\n'
+        '    {"name": "...", "inner_test": "...", "failed_step": "...", "error_type": "...", "location": "...", "reason": "...", "impact": "...", "next_action": "..."}\n'
         "  ],\n"
         '  "skipped": {"count": 0, "reason": "..."},\n'
         '  "confidence": "low|medium|high"\n'
@@ -396,6 +549,8 @@ def render_markdown(summary: dict[str, Any], model: str, skipped_reason: str = "
                 [
                     "",
                     f"### {item.get('name', 'unknown')}",
+                    f"- Inner test: `{item.get('inner_test', '')}`",
+                    f"- Failed step: `{item.get('failed_step', '')}`",
                     f"- Error type: `{item.get('error_type', 'unknown')}`",
                     f"- Location: `{item.get('location', 'unknown')}`",
                     f"- Reason: {item.get('reason', '')}",
@@ -493,7 +648,7 @@ def main() -> int:
         print(f"AI summary xato bilan tugadi, test exit code o'zgarmaydi: {exc}", file=sys.stderr)
         return 0
 
-    summary["deterministic_summary"] = deterministic
+    summary = enrich_ai_summary(summary, deterministic)
     write_outputs(summary, args.output_md, args.output_json, model=args.model)
     write_allure_summary(summary, args.output_md, args.output_json, args.results_dir)
     print(f"AI summary yozildi: {args.output_md}")

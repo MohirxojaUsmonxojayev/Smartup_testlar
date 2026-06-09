@@ -179,11 +179,8 @@ jobs:
               raise SystemExit
 
           lines = []
-          result = data.get("result")
           provider_note = data.get("provider_note")
           summary = data.get("summary")
-          if result:
-              lines.append(f"Natija: {result}")
           if provider_note:
               lines.append(f"Izoh: {provider_note}")
           if summary:
@@ -192,12 +189,18 @@ jobs:
           failed_tests = data.get("failed_tests")
           if isinstance(failed_tests, list) and failed_tests:
               first = failed_tests[0] if isinstance(failed_tests[0], dict) else {}
-              name = first.get("name")
+              inner_test = first.get("inner_test")
+              failed_step = first.get("failed_step")
+              source = first.get("source") or first.get("location")
               reason = first.get("reason") or first.get("message")
               impact = first.get("impact")
               next_action = first.get("next_action")
-              if name:
-                  lines.append(f"Fail bo'lgan test: {name}")
+              if inner_test:
+                  lines.append(f"Ichki test: {inner_test}")
+              if failed_step:
+                  lines.append(f"Allure step: {failed_step}")
+              if source:
+                  lines.append(f"Kod joyi: {source}")
               if reason:
                   lines.append(f"Sabab: {reason}")
               if impact:
