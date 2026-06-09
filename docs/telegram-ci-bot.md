@@ -1,7 +1,7 @@
 # Telegram CI Bot
 
 Telegram bot GitHub Actions workflow `.github/workflows/daily-smoke.yml`ni
-ishga tushiradi.
+ishga tushiradi. Workflow avtomatik ravishda har soat `00` daqiqada ham yuradi.
 
 ## Bot Flow
 
@@ -24,16 +24,42 @@ Keyin scope tanlatadi:
 [smoke] [regression]
 ```
 
-Bot GitHub Actions run boshlaydi. Shu xabarning o'zi edit bo'lib boradi:
+Bot GitHub Actions run boshlaydi. Workflow shu xabarning o'zini edit qilib
+progress ko'rsatadi:
 
 ```text
-Test boshlanyapti...
-Run boshlandi: https://github.com/turgunovjasur/Playwright/actions/runs/...
-Test davom etyapti: 2 daqiqa
-Test davom etyapti: 5 daqiqa
+Test boshlandi
+Smoke scope tanlangan
+Status: requirements o'rnatilyapti
 ```
 
-Bu jarayon xabarlari vaqtinchalik. Workflow tugaganda bot ularni o'chiradi.
+Keyin:
+
+```text
+Test boshlandi
+Smoke scope tanlangan
+Status: testlar ishlayapti
+Hozir: test_02_legal_person
+
+Passed:
+test_company [PASSED]
+test_01_authorization [PASSED]
+```
+
+Testlar o'tgan sari `Passed` ro'yxatiga qo'shilib boradi. Failed bo'lsa shu
+progress xabarda alohida block chiqadi:
+
+```text
+Failed:
+Group: B group
+Runner test: test_03_b_group_runner
+Ichki test: B-04 - Custom invoice report template yaratish va orderda tekshirish
+Step: B-04 - Custom invoice report template yaratish va orderda tekshirish -> 4 - User order listda Счет-фактуры custom template downloadini tekshiradi
+Error turi: TimeoutError
+```
+
+Bu progress xabari vaqtinchalik. Workflow final xabarni yuborgandan keyin
+progress xabarini o'chiradi.
 
 Test jarayonda bo'lsa, yangi `/run` boshlanmaydi. Bot mavjud runni qisqa
 ko'rsatadi:
@@ -43,8 +69,9 @@ Test jarayonda: 3 daqiqa. Run: https://github.com/turgunovjasur/Playwright/actio
 ```
 
 Workflow tugagach `.github/workflows/daily-smoke.yml` yakuniy test summary
-xabarini Telegramga yuboradi. `System summary` har doim chiqadi: qaysi ichki
-test/Allure step yiqilgani, kod joyi, error turi, sabab va ta'sir.
+xabarini Telegramga yuboradi. Failed bo'lsa final xabarda `Failed` blocki
+chiqadi: group, runner test, ichki test, step, kod joyi, error turi, sabab va
+ta'sir.
 
 Gemini AI default holatda off. Workflow manual run qilinganda `ai_summary=true`
 tanlansa yoki runner `--ai-summary` bilan yursa, Telegram xabarda qo'shimcha

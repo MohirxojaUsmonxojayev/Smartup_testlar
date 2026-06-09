@@ -123,6 +123,37 @@ def _location(item: dict[str, Any]) -> str:
     return full_name or str(item.get("name") or "unknown")
 
 
+def _runner_test(item: dict[str, Any]) -> str:
+    full_name = str(item.get("fullName") or "")
+    match = re.search(r"(test_[A-Za-z0-9_]+)$", full_name)
+    if match:
+        return match.group(1)
+
+    name = str(item.get("name") or "").lower()
+    if "user setup runner" in name:
+        return "test_01_user_setup_runner"
+    if "a group runner" in name:
+        return "test_02_a_group_runner"
+    if "b group runner" in name:
+        return "test_03_b_group_runner"
+    return ""
+
+
+def _group_name(item: dict[str, Any], runner_test: str) -> str:
+    full_name = str(item.get("fullName") or "").lower()
+    name = str(item.get("name") or "").lower()
+    source = str(item.get("source") or item.get("location") or "").lower()
+    combined = " ".join([full_name, name, source, runner_test.lower()])
+
+    if "b_group" in combined or "b group" in combined or runner_test == "test_03_b_group_runner":
+        return "B group"
+    if "a_group" in combined or "a group" in combined or runner_test == "test_02_a_group_runner":
+        return "A group"
+    if "setup" in combined or runner_test == "test_01_user_setup_runner":
+        return "Setup"
+    return ""
+
+
 def _trace_locations(trace: str) -> list[dict[str, str]]:
     locations: list[dict[str, str]] = []
     pattern = re.compile(
@@ -261,11 +292,14 @@ def _humanize_failure(item: dict[str, Any], skipped_count: int) -> dict[str, Any
     message = str(item.get("message") or "")
     trace_source = _inner_source_from_trace(str(item.get("trace") or ""))
     step_info = _failed_step_info(item)
+    runner_test = _runner_test(item)
     return {
         "name": item.get("name") or item.get("fullName") or "unknown",
         "status": item.get("status") or "unknown",
         "message": _truncate(message, 700),
         "error_type": _error_type(message),
+        "group": _group_name(item, runner_test),
+        "runner_test": runner_test,
         "location": trace_source.get("source") or _location(item),
         "source": trace_source.get("source") or "",
         "source_function": trace_source.get("function") or "",
@@ -509,6 +543,8 @@ def render_markdown(
                 [
                     "",
                     f"### {item.get('name', 'unknown')}",
+                    f"- Group: `{item.get('group', '')}`",
+                    f"- Runner test: `{item.get('runner_test', '')}`",
                     f"- Inner test: `{item.get('inner_test', '')}`",
                     f"- Failed step: `{item.get('failed_step', '')}`",
                     f"- Error type: `{item.get('error_type', 'unknown')}`",

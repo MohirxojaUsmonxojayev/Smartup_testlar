@@ -2,8 +2,7 @@ name: Daily Smoke Tests
 
 on:
   schedule:
-    - cron: "15 9 * * *"
-      timezone: "Asia/Tashkent"
+    - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
       scope:
@@ -34,6 +33,11 @@ on:
         required: false
         default: false
         type: boolean
+      telegram_progress_message_id:
+        description: Existing Telegram progress message id
+        required: false
+        default: ""
+        type: string
 
 concurrency:
   group: daily-smoke-tests
@@ -48,6 +52,7 @@ jobs:
       TEST_SERVER_URL: ${{ github.event.inputs.server_url || 'https://smartup.online/' }}
       TEST_TARGET: ${{ github.event.inputs.target || 'all' }}
       TEST_AI_SUMMARY: ${{ github.event.inputs.ai_summary || 'false' }}
+      TEST_TELEGRAM_PROGRESS_MESSAGE_ID: ${{ github.event.inputs.telegram_progress_message_id || '' }}
       SMARTUP_COMPANY_CODE: ${{ secrets.SMARTUP_COMPANY_CODE }}
       SMARTUP_COMPANY_PASSWORD: ${{ secrets.SMARTUP_COMPANY_PASSWORD }}
       APP3_COMPANY_CODE: ${{ secrets.APP3_COMPANY_CODE }}
@@ -64,13 +69,47 @@ jobs:
           python-version: "3.13"
           cache: "pip"
 
+      - name: Start Telegram progress
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          mkdir -p test-results
+          python scripts/telegram_progress.py start \
+            --scope "$TEST_SCOPE" \
+            --server "$TEST_SERVER_URL" \
+            --target "$TEST_TARGET" \
+            --message-id "$TEST_TELEGRAM_PROGRESS_MESSAGE_ID" \
+            --status "requirements o'rnatilyapti"
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Mark requirements installed
+        if: ${{ success() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/telegram_progress.py update --status "requirements o'rnatildi"
+
+      - name: Mark browser install started
+        if: ${{ success() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/telegram_progress.py update --status "browser o'rnatilyapti"
+
       - name: Install Playwright browser
         run: python -m playwright install --with-deps chromium
+
+      - name: Mark browser installed
+        if: ${{ success() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/telegram_progress.py update --status "browser o'rnatildi"
 
       - name: Select and mask company credentials
         run: |
@@ -97,6 +136,9 @@ jobs:
           [ -n "$GEMINI_API_KEY" ] && echo "::add-mask::$GEMINI_API_KEY"
 
       - name: Run daily smoke tests
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           mkdir -p test-results
           AI_SUMMARY_ARGS=()
@@ -104,7 +146,7 @@ jobs:
             AI_SUMMARY_ARGS+=(--ai-summary)
           fi
           set -o pipefail
-          python scripts/run_tests.py "$TEST_TARGET" \
+          python scripts/telegram_progress.py run -- python scripts/run_tests.py "$TEST_TARGET" \
             --url "$TEST_SERVER_URL" \
             --company-code "$TEST_COMPANY_CODE" \
             --company-password "$TEST_COMPANY_PASSWORD" \
@@ -189,20 +231,25 @@ jobs:
               raise SystemExit
 
           lines = []
-          summary = data.get("summary")
           failed_tests = data.get("failed_tests")
           if isinstance(failed_tests, list) and failed_tests:
               first = failed_tests[0] if isinstance(failed_tests[0], dict) else {}
+              group = first.get("group")
+              runner_test = first.get("runner_test")
               inner_test = first.get("inner_test")
               failed_step = first.get("failed_step")
               source = first.get("source") or first.get("location")
               error_type = first.get("error_type")
               reason = first.get("reason") or first.get("message")
               impact = first.get("impact")
+              if group:
+                  lines.append(f"Group: {group}")
+              if runner_test:
+                  lines.append(f"Runner test: {runner_test}")
               if inner_test:
                   lines.append(f"Ichki test: {inner_test}")
               if failed_step:
-                  lines.append(f"Allure step: {failed_step}")
+                  lines.append(f"Step: {failed_step}")
               if source:
                   lines.append(f"Kod joyi: {source}")
               if error_type:
@@ -214,8 +261,6 @@ jobs:
               extra_count = len(failed_tests) - 1
               if extra_count > 0:
                   lines.append(f"Yana {extra_count} ta failed test bor.")
-          elif summary:
-              lines.append(f"Xulosa: {summary}")
 
           print("\n".join(line for line in lines if line).strip()[:1200])
           PY
@@ -243,12 +288,12 @@ jobs:
           MESSAGE=$(printf 'Daily Smoke Tests %s\n\nServer: %s\nScope: %s\nTarget: %s\nCompany: %s\nUser login: %s\nSummary: %s\n\nRun: %s' \
             "$STATUS_TEXT" "$TEST_SERVER_URL" "$TEST_SCOPE" "$TEST_TARGET" "$TEST_COMPANY_SOURCE" "$USER_LOGIN" "$SUMMARY" "$RUN_URL")
 
-          if [ -n "$FAILED_TEST" ]; then
+          if [ -n "$SYSTEM_SUMMARY_TEXT" ]; then
+            MESSAGE=$(printf '%s\n\nFailed:\n%s' "$MESSAGE" "$SYSTEM_SUMMARY_TEXT")
+          elif [ -n "$FAILED_TEST" ]; then
             MESSAGE=$(printf '%s\n\nFailed test:\n%s' "$MESSAGE" "$FAILED_TEST")
           fi
-          if [ -n "$SYSTEM_SUMMARY_TEXT" ]; then
-            MESSAGE=$(printf '%s\n\nSystem summary:\n%s' "$MESSAGE" "$SYSTEM_SUMMARY_TEXT")
-          elif [ -n "$ERROR_LINE" ]; then
+          if [ -z "$SYSTEM_SUMMARY_TEXT" ] && [ -n "$ERROR_LINE" ]; then
             MESSAGE=$(printf '%s\n\nTechnical error:\n%s' "$MESSAGE" "$ERROR_LINE")
           fi
           if [ -n "$AI_CONCLUSION_TEXT" ]; then
@@ -278,3 +323,10 @@ jobs:
                 || echo "Telegram screenshot-missing notification failed."
             fi
           fi
+
+      - name: Delete Telegram progress
+        if: ${{ always() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/telegram_progress.py delete

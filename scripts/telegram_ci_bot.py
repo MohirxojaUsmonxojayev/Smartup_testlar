@@ -244,18 +244,21 @@ class GitHubActionsClient:
     def workflow_url(self) -> str:
         return f"https://github.com/{self.repository}/actions/workflows/{self.workflow}"
 
-    def dispatch(self, request: RunRequest) -> WorkflowRun:
+    def dispatch(self, request: RunRequest, telegram_progress_message_id: int | None = None) -> WorkflowRun:
         started_at = datetime.now(timezone.utc)
         url = f"https://api.github.com/repos/{self.repository}/actions/workflows/{self.workflow}/dispatches"
+        inputs = {
+            "scope": request.scope,
+            "server_url": request.server_url,
+            "target": request.target,
+        }
+        if telegram_progress_message_id is not None:
+            inputs["telegram_progress_message_id"] = str(telegram_progress_message_id)
         response = self.session.post(
             url,
             json={
                 "ref": self.ref,
-                "inputs": {
-                    "scope": request.scope,
-                    "server_url": request.server_url,
-                    "target": request.target,
-                },
+                "inputs": inputs,
             },
             timeout=30,
         )
@@ -355,15 +358,6 @@ def process_message_ids(active: ActiveRun | None) -> tuple[int, ...]:
         message_ids.append(active.status_message_id)
     message_ids.extend(active.extra_status_message_ids)
     return tuple(message_ids)
-
-
-def safe_edit_message(telegram: TelegramClient, chat_id: str, message_id: int | None, text: str) -> None:
-    if message_id is None:
-        return
-    try:
-        telegram.edit_message(chat_id, message_id, text)
-    except Exception as exc:
-        print(f"Telegram process message edit failed: {exc}", file=sys.stderr)
 
 
 def safe_delete_message(telegram: TelegramClient, chat_id: str, message_id: int | None) -> None:
@@ -490,7 +484,7 @@ def start_run(
         "Test boshlanyapti...",
     )
     try:
-        workflow_run = github.dispatch(request)
+        workflow_run = github.dispatch(request, telegram_progress_message_id=message_id)
     except Exception as exc:
         telegram.edit_message(chat_id, message_id, f"Testni boshlashda xato: {exc}")
         return
@@ -532,13 +526,9 @@ def monitor_run(
     active_store: ActiveRunStore,
 ) -> None:
     assert workflow_run.run_id is not None
-    started = time.monotonic()
-    sent_two_min = False
-    sent_five_min = False
     status_errors = 0
 
     while True:
-        elapsed = time.monotonic() - started
         try:
             status, _conclusion, _html_url = github.get_run_status(workflow_run.run_id)
         except Exception as exc:
@@ -570,17 +560,6 @@ def monitor_run(
             active_store.clear(workflow_run.run_id)
             safe_delete_process_messages(telegram, active)
             return
-
-        if elapsed >= 300 and not sent_five_min:
-            active = active_store.get()
-            message_id = active.status_message_id if active else None
-            safe_edit_message(telegram, chat_id, message_id, "Test davom etyapti: 5 daqiqa")
-            sent_five_min = True
-        elif elapsed >= 120 and not sent_two_min:
-            active = active_store.get()
-            message_id = active.status_message_id if active else None
-            safe_edit_message(telegram, chat_id, message_id, "Test davom etyapti: 2 daqiqa")
-            sent_two_min = True
 
         time.sleep(STATUS_POLL_INTERVAL_SECONDS)
 
