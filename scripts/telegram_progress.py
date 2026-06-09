@@ -280,6 +280,9 @@ def command_run(args: argparse.Namespace) -> int:
         return 2
 
     state = load_state()
+    state["status"] = "testlar boshlanyapti"
+    save_state(state)
+    edit_progress(state)
     process = subprocess.Popen(
         command,
         cwd=ROOT,
@@ -290,7 +293,7 @@ def command_run(args: argparse.Namespace) -> int:
     )
     assert process.stdout is not None
     for line in process.stdout:
-        print(line, end="")
+        print(line, end="", flush=True)
         if not line.startswith(EVENT_PREFIX):
             continue
         try:

@@ -146,13 +146,14 @@ jobs:
             AI_SUMMARY_ARGS+=(--ai-summary)
           fi
           set -o pipefail
-          python scripts/telegram_progress.py run -- python scripts/run_tests.py "$TEST_TARGET" \
+          python -u scripts/telegram_progress.py run -- python -u scripts/run_tests.py "$TEST_TARGET" \
             --url "$TEST_SERVER_URL" \
             --company-code "$TEST_COMPANY_CODE" \
             --company-password "$TEST_COMPANY_PASSWORD" \
             --scope "$TEST_SCOPE" \
             --headless \
-            "${AI_SUMMARY_ARGS[@]}" 2>&1 | tee test-results/ci-test-output.log
+            "${AI_SUMMARY_ARGS[@]}" \
+            -s 2>&1 | tee test-results/ci-test-output.log
 
       - name: Upload test results
         if: ${{ always() }}

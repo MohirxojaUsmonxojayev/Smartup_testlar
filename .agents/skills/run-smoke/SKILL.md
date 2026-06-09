@@ -89,6 +89,7 @@ allure serve test-results/allure-results
 - Telegram CI botda bir vaqtning o'zida faqat bitta test run faol bo'ladi; run tugaguncha yangi `/run` bloklanadi.
 - Telegram CI workflow har soat `00` daqiqada avtomatik smoke run qiladi.
 - Telegram CI progress xabari bitta edit-in-place message bo'ladi: `Test boshlandi`, `<Scope> scope tanlangan`, status, `Hozir`, `Passed` ro'yxati va failed bo'lsa `Group/Runner test/Ichki test/Step/Error turi`; workflow final xabar yuborgandan keyin progress message o'chiriladi.
+- Telegram CI progress eventlari real-time ko'rinishi uchun GitHub Actions pytestni `-s` bilan, progress wrapperni esa `python -u` bilan ishlatadi; aks holda pytest stdout capture sabab progress xabar `browser o'rnatildi`da qolib ketishi mumkin.
 - Telegram CI final xabarida `test-results/data/data_store.json` ichidagi `code` va tanlangan company code asosida `User login: user-pw<code>@<company>` ko'rsatiladi; password xabarga chiqarilmaydi.
 - Telegram CI bot GitHub run statusini olishdagi vaqtinchalik network/API xatolarini retry qiladi; faqat ketma-ket 5 marta status olinmasa Telegramga xato yuboradi.
 
