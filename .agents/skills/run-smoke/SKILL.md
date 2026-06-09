@@ -87,6 +87,7 @@ allure serve test-results/allure-results
 
 ### Telegram CI bot
 - Telegram CI botda bir vaqtning o'zida faqat bitta test run faol bo'ladi; run tugaguncha yangi `/run` bloklanadi.
+- Telegram CI bot jarayon/progress xabarlarini qisqa bir qator qilib edit-in-place qiladi va workflow tugaganda ularni o'chiradi; batafsil yakuniy natijani GitHub Actions workflow yuboradi.
 - Telegram CI final xabarida `test-results/data/data_store.json` ichidagi `code` va tanlangan company code asosida `User login: user-pw<code>@<company>` ko'rsatiladi; password xabarga chiqarilmaydi.
 - Telegram CI bot GitHub run statusini olishdagi vaqtinchalik network/API xatolarini retry qiladi; faqat ketma-ket 5 marta status olinmasa Telegramga xato yuboradi.
 

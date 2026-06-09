@@ -5,7 +5,7 @@ import os
 import sys
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -56,6 +56,8 @@ class ActiveRun:
     request: RunRequest
     workflow_run: WorkflowRun
     started_at: float
+    status_message_id: int | None
+    extra_status_message_ids: tuple[int, ...] = ()
 
 
 class ActiveRunStore:
@@ -80,6 +82,22 @@ class ActiveRunStore:
                 return
             if run_id is None or self._active.workflow_run.run_id == run_id:
                 self._active = None
+
+    def add_status_message(self, run_id: int | None, message_id: int | None) -> None:
+        if message_id is None:
+            return
+        with self._lock:
+            if self._active is None:
+                return
+            if run_id is not None and self._active.workflow_run.run_id != run_id:
+                return
+            message_ids = self._active.extra_status_message_ids
+            if message_id == self._active.status_message_id or message_id in message_ids:
+                return
+            self._active = replace(
+                self._active,
+                extra_status_message_ids=message_ids + (message_id,),
+            )
 
 
 @dataclass(frozen=True)
@@ -165,7 +183,7 @@ class TelegramClient:
             payload["offset"] = offset
         return self.request("getUpdates", payload).get("result", [])
 
-    def send_message(self, chat_id: str, text: str, reply_markup: dict[str, Any] | None = None) -> None:
+    def send_message(self, chat_id: str, text: str, reply_markup: dict[str, Any] | None = None) -> int | None:
         payload: dict[str, Any] = {
             "chat_id": chat_id,
             "text": text,
@@ -173,18 +191,33 @@ class TelegramClient:
         }
         if reply_markup is not None:
             payload["reply_markup"] = json.dumps(reply_markup)
-        self.request("sendMessage", payload)
+        data = self.request("sendMessage", payload).get("result")
+        if isinstance(data, dict) and isinstance(data.get("message_id"), int):
+            return data["message_id"]
+        return None
 
-    def edit_message(self, chat_id: str, message_id: int, text: str) -> None:
+    def edit_message(
+        self,
+        chat_id: str,
+        message_id: int,
+        text: str,
+        reply_markup: dict[str, Any] | None = None,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "chat_id": chat_id,
+            "message_id": str(message_id),
+            "text": text,
+            "disable_web_page_preview": "true",
+        }
+        if reply_markup is not None:
+            payload["reply_markup"] = json.dumps(reply_markup)
         self.request(
             "editMessageText",
-            {
-                "chat_id": chat_id,
-                "message_id": str(message_id),
-                "text": text,
-                "disable_web_page_preview": "true",
-            },
+            payload,
         )
+
+    def delete_message(self, chat_id: str, message_id: int) -> None:
+        self.request("deleteMessage", {"chat_id": chat_id, "message_id": str(message_id)})
 
     def answer_callback(self, callback_id: str, text: str = "") -> None:
         payload = {"callback_query_id": callback_id}
@@ -282,7 +315,7 @@ def help_text() -> str:
         "Test run qilish uchun /run yuboring.\n\n"
         "Bot avval serverni so'raydi, keyin scope tanlatadi.\n"
         "Company code/password GitHub Secrets'dan olinadi.\n"
-        "Yakuniy Telegram xabarda AI xulosa ham chiqadi.\n"
+        "Yakuniy test natijasini GitHub Actions workflow yuboradi.\n"
         "Test jarayonda bo'lsa yangi /run bloklanadi."
     )
 
@@ -311,15 +344,42 @@ def active_run_text(active: ActiveRun) -> str:
     elapsed_seconds = max(0, int(time.monotonic() - active.started_at))
     elapsed_minutes = elapsed_seconds // 60
     elapsed_text = "1 daqiqadan kam" if elapsed_minutes == 0 else f"{elapsed_minutes} daqiqa"
-    return (
-        "Hozir test jarayonda.\n\n"
-        f"Server: {active.request.server_url}\n"
-        f"Scope: {active.request.scope}\n"
-        f"Company: {active.request.company_source}\n"
-        f"Vaqt: {elapsed_text}\n"
-        f"Run: {active.workflow_run.html_url}\n\n"
-        "Test tugagach /run yana ishlaydi."
-    )
+    return f"Test jarayonda: {elapsed_text}. Run: {active.workflow_run.html_url}"
+
+
+def process_message_ids(active: ActiveRun | None) -> tuple[int, ...]:
+    if active is None:
+        return ()
+    message_ids = []
+    if active.status_message_id is not None:
+        message_ids.append(active.status_message_id)
+    message_ids.extend(active.extra_status_message_ids)
+    return tuple(message_ids)
+
+
+def safe_edit_message(telegram: TelegramClient, chat_id: str, message_id: int | None, text: str) -> None:
+    if message_id is None:
+        return
+    try:
+        telegram.edit_message(chat_id, message_id, text)
+    except Exception as exc:
+        print(f"Telegram process message edit failed: {exc}", file=sys.stderr)
+
+
+def safe_delete_message(telegram: TelegramClient, chat_id: str, message_id: int | None) -> None:
+    if message_id is None:
+        return
+    try:
+        telegram.delete_message(chat_id, message_id)
+    except Exception as exc:
+        print(f"Telegram process message delete failed: {exc}", file=sys.stderr)
+
+
+def safe_delete_process_messages(telegram: TelegramClient, active: ActiveRun | None) -> None:
+    if active is None:
+        return
+    for message_id in process_message_ids(active):
+        safe_delete_message(telegram, active.chat_id, message_id)
 
 
 def show_run_start(
@@ -330,7 +390,8 @@ def show_run_start(
 ) -> None:
     active = active_store.get()
     if active is not None:
-        telegram.send_message(chat_id, active_run_text(active))
+        message_id = telegram.send_message(chat_id, active_run_text(active))
+        active_store.add_status_message(active.workflow_run.run_id, message_id)
         return
     telegram.send_message(chat_id, "Qaysi serverda run qilamiz?", reply_markup=server_keyboard(config))
 
@@ -385,7 +446,8 @@ def handle_callback(
     active = active_store.get()
     if active is not None:
         telegram.answer_callback(callback_id, "Test jarayonda")
-        telegram.send_message(chat_id, active_run_text(active))
+        active_message_id = telegram.send_message(chat_id, active_run_text(active))
+        active_store.add_status_message(active.workflow_run.run_id, active_message_id)
         return
 
     if data.startswith("server:"):
@@ -394,8 +456,7 @@ def handle_callback(
             telegram.answer_callback(callback_id, "Server not allowed")
             return
         telegram.answer_callback(callback_id, "Server tanlandi")
-        telegram.edit_message(chat_id, message_id, f"Server tanlandi: {SERVERS[server_key]}")
-        telegram.send_message(chat_id, "Qaysi scope bilan run qilamiz?", reply_markup=scope_keyboard(server_key))
+        telegram.edit_message(chat_id, message_id, "Scope tanlang", reply_markup=scope_keyboard(server_key))
         return
 
     if data.startswith("scope:"):
@@ -426,18 +487,15 @@ def start_run(
     telegram.edit_message(
         chat_id,
         message_id,
-        (
-            "Test boshlanyapti...\n"
-            f"Server: {request.server_url}\n"
-            f"Scope: {request.scope}\n"
-            f"Company: {request.company_source}"
-        ),
+        "Test boshlanyapti...",
     )
     try:
         workflow_run = github.dispatch(request)
     except Exception as exc:
-        telegram.send_message(chat_id, f"Testni boshlashda xato:\n{exc}")
+        telegram.edit_message(chat_id, message_id, f"Testni boshlashda xato: {exc}")
         return
+
+    telegram.edit_message(chat_id, message_id, f"Run boshlandi: {workflow_run.html_url}")
 
     if workflow_run.run_id is not None:
         active = ActiveRun(
@@ -445,6 +503,7 @@ def start_run(
             request=request,
             workflow_run=workflow_run,
             started_at=time.monotonic(),
+            status_message_id=message_id,
         )
         if not active_store.set(active):
             current = active_store.get()
@@ -452,19 +511,8 @@ def start_run(
                 telegram.send_message(chat_id, active_run_text(current))
             return
 
-    telegram.send_message(
-        chat_id,
-        (
-            "GitHub Actions run boshlandi.\n"
-            f"Server: {request.server_url}\n"
-            f"Scope: {request.scope}\n"
-            f"Company: {request.company_source}\n"
-            f"Run: {workflow_run.html_url}"
-        ),
-    )
-
     if workflow_run.run_id is None:
-        telegram.send_message(chat_id, "Run statusini kuzatib bo'lmadi. Natija GitHub Actions linkida ko'rinadi.")
+        telegram.edit_message(chat_id, message_id, f"Run boshlandi, status GitHub linkda: {workflow_run.html_url}")
         return
 
     thread = threading.Thread(
@@ -492,7 +540,7 @@ def monitor_run(
     while True:
         elapsed = time.monotonic() - started
         try:
-            status, conclusion, html_url = github.get_run_status(workflow_run.run_id)
+            status, _conclusion, _html_url = github.get_run_status(workflow_run.run_id)
         except Exception as exc:
             status_errors += 1
             print(
@@ -500,7 +548,9 @@ def monitor_run(
                 file=sys.stderr,
             )
             if status_errors >= STATUS_POLL_ERROR_LIMIT:
+                active = active_store.get()
                 active_store.clear(workflow_run.run_id)
+                safe_delete_process_messages(telegram, active)
                 telegram.send_message(
                     chat_id,
                     (
@@ -516,24 +566,20 @@ def monitor_run(
         status_errors = 0
 
         if status == "completed":
+            active = active_store.get()
             active_store.clear(workflow_run.run_id)
-            result = (conclusion or "unknown").upper()
-            telegram.send_message(
-                chat_id,
-                (
-                    f"Test tugadi: {result}\n"
-                    f"Server: {request.server_url}\n"
-                    f"Scope: {request.scope}\n"
-                    f"Run: {html_url}"
-                ),
-            )
+            safe_delete_process_messages(telegram, active)
             return
 
         if elapsed >= 300 and not sent_five_min:
-            telegram.send_message(chat_id, f"Test hali davom etyapti... 5 daqiqa bo'ldi\nRun: {html_url}")
+            active = active_store.get()
+            message_id = active.status_message_id if active else None
+            safe_edit_message(telegram, chat_id, message_id, "Test davom etyapti: 5 daqiqa")
             sent_five_min = True
         elif elapsed >= 120 and not sent_two_min:
-            telegram.send_message(chat_id, f"Test davom etyapti... 2 daqiqa bo'ldi\nRun: {html_url}")
+            active = active_store.get()
+            message_id = active.status_message_id if active else None
+            safe_edit_message(telegram, chat_id, message_id, "Test davom etyapti: 2 daqiqa")
             sent_two_min = True
 
         time.sleep(STATUS_POLL_INTERVAL_SECONDS)

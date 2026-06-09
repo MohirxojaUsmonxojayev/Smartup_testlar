@@ -24,26 +24,22 @@ Keyin scope tanlatadi:
 [smoke] [regression]
 ```
 
-Bot GitHub Actions run boshlaydi. Test jarayonida xabar beradi:
+Bot GitHub Actions run boshlaydi. Shu xabarning o'zi edit bo'lib boradi:
 
 ```text
-GitHub Actions run boshlandi.
-Test davom etyapti... 2 daqiqa bo'ldi
-Test hali davom etyapti... 5 daqiqa bo'ldi
-Test tugadi: SUCCESS
+Test boshlanyapti...
+Run boshlandi: https://github.com/turgunovjasur/Playwright/actions/runs/...
+Test davom etyapti: 2 daqiqa
+Test davom etyapti: 5 daqiqa
 ```
 
-Test jarayonda bo'lsa, yangi `/run` boshlanmaydi. Bot mavjud runni ko'rsatadi:
+Bu jarayon xabarlari vaqtinchalik. Workflow tugaganda bot ularni o'chiradi.
+
+Test jarayonda bo'lsa, yangi `/run` boshlanmaydi. Bot mavjud runni qisqa
+ko'rsatadi:
 
 ```text
-Hozir test jarayonda.
-
-Server: https://app3.greenwhite.uz/xtrade
-Scope: smoke
-Company: APP3 secrets
-Run: https://github.com/turgunovjasur/Playwright/actions/runs/...
-
-Test tugagach /run yana ishlaydi.
+Test jarayonda: 3 daqiqa. Run: https://github.com/turgunovjasur/Playwright/actions/runs/...
 ```
 
 Workflow tugagach `.github/workflows/daily-smoke.yml` yakuniy test summary
