@@ -1,0 +1,366 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+import time
+import urllib.error
+import urllib.request
+import uuid
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+RESULTS_DIR = ROOT / "test-results" / "allure-results"
+LOG_DIR = ROOT / "test-results" / "logs"
+SUMMARY_MD = ROOT / "test-results" / "ai-summary.md"
+SUMMARY_JSON = ROOT / "test-results" / "ai-summary.json"
+DEFAULT_MODEL = "gemini-2.5-flash"
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Pytest/Allure natijasini Gemini bilan qisqa tahlil qiladi.")
+    parser.add_argument("--exit-code", type=int, required=True, help="pytest exit code")
+    parser.add_argument("--command", default="", help="Maskalangan pytest command")
+    parser.add_argument("--started-at", type=float, default=0.0, help="Run boshlanish vaqti: time.time()")
+    parser.add_argument("--model", default=os.getenv("GEMINI_MODEL", DEFAULT_MODEL), help="Gemini model id")
+    parser.add_argument("--results-dir", type=Path, default=RESULTS_DIR)
+    parser.add_argument("--logs-dir", type=Path, default=LOG_DIR)
+    parser.add_argument("--output-md", type=Path, default=SUMMARY_MD)
+    parser.add_argument("--output-json", type=Path, default=SUMMARY_JSON)
+    return parser.parse_args()
+
+
+def _read_json(path: Path) -> dict[str, Any] | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _mask_sensitive(text: str) -> str:
+    if not text:
+        return text
+    replacements = [
+        (r"(--(?:company-password|head-password)\s+)(\S+)", r"\1***"),
+        (r"((?:password|пароль)\s*[=:]\s*)(\S+)", r"\1***"),
+        (r"(GEMINI_API_KEY\s*[=:]\s*)(\S+)", r"\1***"),
+        (r"(AIza[0-9A-Za-z_\-]{20,})", "***"),
+        (r"(sk-[0-9A-Za-z_\-]{20,})", "***"),
+    ]
+    masked = text
+    for pattern, repl in replacements:
+        masked = re.sub(pattern, repl, masked, flags=re.IGNORECASE)
+    return masked
+
+
+def _truncate(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "\n...[truncated]..."
+
+
+def collect_allure_results(results_dir: Path, started_at: float) -> list[dict[str, Any]]:
+    if not results_dir.exists():
+        return []
+
+    threshold = max(started_at - 5, 0)
+    rows: list[dict[str, Any]] = []
+    for path in sorted(results_dir.glob("*-result.json"), key=lambda item: item.stat().st_mtime):
+        if threshold and path.stat().st_mtime < threshold:
+            continue
+        data = _read_json(path)
+        if not data:
+            continue
+        if data.get("fullName") == "ai.test.summary":
+            continue
+        status_details = data.get("statusDetails") if isinstance(data.get("statusDetails"), dict) else {}
+        rows.append(
+            {
+                "name": data.get("name") or "",
+                "fullName": data.get("fullName") or "",
+                "status": data.get("status") or "unknown",
+                "message": status_details.get("message") or "",
+                "trace": _truncate(status_details.get("trace") or "", 3500),
+                "start": data.get("start"),
+                "stop": data.get("stop"),
+            }
+        )
+    return rows
+
+
+def collect_failure_logs(logs_dir: Path, started_at: float) -> list[dict[str, str]]:
+    if not logs_dir.exists():
+        return []
+
+    threshold = max(started_at - 5, 0)
+    logs: list[dict[str, str]] = []
+    for path in sorted(logs_dir.glob("*.log"), key=lambda item: item.stat().st_mtime, reverse=True):
+        if threshold and path.stat().st_mtime < threshold:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if not text.strip():
+            continue
+        logs.append({"path": str(path.relative_to(ROOT)), "content": _truncate(_mask_sensitive(text), 7000)})
+        if len(logs) >= 5:
+            break
+    return logs
+
+
+def build_deterministic_summary(exit_code: int, results: list[dict[str, Any]]) -> dict[str, Any]:
+    counts: dict[str, int] = {}
+    for item in results:
+        status = str(item.get("status") or "unknown")
+        counts[status] = counts.get(status, 0) + 1
+    result = "PASSED" if exit_code == 0 else "FAILED"
+    failed = [item for item in results if item.get("status") in {"failed", "broken"}]
+    skipped = [item for item in results if item.get("status") == "skipped"]
+    return {
+        "result": result,
+        "exit_code": exit_code,
+        "counts": counts,
+        "failed_count": len(failed),
+        "skipped_count": len(skipped),
+        "failed_tests": [
+            {
+                "name": item.get("name") or item.get("fullName") or "unknown",
+                "status": item.get("status") or "unknown",
+                "message": _truncate(str(item.get("message") or ""), 700),
+            }
+            for item in failed
+        ],
+    }
+
+
+def build_prompt(command: str, deterministic: dict[str, Any], results: list[dict[str, Any]], logs: list[dict[str, str]]) -> str:
+    payload = {
+        "command": command,
+        "deterministic_summary": deterministic,
+        "allure_results": results,
+        "failure_logs": logs,
+    }
+    return (
+        "Smartup Playwright + pytest smoke test natijasini tahlil qil.\n"
+        "Qoidalar:\n"
+        "- Pass/fail statusni faqat deterministic_summary.exit_code va resultlardan ol; o'zing taxmin qilib statusni o'zgartirma.\n"
+        "- Sababni log va stacktrace asosida ayt. Ishonching past bo'lsa confidence=low qil.\n"
+        "- Javob Uzbek tilida bo'lsin.\n"
+        "- Juda uzun yozma, eng muhim sabab va keyingi qadamni ber.\n"
+        "- Faqat JSON qaytar.\n\n"
+        "JSON schema:\n"
+        "{\n"
+        '  "result": "PASSED|FAILED",\n'
+        '  "summary": "1-2 gaplik umumiy xulosa",\n'
+        '  "failed_tests": [\n'
+        '    {"name": "...", "error_type": "...", "location": "...", "reason": "...", "impact": "...", "next_action": "..."}\n'
+        "  ],\n"
+        '  "skipped": {"count": 0, "reason": "..."},\n'
+        '  "confidence": "low|medium|high"\n'
+        "}\n\n"
+        f"INPUT:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+    )
+
+
+def call_gemini(prompt: str, model: str, api_key: str) -> str:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    body = {
+        "systemInstruction": {
+            "parts": [
+                {
+                    "text": (
+                        "Siz QA test natijalarini tahlil qiladigan yordamchisiz. "
+                        "Faqat berilgan loglarga tayaning va JSON formatida javob bering."
+                    )
+                }
+            ]
+        },
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 2048,
+            "responseMimeType": "application/json",
+        },
+    }
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Gemini API HTTP {exc.code}: {_truncate(detail, 1000)}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Gemini API network xatosi: {exc}") from exc
+
+    parts = (
+        data.get("candidates", [{}])[0]
+        .get("content", {})
+        .get("parts", [])
+    )
+    text = "".join(str(part.get("text") or "") for part in parts if isinstance(part, dict)).strip()
+    if not text:
+        raise RuntimeError("Gemini API bo'sh javob qaytardi")
+    return text
+
+
+def parse_ai_json(text: str) -> dict[str, Any]:
+    clean = text.strip()
+    if clean.startswith("```"):
+        clean = re.sub(r"^```(?:json)?\s*", "", clean)
+        clean = re.sub(r"\s*```$", "", clean)
+    try:
+        data = json.loads(clean)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", clean, flags=re.DOTALL)
+        if not match:
+            raise
+        data = json.loads(match.group(0))
+    if not isinstance(data, dict):
+        raise ValueError("AI JSON object qaytarmadi")
+    return data
+
+
+def render_markdown(summary: dict[str, Any], model: str, skipped_reason: str = "") -> str:
+    lines = [
+        "# AI Test Summary",
+        "",
+        f"- Model: `{model}`",
+        f"- Result: `{summary.get('result', 'UNKNOWN')}`",
+        f"- Confidence: `{summary.get('confidence', 'unknown')}`",
+        "",
+        str(summary.get("summary") or "AI xulosa mavjud emas."),
+    ]
+    failed_tests = summary.get("failed_tests")
+    if isinstance(failed_tests, list) and failed_tests:
+        lines.extend(["", "## Failed Tests"])
+        for item in failed_tests:
+            if not isinstance(item, dict):
+                continue
+            lines.extend(
+                [
+                    "",
+                    f"### {item.get('name', 'unknown')}",
+                    f"- Error type: `{item.get('error_type', 'unknown')}`",
+                    f"- Location: `{item.get('location', 'unknown')}`",
+                    f"- Reason: {item.get('reason', '')}",
+                    f"- Impact: {item.get('impact', '')}",
+                    f"- Next action: {item.get('next_action', '')}",
+                ]
+            )
+    skipped = summary.get("skipped")
+    if isinstance(skipped, dict) and skipped.get("count"):
+        lines.extend(["", "## Skipped", f"- Count: `{skipped.get('count')}`", f"- Reason: {skipped.get('reason', '')}"])
+    if skipped_reason:
+        lines.extend(["", "## Note", skipped_reason])
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_outputs(summary: dict[str, Any], output_md: Path, output_json: Path, model: str, note: str = "") -> None:
+    output_md.parent.mkdir(parents=True, exist_ok=True)
+    output_json.parent.mkdir(parents=True, exist_ok=True)
+    output_json.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    output_md.write_text(render_markdown(summary, model=model, skipped_reason=note), encoding="utf-8")
+
+
+def write_allure_summary(summary: dict[str, Any], output_md: Path, output_json: Path, results_dir: Path) -> None:
+    results_dir.mkdir(parents=True, exist_ok=True)
+    result_uuid = str(uuid.uuid4())
+    md_source = f"{result_uuid}-ai-summary.md"
+    json_source = f"{result_uuid}-ai-summary.json"
+    (results_dir / md_source).write_text(output_md.read_text(encoding="utf-8"), encoding="utf-8")
+    (results_dir / json_source).write_text(output_json.read_text(encoding="utf-8"), encoding="utf-8")
+
+    now_ms = int(time.time() * 1000)
+    result = {
+        "name": "AI Test Summary",
+        "status": "passed",
+        "description": str(summary.get("summary") or "Gemini AI test xulosasi."),
+        "attachments": [
+            {"name": "AI Summary", "source": md_source, "type": "text/markdown"},
+            {"name": "AI Summary JSON", "source": json_source, "type": "application/json"},
+        ],
+        "start": now_ms,
+        "stop": now_ms,
+        "uuid": result_uuid,
+        "historyId": "ai-test-summary",
+        "testCaseId": "ai-test-summary",
+        "fullName": "ai.test.summary",
+        "labels": [
+            {"name": "epic", "value": "AI"},
+            {"name": "feature", "value": "Test Summary"},
+            {"name": "story", "value": "Gemini"},
+            {"name": "parentSuite", "value": "AI"},
+            {"name": "suite", "value": "Test Summary"},
+            {"name": "framework", "value": "pytest"},
+            {"name": "language", "value": "python"},
+            {"name": "package", "value": "ai"},
+        ],
+        "titlePath": ["AI", "Test Summary"],
+    }
+    (results_dir / f"{result_uuid}-result.json").write_text(
+        json.dumps(result, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def main() -> int:
+    args = parse_args()
+    command = _mask_sensitive(args.command)
+    results = collect_allure_results(args.results_dir, args.started_at)
+    logs = collect_failure_logs(args.logs_dir, args.started_at)
+    deterministic = build_deterministic_summary(args.exit_code, results)
+
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        skipped = {
+            "result": deterministic["result"],
+            "summary": "AI summary skipped: GEMINI_API_KEY set qilinmagan.",
+            "failed_tests": deterministic["failed_tests"],
+            "skipped": {"count": deterministic["skipped_count"], "reason": ""},
+            "confidence": "low",
+            "deterministic_summary": deterministic,
+        }
+        write_outputs(skipped, args.output_md, args.output_json, model=args.model, note="GEMINI_API_KEY yo'q.")
+        write_allure_summary(skipped, args.output_md, args.output_json, args.results_dir)
+        print(f"AI summary skipped: GEMINI_API_KEY set qilinmagan ({args.output_md})")
+        return 0
+
+    prompt = build_prompt(command, deterministic, results, logs)
+    try:
+        raw = call_gemini(prompt, model=args.model, api_key=api_key)
+        summary = parse_ai_json(raw)
+    except Exception as exc:
+        summary = {
+            "result": deterministic["result"],
+            "summary": f"AI summary yaratishda xato: {exc}",
+            "failed_tests": deterministic["failed_tests"],
+            "skipped": {"count": deterministic["skipped_count"], "reason": ""},
+            "confidence": "low",
+            "deterministic_summary": deterministic,
+        }
+        write_outputs(summary, args.output_md, args.output_json, model=args.model)
+        write_allure_summary(summary, args.output_md, args.output_json, args.results_dir)
+        print(f"AI summary xato bilan tugadi, test exit code o'zgarmaydi: {exc}", file=sys.stderr)
+        return 0
+
+    summary["deterministic_summary"] = deterministic
+    write_outputs(summary, args.output_md, args.output_json, model=args.model)
+    write_allure_summary(summary, args.output_md, args.output_json, args.results_dir)
+    print(f"AI summary yozildi: {args.output_md}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

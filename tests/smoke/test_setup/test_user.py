@@ -111,6 +111,39 @@ def _click_role_switch(page: Page, remaining, remaining_count: int) -> None:
     expect(_remaining_role_switches(page)).to_have_count(expected_remaining_count)
 
 
+def _set_permission_page_size_1000(page: Page, base_page: BasePage) -> None:
+    page_size = page.locator("button").filter(has_text=re.compile(r"\b50\s*/")).first
+    if page_size.count() == 0 or not page_size.is_visible():
+        return
+    page_size.click()
+    option = page.get_by_role("link", name="1000").first
+    expect(option).to_be_visible()
+    option.click()
+    base_page.wait_for_loader()
+
+
+def _available_permissions_empty(page: Page) -> bool:
+    try:
+        expect(page.locator("b-page")).to_contain_text("нет данных", timeout=1_000)
+        return True
+    except (AssertionError, PlaywrightTimeoutError):
+        return False
+
+
+def _attach_available_permissions(page: Page, base_page: BasePage) -> None:
+    _set_permission_page_size_1000(page, base_page)
+    if _available_permissions_empty(page):
+        return
+
+    base_page.click_first_visible_checkbox()
+    base_page.wait_for_loader()
+    page.get_by_role("button", name="Прикрепить").click()
+    expect(page.get_by_role("heading", name="Прикрепить формы в количестве", exact=False)).to_be_visible()
+    base_page.confirm_biruni()
+    base_page.wait_for_loader()
+    expect(page.locator("b-page")).to_contain_text("нет данных")
+
+
 def run_user(page: Page, code, scope: str = "smoke") -> None:
     with allure.step("1 - Foydalanuvchilar ro'yxatiga o'tish"):
         switch_filial(page, name=f"filial-pw{code}")
@@ -140,8 +173,18 @@ def run_user_attach_form(page: Page, code, scope: str = "smoke") -> None:
     base_page = BasePage(page)
 
     with allure.step("1 - Foydalanuvchi sahifasini ochish"):
-        expect(page.get_by_text(f"natural_person-pw{code}").first).to_be_visible()
-        page.get_by_text(f"natural_person-pw{code}").first.click()
+        switch_filial(page, name=f"filial-pw{code}")
+        navigate_to(page, tab="Главное", name="Пользователи")
+        base_page.wait_for_loader()
+        expect(page.get_by_role("heading")).to_contain_text("Пользователи")
+        search = page.get_by_role("searchbox", name="Поиск")
+        expect(search).to_be_visible()
+        search.fill(f"natural_person-pw{code}")
+        search.press("Enter")
+        base_page.wait_for_loader()
+        user_row = page.get_by_text(f"natural_person-pw{code}").first
+        expect(user_row).to_be_visible()
+        user_row.click()
         page.get_by_role("button", name="Просмотреть").click()
         expect(page.get_by_text(f"natural_person-pw{code}").first).to_be_visible()
         page.get_by_role("link", name=" Формы").click()
@@ -149,51 +192,21 @@ def run_user_attach_form(page: Page, code, scope: str = "smoke") -> None:
     with allure.step("2 - Формы ulash"):
         page.get_by_role("tab", name="Формы").click()
         page.get_by_role("button", name="Доступные").click()
-        page.get_by_role("button", name=" 50 /").click()
-        page.get_by_role("link", name="1000").click()
-        base_page.wait_for_loader()
-        base_page.click_first_visible_checkbox()
-        base_page.wait_for_loader()
-        page.get_by_role("button", name="Прикрепить").click()
-        expect(page.get_by_role("heading", name="Прикрепить формы в количестве", exact=False)).to_be_visible()
-        base_page.confirm_biruni()
-        base_page.wait_for_loader()
-        expect(page.locator("b-page")).to_contain_text("нет данных")
+        _attach_available_permissions(page, base_page)
 
     with allure.step("3 - Отчеты ulash"):
         page.get_by_role("tab", name="Отчеты").click()
-        page.get_by_role("button", name=" 50 /").click()
-        page.get_by_role("link", name="1000").click()
-        base_page.wait_for_loader()
-        base_page.click_first_visible_checkbox()
-        base_page.wait_for_loader()
-        page.get_by_role("button", name="Прикрепить").click()
-        expect(page.get_by_role("heading", name="Прикрепить формы в количестве", exact=False)).to_be_visible()
-        base_page.confirm_biruni()
-        base_page.wait_for_loader()
-        expect(page.locator("b-page")).to_contain_text("нет данных")
+        _attach_available_permissions(page, base_page)
 
     with allure.step("4 - Накладные ulash"):
         page.get_by_role("tab", name="Накладные").click()
         base_page.wait_for_loader()
-        base_page.click_first_visible_checkbox()
-        base_page.wait_for_loader()
-        page.get_by_role("button", name="Прикрепить").click()
-        expect(page.get_by_role("heading", name="Прикрепить формы в количестве", exact=False)).to_be_visible()
-        base_page.confirm_biruni()
-        base_page.wait_for_loader()
-        expect(page.locator("b-page")).to_contain_text("нет данных")
+        _attach_available_permissions(page, base_page)
 
     with allure.step("5 - Внешние системы ulash"):
         page.get_by_role("tab", name="Внешние системы").click()
         base_page.wait_for_loader()
-        base_page.click_first_visible_checkbox()
-        base_page.wait_for_loader()
-        page.get_by_role("button", name="Прикрепить").click()
-        expect(page.get_by_role("heading", name="Прикрепить формы в количестве", exact=False)).to_be_visible()
-        base_page.confirm_biruni()
-        base_page.wait_for_loader()
-        expect(page.locator("b-page")).to_contain_text("нет данных")
+        _attach_available_permissions(page, base_page)
 
     with allure.step("6 - Foydalanuvchilar ro'yxatiga qaytish"):
         page.get_by_role("button", name="Закрыть").click()

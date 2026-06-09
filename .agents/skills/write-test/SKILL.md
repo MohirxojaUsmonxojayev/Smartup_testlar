@@ -96,6 +96,7 @@ def test_XX_<nomi>(session_page: Page, code):
 - Agar qo'shilgan elementni list formadan topish uchun kerakli ustun yoki search yo'q bo'lsa, grid settingdan kerakli ustunni va shu ustun bo'yicha searchni yoq; Smartup listlarida bu umumiy pattern.
 - Add formaga kiritiladigan nom, kompaniya, shaxs, manzil kabi biznes qiymatlarni mantiqan `Faker` bilan generatsiya qil; testda qidirish/bog'lash oson bo'lishi uchun kerakli joyda `code` yoki saqlangan entity code qo'shimchasini saqla.
 - Smartup test yozish jarayonida yangi formaga kirilganda yoki URL/form state o'zgarganda screenshotni `.agents/skills/smartup-guide/references/forms/screenshots/<form-slug>/` ichiga saqla; `test-results/screens/smartup/` forma arxivi uchun ishlatilmasin.
+- Natural Person alohida entity flow/test hisoblanadi; Legal Person regressionda director natural person kerak bo'lsa Natural Person helperini import qilib ishlatadi, natural person locator/fill/assert logikasini Legal Person ichida dublikat qilmaydi.
 
 ### Smoke va Regression farqi
 - Smoke testlarda forma minimal yurishi uchun kerak bo'lgan majburiy maydonlar va minimal harakatlar bajariladi; maqsad forma ishlashini tez tekshirish.
@@ -127,6 +128,9 @@ def test_XX_<nomi>(session_page: Page, code):
 - Grouplar bir-birining browser/page holatini meros qilib olmasin: full runnerda har group `group_page` bilan alohida oyna oladi, alohida group runner faylida esa testlar `group_user_page` bilan bitta module-scoped oyna va bitta loginni bo'lishadi.
 - Har bir group runner ichida `*_GROUP_TEST_SCENARIO` constant bo'lsin; unda shu groupdagi testcaselar jamlangan biznes ssenariy yozilsin va `run_*_group_chain` boshida `allure.dynamic.description(...)` orqali reportga berilsin.
 - Group ichidagi `run_*` funksiyalarda `login=True` default bo'lsin; group chain yoki group runner wrapperlari boshida bir marta login qilib, ichki chaqiruvlarga `login=False` bersin.
+- B-group leaf testlari alohida fayllarda turadi: har bir `test_b_XX_*.py` ichida faqat bitta pytest test bo'lsin; umumiy order logikasi `order_helpers.py` ichidagi `run_*` funksiyalarda saqlanadi va `test_b_group_runner.py` shu `run_*` funksiyalarni zanjir qilib yig'adi.
+- Bitta testga xos local yordamchi funksiyalar shu test faylida qolsin; helper/flow alohida faylga faqat funksiya bir nechta testda qayta ishlatilsa yoki haqiqiy umumiy flow bo'lsa chiqariladi.
+- Bitta test ichidagi 1 qatorlik wrapper/helper yoki constant-getter funksiyalar yozilmasin; oddiy test data va `f"..."` kabi expressionlar test/run flow boshida local variable bo'lib tursin. Helper faqat takrorlanadigan UI harakati, conditional/retry, download/file validation yoki o'qishni aniq yengillashtiradigan blok uchun ishlatilsin.
 - Group test ichida cleanup yoki oldingi recordlarni cancel qilish faqat optional bo'lsin: data topilmasa no-op bo'lib, test yangi record yaratib davom etishi kerak.
 - Yangi test yozishda u setup bosqichigami yoki qaysi mustaqil groupga tegishli ekanini aniq ajrat.
 - `tests/smoke/test_setup/test_setup_runner.py` ichidagi mavjud barcha testlar user setup testlari hisoblanadi; runner setup testlari bilan bir papkada turadi va ular yozib bo'lingan.

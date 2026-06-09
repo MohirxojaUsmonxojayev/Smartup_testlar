@@ -7,6 +7,7 @@ from playwright.sync_api import Page, expect
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from tests.smoke.flows.flow_navigate import navigate_to
+from tests.smoke.test_setup.test_natural_person import create_natural_person_record, natural_person_values
 from utils.base_page import BasePage
 
 pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("Legal Person")]
@@ -73,29 +74,6 @@ def _legal_person_values(code: str, code_prefix: str, name_suffix: str) -> dict[
     }
 
 
-def _natural_person_values(code: str) -> dict[str, str]:
-    first_name = fake_ru.first_name_male()
-    last_name = fake_ru.last_name_male()
-    middle_name = fake_ru.middle_name_male()
-    return {
-        "code": f"director_np_pw{code}",
-        "first_name": first_name,
-        "last_name": last_name,
-        "middle_name": middle_name,
-        "full_name": f"{last_name} {first_name} {middle_name}",
-        "birthday": fake_ru.date_of_birth(minimum_age=30, maximum_age=55).strftime("%d.%m.%Y"),
-        "passport_series": "AA",
-        "passport_digits": _digits(7),
-        "phone": _uz_phone(),
-        "tin": _digits(14),
-        "telegram": f"@director_pw{code}",
-        "email": f"director-pw{code}@example.test",
-        "web": f"https://director-pw{code}.example.test",
-        "address": _clean_address(fake_ru.address()),
-        "post_address": _clean_address(fake_ru.address()),
-    }
-
-
 def _contact_position_values(code: str) -> dict[str, str]:
     return {
         "code": f"contact_position_pw{code}",
@@ -141,14 +119,29 @@ def _fill_textarea(page: Page, ng_model: str, value: str) -> None:
 
 
 def _select_tashkent_region(page: Page) -> None:
-    search = page.locator('input[ng-model="_$bTree.searchValue"]').first
+    search = page.locator('b-tree-select:visible input[ng-model="_$bTree.searchValue"]').first
+    expect(search).to_be_visible()
+    search.click()
     search.fill("Ташкент")
-    option = page.locator(".jstree-anchor").filter(has_text="город Ташкент").first
-    try:
-        expect(option).to_be_visible(timeout=5_000)
-        option.click()
-    except (AssertionError, PlaywrightTimeoutError):
-        page.get_by_text("город Ташкент").first.click()
+    hint = page.locator("b-tree-select:visible .hint").first
+    expect(hint).to_be_visible(timeout=5_000)
+
+    for option_text in ("город Ташкент", "Ташкент"):
+        options = (
+            hint.get_by_text(option_text, exact=True).first,
+            hint.locator("label").filter(has_text=option_text).first,
+            hint.locator(".jstree-anchor").filter(has_text=option_text).first,
+        )
+        for option in options:
+            try:
+                expect(option).to_be_visible(timeout=5_000)
+                option.click()
+                expect(search).to_have_value(re.compile("Ташкент"))
+                return
+            except (AssertionError, PlaywrightTimeoutError):
+                continue
+
+    raise AssertionError("Region option 'город Ташкент' not found")
 
 
 def _select_b_input_by_search(page: Page, ng_model: str, search_text: str, expected_value: str) -> None:
@@ -339,17 +332,6 @@ def _assert_legal_person_list_row(page: Page, values: dict[str, str], scope: str
     expect(row).to_contain_text("Активный")
 
 
-def _assert_director_natural_person_list_row(page: Page, values: dict[str, str]) -> None:
-    page.get_by_role("searchbox", name="Поиск").fill(values["code"])
-    page.get_by_role("searchbox", name="Поиск").press("Enter")
-    BasePage(page).wait_for_loader()
-    row = page.locator("b-grid .tbl-row").first
-    expect(row).to_be_visible()
-    expect(row).to_contain_text(values["first_name"])
-    expect(row).to_contain_text(values["last_name"])
-    expect(row).to_contain_text("Активный")
-
-
 def _open_selected_legal_person_view(page: Page, values: dict[str, str]) -> None:
     row = page.locator("b-grid .tbl-row").filter(has_text=values["code"]).first
     expect(row).to_be_visible()
@@ -443,32 +425,6 @@ def _create_support_legal_person(page: Page, values: dict[str, str]) -> None:
     _save_add_form(page, list_heading="Юридические лица")
 
 
-def _create_director_natural_person(page: Page, values: dict[str, str]) -> None:
-    navigate_to(page, tab="Справочники", name="Физические лица")
-    expect(page.get_by_role("heading")).to_contain_text("Физические лица")
-    page.get_by_role("button", name="Создать").click()
-    expect(page.get_by_role("heading")).to_contain_text("Физическое лицо (создание)")
-
-    _fill_input(page, "d.last_name", values["last_name"])
-    _fill_input(page, "d.first_name", values["first_name"])
-    _fill_input(page, "d.middle_name", values["middle_name"])
-    _fill_input(page, "d.code", values["code"])
-    _fill_input(page, "d.birthday", values["birthday"])
-    _fill_input(page, "d.passport_series", values["passport_series"])
-    _fill_input(page, "d.passport_digits", values["passport_digits"])
-    _select_tashkent_region(page)
-    _fill_textarea(page, "d.address", values["address"])
-    _fill_textarea(page, "d.post_address", values["post_address"])
-    _fill_input(page, "d.main_phone", values["phone"])
-    _fill_input(page, "d.tin", values["tin"])
-    _fill_input(page, "d.telegram", values["telegram"])
-    _fill_input(page, "d.email", values["email"])
-    _fill_input(page, "d.web", values["web"])
-
-    _save_add_form(page, list_heading="Физические лица", confirm_text=None)
-    _assert_director_natural_person_list_row(page, values)
-
-
 def _create_contact_position(page: Page, values: dict[str, str]) -> None:
     _open_legal_person_add(page)
     page.locator("a:visible").filter(has_text="Контактные лица").first.click()
@@ -538,7 +494,7 @@ def _save_legal_person_data(
 
 def run_legal_person(page: Page, code, save_data=None, scope: str = "smoke") -> None:
     owner_values = _legal_person_values(code, code_prefix="cod_owner_lg_pw", name_suffix="legal_owner")
-    director_values = _natural_person_values(code)
+    director_values = natural_person_values(code, code_prefix="director_np_pw", name_suffix="director")
     main_values = _legal_person_values(code, code_prefix="cod_lg_pw", name_suffix="legal_person")
     position_values = _contact_position_values(code)
     bank_values = _bank_account_values(code)
@@ -553,7 +509,7 @@ def run_legal_person(page: Page, code, save_data=None, scope: str = "smoke") -> 
             _create_support_legal_person(page, owner_values)
 
         with allure.step("3 - Regression: Руководитель uchun alohida jismoniy shaxs yaratish"):
-            _create_director_natural_person(page, director_values)
+            create_natural_person_record(page, director_values, scope="regression")
 
         with allure.step("4 - Regression: Kontakt shaxs lavozimini yaratish"):
             _create_contact_position(page, position_values)

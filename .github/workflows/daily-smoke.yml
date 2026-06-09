@@ -46,6 +46,7 @@ jobs:
       SMARTUP_COMPANY_PASSWORD: ${{ secrets.SMARTUP_COMPANY_PASSWORD }}
       APP3_COMPANY_CODE: ${{ secrets.APP3_COMPANY_CODE }}
       APP3_COMPANY_PASSWORD: ${{ secrets.APP3_COMPANY_PASSWORD }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
     steps:
       - name: Checkout
@@ -87,6 +88,7 @@ jobs:
           [ -n "$APP3_COMPANY_PASSWORD" ] && echo "::add-mask::$APP3_COMPANY_PASSWORD"
           [ -n "$SELECTED_COMPANY_CODE" ] && echo "::add-mask::$SELECTED_COMPANY_CODE"
           [ -n "$SELECTED_COMPANY_PASSWORD" ] && echo "::add-mask::$SELECTED_COMPANY_PASSWORD"
+          [ -n "$GEMINI_API_KEY" ] && echo "::add-mask::$GEMINI_API_KEY"
 
       - name: Run daily smoke tests
         run: |
@@ -97,7 +99,8 @@ jobs:
             --company-code "$TEST_COMPANY_CODE" \
             --company-password "$TEST_COMPANY_PASSWORD" \
             --scope "$TEST_SCOPE" \
-            --headless 2>&1 | tee test-results/ci-test-output.log
+            --headless \
+            --ai-summary 2>&1 | tee test-results/ci-test-output.log
 
       - name: Upload test results
         if: ${{ always() }}
@@ -161,6 +164,50 @@ jobs:
             | head -5 | sed 's/^/- /' || true)
           FAILED_TEST=$(printf '%s' "$FAILED_TESTS" | head -1 | sed -E 's/^- (FAILED|ERROR) //; s/ - .*$//' || true)
           ERROR_LINE=$(printf '%s' "$FAILED_TESTS" | head -1 | sed -E 's/^- (FAILED|ERROR) [^ ]+ - //' || true)
+          AI_SUMMARY_TEXT=$(python - <<'PY' || true
+          import json
+          from pathlib import Path
+
+          path = Path("test-results/ai-summary.json")
+          if not path.exists():
+              raise SystemExit
+          try:
+              data = json.loads(path.read_text(encoding="utf-8"))
+          except json.JSONDecodeError:
+              raise SystemExit
+          if not isinstance(data, dict):
+              raise SystemExit
+
+          lines = []
+          result = data.get("result")
+          confidence = data.get("confidence")
+          summary = data.get("summary")
+          if result:
+              lines.append(f"Result: {result}")
+          if confidence:
+              lines.append(f"Confidence: {confidence}")
+          if summary:
+              lines.append(str(summary))
+
+          failed_tests = data.get("failed_tests")
+          if isinstance(failed_tests, list) and failed_tests:
+              first = failed_tests[0] if isinstance(failed_tests[0], dict) else {}
+              name = first.get("name")
+              reason = first.get("reason") or first.get("message")
+              next_action = first.get("next_action")
+              if name:
+                  lines.append(f"Failed: {name}")
+              if reason:
+                  lines.append(f"Reason: {reason}")
+              if next_action:
+                  lines.append(f"Next: {next_action}")
+              extra_count = len(failed_tests) - 1
+              if extra_count > 0:
+                  lines.append(f"Yana {extra_count} ta failed test bor.")
+
+          print("\n".join(line for line in lines if line).strip()[:1200])
+          PY
+          )
 
           COMMIT_SHORT=$(printf '%s' "$GITHUB_SHA" | cut -c1-7)
           MESSAGE=$(printf 'Daily Smoke Tests %s\n\nServer: %s\nScope: %s\nTarget: %s\nCompany: %s\nUser login: %s\nSummary: %s\n\nRun: %s' \
@@ -171,6 +218,9 @@ jobs:
           fi
           if [ -n "$ERROR_LINE" ]; then
             MESSAGE=$(printf '%s\n\nError:\n%s' "$MESSAGE" "$ERROR_LINE")
+          fi
+          if [ -n "$AI_SUMMARY_TEXT" ]; then
+            MESSAGE=$(printf '%s\n\nAI summary:\n%s' "$MESSAGE" "$AI_SUMMARY_TEXT")
           fi
           MESSAGE=$(printf '%s\n\nArtifacts:\nOpen run link -> daily-smoke-test-results' "$MESSAGE")
 

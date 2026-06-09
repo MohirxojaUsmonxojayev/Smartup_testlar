@@ -159,6 +159,15 @@ Yangi company yaratish kerak bo'lsa shu command ishlatiladi:
 python scripts/run_tests.py --url <server_url> --create-company --head-email <head_email> --head-password <head_password> --open-report
 ```
 
+AI xulosa kerak bo'lsa Gemini API keyni environment variable qilib bering. Key repo yoki commandga yozilmaydi:
+
+```bash
+export GEMINI_API_KEY="<gemini_api_key>"
+python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password> --ai-summary --open-report
+```
+
+AI default holatda off. `--ai-summary` flagi berilsa testdan keyin `test-results/ai-summary.md` va `test-results/ai-summary.json` yozadi. Allure report ichida ham `AI Test Summary` card sifatida ko'rinadi. Default model: `gemini-2.5-flash`.
+
 ✅ Tayyor — hisobot brauzerda ochiladi. Keyinroq hisobotni qayta ochish uchun: `allure open test-results/allure-report`.
 
 ---
@@ -204,6 +213,9 @@ Bu buyruq macOS, Linux va Windowsda ishlaydi. `.env` ishlatilmaydi.
 | `--headless` | Browserni ko'rsatmasdan ishlatadi. |
 | `--regression` | Testlarni regression scope bilan ishlatadi. |
 | `--show-trace` | Testdan keyin oxirgi Playwright trace viewerini ochadi. |
+| `--ai-summary` | Gemini AI summary mexanizmini chaqiradi; key yo'q bo'lsa skipped yozadi. |
+| `--no-ai-summary` | AI summary yaratmaydi. |
+| `--ai-model <model>` | AI summary uchun Gemini model. Default: `gemini-2.5-flash`. |
 | `--dry-run` | Testni ishga tushirmaydi, faqat pytest commandni ko'rsatadi. |
 | `all` | Default target. Setup + A group + B group ishlaydi. |
 | `setup` | Faqat setup runner ishlaydi. |
@@ -270,6 +282,15 @@ python scripts/run_tests.py --url <server_url> --company-code <company_code> --c
 ```
 
 Nima qiladi: test tugagandan keyin Allure reportni generate qilib ochadi.
+
+#### Gemini AI xulosa bilan run qilish
+
+```bash
+export GEMINI_API_KEY="<gemini_api_key>"
+python scripts/run_tests.py --url <server_url> --company-code <company_code> --company-password <company_password> --ai-summary --open-report
+```
+
+Nima qiladi: test tugagach Gemini `gemini-2.5-flash` orqali natijani tahlil qiladi va `test-results/ai-summary.md` hamda `test-results/ai-summary.json` fayllarini yozadi. Allure reportda `AI Test Summary` card ochilib, shu ikki fayl attachment bo'lib ko'rinadi. AI pass/failni hal qilmaydi; u faqat pytest/Allure/log natijasini xulosa qiladi.
 
 #### Browserni ko'rsatmasdan ishlatish
 

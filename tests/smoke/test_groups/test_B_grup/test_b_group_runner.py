@@ -3,7 +3,10 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from tests.smoke.flows.flow_authorization import authorization_user
-from tests.smoke.test_groups.test_B_grup.test_order import (
+from tests.smoke.test_groups.test_B_grup.test_b_04_invoice_report_template import (
+    run_b_group_create_custom_invoice_report_template,
+)
+from tests.smoke.test_groups.test_B_grup.order_helpers import (
     run_b_group_create_order_with_consignment_limit,
     run_b_group_edit_order_with_consignment_limit,
     run_b_group_order_invoice_reports,
@@ -30,6 +33,7 @@ B Group test ssenariysi:
 10. Konsignatsiya ikkita sanaga 14 000 + 14 000 qilib bo'linadi va viewda tekshiriladi.
 11. Editdan keyin draft order listda qolgan holatda Накладные dropdown optionlari tekshiriladi.
 12. Накладные reportlari B-group order datasi bilan ochilishi tekshiriladi.
+13. Admin bilan custom invoice report template yaratiladi, Админ rolega attach qilinadi va order listda tekshiriladi.
 """
 
 
@@ -45,24 +49,10 @@ def run_b_group_chain(group_page: Page, code: str, save_data, load_data, scope: 
         run_b_group_edit_order_with_consignment_limit(group_page, code, load_data, save_data, scope=scope, login=False)
     with allure.step("B-03 - Draft zakaz Накладные reportlarini tekshirish"):
         run_b_group_order_invoice_reports(group_page, code, load_data, scope=scope)
+    with allure.step("B-04 - Custom invoice report template yaratish va orderda tekshirish"):
+        run_b_group_create_custom_invoice_report_template(group_page, code, load_data, scope=scope)
 
 
-@allure.title("B-01 - Konsignatsiya limiti bilan zakaz yaratish")
-def test_b_01_create_order_with_consignment_limit(group_user_page: Page, code: str, save_data, test_scope) -> None:
-    run_b_group_create_order_with_consignment_limit(group_user_page, code, save_data, scope=test_scope, login=False)
-
-
-@allure.title("B-02 - Konsignatsiyali zakazni edit qilish va split qilish")
-def test_b_02_edit_order_with_consignment_limit(
-    group_user_page: Page,
-    code: str,
-    load_data,
-    save_data,
-    test_scope,
-) -> None:
-    run_b_group_edit_order_with_consignment_limit(group_user_page, code, load_data, save_data, scope=test_scope, login=False)
-
-
-@allure.title("B-03 - Draft zakaz Накладные reportlarini tekshirish")
-def test_b_03_order_invoice_reports(group_user_page: Page, code: str, load_data, test_scope) -> None:
-    run_b_group_order_invoice_reports(group_user_page, code, load_data, scope=test_scope)
+@allure.title("B Group runner")
+def test_b_group_runner(group_session_page: Page, code: str, save_data, load_data, test_scope) -> None:
+    run_b_group_chain(group_session_page, code, save_data, load_data, scope=test_scope)

@@ -97,3 +97,8 @@ Yechim: <nima qilish kerak>
 - Order add product qadamida tovar/product topilmasa, zaxira/balans yo'qligi yoki product bron qilingan orderlarda bandligi ehtimolini tekshir.
 - Balans kerak bo'lsa setupdagi `test_20_init_balance` ni run qilib product balansini qo'shib kelish mumkin.
 - Agar product bron qilingan bo'lsa, order listdagi bron qilingan orderlarni `Canceled/Отменен` statusga o'tkazish kerak.
+
+### AI test summary
+- Test run tugagandan keyingi xulosa uchun OpenAI emas, Gemini API ishlatiladi; default model `gemini-2.5-flash`, key esa faqat `GEMINI_API_KEY` environment variable orqali olinadi va repo/chat/logga yozilmaydi.
+- AI summary default holatda off; faqat `scripts/run_tests.py ... --ai-summary` flagi berilganda ishlaydi.
+- AI xulosa `test-results/ai-summary.md/json` fayllariga yoziladi va Allure report ichida alohida `AI Test Summary` card sifatida attachment qilinadi; bu card test pass/fail statusini o'zgartirmaydi.

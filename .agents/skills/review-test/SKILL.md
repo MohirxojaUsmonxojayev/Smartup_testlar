@@ -49,3 +49,8 @@ Har bir muammo uchun:
 - **Yechim**: qanday tuzatish kerak
 
 Oxirida umumiy baho: `Yaxshi / O'rta / Qayta ko'rib chiqish kerak`
+
+## Loyiha Xususiyatlari
+
+### Smoke run isolation
+- Setup/group smoke flowlarda har bir `run_*` o'z ro'yxat sahifasiga defensive `navigate_to(...)` qilishi kerak; session/page holatini oldingi qadamdan meros olish flaky dependency hisoblanadi.

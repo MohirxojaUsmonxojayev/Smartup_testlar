@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -81,6 +82,35 @@ def show_trace(env: dict[str, str], dry_run: bool) -> None:
         run([playwright, "show-trace", str(traces[0])], env, dry_run=dry_run)
 
 
+def should_run_ai_summary(args: argparse.Namespace, env: dict[str, str]) -> bool:
+    if args.no_ai_summary:
+        return False
+    return args.ai_summary
+
+
+def generate_ai_summary(
+    env: dict[str, str],
+    test_exit: int,
+    pytest_command: list[str],
+    started_at: float,
+    model: str,
+    dry_run: bool,
+) -> None:
+    command = [
+        sys.executable,
+        str(ROOT / "scripts" / "analyze_test_result.py"),
+        "--exit-code",
+        str(test_exit),
+        "--command",
+        command_text(pytest_command),
+        "--started-at",
+        str(started_at),
+        "--model",
+        model,
+    ]
+    run(command, env, dry_run=dry_run)
+
+
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(
         description="Smartup smoke testlarini Mac, Linux va Windows terminalida ishga tushiradi."
@@ -111,6 +141,21 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     )
     parser.add_argument("--open-report", action="store_true", help="Allure reportni generate qilib ochadi.")
     parser.add_argument("--show-trace", action="store_true", help="Oxirgi Playwright trace viewerini ochadi.")
+    parser.add_argument(
+        "--ai-summary",
+        action="store_true",
+        help="Test tugagach Gemini orqali test-results/ai-summary.md/json yozadi.",
+    )
+    parser.add_argument(
+        "--no-ai-summary",
+        action="store_true",
+        help="AI summary yaratmaydi.",
+    )
+    parser.add_argument(
+        "--ai-model",
+        default=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        help="AI summary uchun Gemini model id. Default: gemini-2.5-flash",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Commandni ko'rsatadi, lekin ishga tushirmaydi.")
     return parser.parse_known_args()
 
@@ -213,7 +258,18 @@ def main() -> int:
 
     if not args.dry_run:
         clean_allure_results()
+    run_started_at = time.time()
     test_exit = run(pytest_command, env, dry_run=args.dry_run)
+
+    if should_run_ai_summary(args, env):
+        generate_ai_summary(
+            env,
+            test_exit=test_exit,
+            pytest_command=pytest_command,
+            started_at=run_started_at,
+            model=args.ai_model,
+            dry_run=args.dry_run,
+        )
 
     generate_report(env, open_report=args.open_report, dry_run=args.dry_run)
     if args.show_trace:

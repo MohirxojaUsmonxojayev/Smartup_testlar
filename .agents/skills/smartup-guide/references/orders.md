@@ -64,7 +64,8 @@ Tags: order, consignment, settings, view
 - Create test maqsadi keyingi edit case uchun precondition ham yaratadi: quantity `5`, total/konsignatsiya `35 000` bo'lsin; quantity `1` bilan keyingi testda totalni kamaytirib bo'lmaydi.
 - Testda ishlatish: final formadagi Angular state `q.consignment_day_limit == "30"` va `d.max_consignment_date == delivery_date + 30 days` bo'lishi kerak.
 - View assert: order viewda visible `Консигнация` textini bosib, visible text orqali consignment date va `35 000` summa tekshiriladi.
-- B-group test fayli: `tests/smoke/test_groups/test_B_grup/test_order.py`.
+- B-group order helper fayli: `tests/smoke/test_groups/test_B_grup/order_helpers.py`.
+- B-group leaf testlari alohida fayllarda turadi: `test_b_01_*`, `test_b_02_*`, `test_b_03_*`; har bir faylda faqat bitta pytest test bo'ladi.
 
 ### Consignment Edit And Split Case
 Tags: order, consignment, edit, validation, split
@@ -100,5 +101,15 @@ Tags: order, view, data-store
 Tags: order, invoice, report, b-group, locator
 - Qayerda: `Продажа > Заказы` listida kerakli row ochilgandan keyin row menu ichidagi `Накладные` dropdown; order view ichida emas.
 - Locator: bitta order uchun row-level button `#trade81-button-report_one`. Reportni ochish uchun `a.dropdown-item` markaziga emas, option nomi yozilgan `span[ng-click*="reportOne"]` yoki `span[ng-click*="chequeOne"]` elementiga click qilish kerak.
-- Qoida: `Счет-фактура с наценкой` va `Экспортировать заказ` dropdownda ko'rinadi, lekin HTML report popup sikliga qo'shilmaydi; ularni visible option sifatida tekshir.
-- B-group case: B-02 draft orderni listda qoldiradi; B-03 shu sessiyadan foydalanib `Накладные` optionlarini tekshiradi va asosiy reportlarda client/product/summa/order id ko'rinishini assert qiladi.
+- Qoida: B-03 HTML report sifatida ochiladigan `Накладные` optionlarini bosib tekshiradi; `Экспортировать заказ` yangi oyna ochmaydi, download sifatida `expect_download` bilan tekshiriladi.
+- B-group case: B-02 draft orderni listda qoldiradi; B-03 shu sessiyadan foydalanib `Накладные` optionlarini tekshiradi, har bir reportni ochadi va reportga mos client/product/summa/order data ko'rinishini assert qiladi.
+- Hozirgi kelishuv: B-03 report testi `smoke` va `regression` scope'da foydalanuvchi manual tekshirgan report ro'yxatini bir xil tekshiradi; `Чек-лист (80 мм)` uchun faqat yangi oyna ochilishi va yopilishi tekshiriladi, chunki native print dialog Playwright tomonidan boshqarilmaydi.
+- Report popup ochilganda ba'zi HTML reportlar `window.print()` chaqirib native `Печать` dialogini ochadi; Playwright testlarida popupdan oldin `window.print` stub/no-op qilinsin.
+
+### Custom Invoice Report Template
+Tags: order, invoice, report-template, b-group, admin
+- Navigation: `Главное -> Шаблоны накладных`; URL pattern `anor/mr/template_list`.
+- B-04 case: mavjud admin login bilan `Шаблоны накладных` sahifasida `Накладная (заказ)` uchun `Test_invoice_report-{code}` nomli custom invoice report template yaratiladi.
+- Precondition: `data/test_invoice_report.xlsx` repo ichida mavjud bo'lishi kerak; shu Excel fayl template sifatida upload qilinadi.
+- Role: template `Админ` rolega attach qilinadi; attachdan oldin shu role uchun detach/no-op qadam bajarilishi mumkin.
+- Davomiy tekshiruv: role oynasi yopilgandan keyin admin profildan chiqiladi, `user-pw{code}@<company>` bilan login qilinadi; `Продажа > Заказы` / `order_list`da B-group draft order row bosilganda yangi `Счет-фактуры` buttoni chiqadi. Shu button bosilganda `Test_invoice_report-{code}` optioni ko'rinishi va bosilganda fayl download bo'lishi tekshiriladi.

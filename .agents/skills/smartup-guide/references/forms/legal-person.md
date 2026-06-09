@@ -37,11 +37,12 @@ Tags: legal-person, owner, director, natural-person, relation
 - `Собственник` b-input ustunlari `Код` / `Название`; u alohida legal person bo'lishi kerak.
 - `Руководитель` b-input ustunlari `Ф.И.О.` / `Код`; u alohida natural person bo'lishi kerak.
 - Director quick-add `Физическое лицо (создание)` sahifasiga o'tadi; owner quick-add esa yana `Юридическое лицо (создание)` ochadi. Barqaror test uchun avval owner legal person va director natural person alohida yaratiladi, keyin asosiy legal person add formida code orqali tanlanadi.
+- Director natural person yaratish logikasi Legal Person ichida yozilmaydi; `tests/smoke/test_setup/test_natural_person.py` ichidagi `natural_person_values` va `create_natural_person_record` import qilib ishlatiladi.
 
 ### Region
 Tags: legal-person, region, b-tree
 - `Регион` oddiy b-input emas, b-tree search input (`_$bTree.searchValue`).
-- `Ташкент` search qilinganda `город Ташкент` tanlanadi; `.jstree-anchor` har doim chiqmasligi mumkin, fallback sifatida text locator ishlaydi.
+- `Ташкент` search qilishdan oldin b-tree input click/focus qilinadi; shunda `.hint` ochiladi va `город Ташкент` yoki `Ташкент` optioni hint ichidagi exact text/label yoki `.jstree-anchor` orqali tanlanadi.
 
 ### Tabs
 Tags: legal-person, tabs, note, leadership
@@ -55,7 +56,7 @@ Tags: legal-person, tabs, note, leadership
 ### Legal person list
 Tags: legal-person, list, grid, assert
 - List URL/search: `Справочники` -> `Юридические лица`, global `Поиск`ga `legal_person_code` yoziladi.
-- Regression setupda director natural person yaratilgandan keyin `Физические лица` listida ham global `Поиск`ga director code yozib tekshiriladi; listda ko'p qator bo'lsa Faker first name (`Платон` kabi) birinchi 50 visible row ichida bo'lmasligi mumkin.
+- Regression setupda director natural person Natural Person helper orqali yaratiladi va `Физические лица` listida global `Поиск`ga director code yozib tekshiriladi; listda ko'p qator bo'lsa row assert ko'rinadigan F.I.O. qismlariga tayanadi.
 - Default grid ustunlari ichida `Код`, `Название`, `Альтернативное название`, `Статус` ko'rinadi.
 - Smoke mode: listda faqat `code`, `name`, `Активный` ni tekshiriladi.
 - Regression mode: listda `short_name` ham tekshiriladi.

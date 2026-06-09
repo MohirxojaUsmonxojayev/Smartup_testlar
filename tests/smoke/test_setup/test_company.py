@@ -309,9 +309,17 @@ def _open_company_security_tab(page: Page) -> None:
     raise AssertionError("Company viewda Security/Безопасность tab topilmadi")
 
 
-def _license_policy_container(page: Page):
-    label = page.get_by_text("Политика лицензирования", exact=True).first
-    expect(label).to_be_visible()
+def _setting_label(page: Page, labels: tuple[str, ...]):
+    for label_text in labels:
+        label = page.get_by_text(label_text, exact=True).first
+        if label.count() > 0:
+            expect(label).to_be_visible()
+            return label
+    raise AssertionError(f"Company Security tabida '{labels[0]}' label topilmadi")
+
+
+def _setting_container(page: Page, labels: tuple[str, ...]):
+    label = _setting_label(page, labels)
 
     for ancestor in (
         "ancestor::*[.//*[@role='switch'] or .//input[@type='checkbox'] or .//*[contains(@class,'switch')]][1]",
@@ -331,11 +339,11 @@ def _license_policy_container(page: Page):
         ):
             return container.first
 
-    raise AssertionError("'Политика лицензирования' control topilmadi")
+    raise AssertionError(f"'{labels[0]}' control topilmadi")
 
 
-def _set_license_policy_enabled(page: Page, enabled: bool) -> bool:
-    container = _license_policy_container(page)
+def _set_setting_enabled(page: Page, labels: tuple[str, ...], enabled: bool) -> bool:
+    container = _setting_container(page, labels)
 
     switch = container.get_by_role("switch").first
     if switch.count() > 0 and switch.is_visible():
@@ -373,6 +381,30 @@ def _set_license_policy_enabled(page: Page, enabled: bool) -> bool:
     return False
 
 
+def _set_license_policy_enabled(page: Page, enabled: bool) -> bool:
+    return _set_setting_enabled(page, ("Политика лицензирования", "Licensing policy"), enabled)
+
+
+def _disable_concurrent_session_limit(page: Page) -> bool:
+    label = page.get_by_text("Ограничение количества одновременных сеансов", exact=True).first
+    if label.count() == 0:
+        return False
+    expect(label).to_be_visible()
+
+    container = label.locator(
+        "xpath=ancestor::*[.//*[normalize-space()='Отключено'] and .//*[normalize-space()='1']][1]"
+    ).first
+    if container.count() == 0:
+        return False
+
+    disabled_option = container.get_by_role("button", name="Отключено", exact=True).first
+    if disabled_option.count() == 0:
+        disabled_option = container.get_by_text("Отключено", exact=True).first
+    expect(disabled_option).to_be_visible()
+    disabled_option.click()
+    return True
+
+
 def _save_company_changes(page: Page) -> None:
     save_button = page.get_by_role("button", name="Сохранить", exact=True).first
     expect(save_button).to_be_visible()
@@ -405,14 +437,15 @@ def _ensure_company_view(page: Page, company_code: str) -> None:
     _open_company_view(page, company_code)
 
 
-def _disable_license_policy_if_configured(page: Page, company_code: str) -> None:
-    if not _env_flag("DISABLE_LICENSE_POLICY"):
-        return
-
+def _apply_company_security_settings(page: Page, company_code: str) -> None:
     _open_company_security_tab(page)
 
-    if not _set_license_policy_enabled(page, enabled=False):
+    if not _disable_concurrent_session_limit(page):
+        raise AssertionError("'Ограничение количества одновременных сеансов' off qilinmadi")
+
+    if _env_flag("DISABLE_LICENSE_POLICY") and not _set_license_policy_enabled(page, enabled=False):
         raise AssertionError("'Политика лицензирования' off qilinmadi")
+
     BasePage(page).wait_for_loader(timeout=600_000)
 
     save_button = page.get_by_role("button", name="Сохранить", exact=True).first
@@ -448,7 +481,7 @@ def run_company(page: Page, code, save_data=None, company_code: str | None = Non
     with allure.step("3 - Company mavjud bo'lsa qayta yaratmasdan code saqlash"):
         if _company_exists(page, company_code):
             _open_company_view(page, company_code)
-            _disable_license_policy_if_configured(page, company_code)
+            _apply_company_security_settings(page, company_code)
             _save_company_code(save_data, company_code)
             return company_code
 
@@ -469,9 +502,9 @@ def run_company(page: Page, code, save_data=None, company_code: str | None = Non
     with allure.step("8 - Ro'yxatda yaratilgan company code ni tekshirish"):
         _assert_company_list_row(page, company_code)
 
-    with allure.step("9 - Company viewda license policy sozlamasini qo'llash"):
+    with allure.step("9 - Company viewda security sozlamalarini qo'llash"):
         _open_company_view(page, company_code)
-        _disable_license_policy_if_configured(page, company_code)
+        _apply_company_security_settings(page, company_code)
 
     with allure.step("10 - Company code ni data storega saqlash"):
         _save_company_code(save_data, company_code)

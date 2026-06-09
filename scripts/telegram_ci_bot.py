@@ -282,6 +282,7 @@ def help_text() -> str:
         "Test run qilish uchun /run yuboring.\n\n"
         "Bot avval serverni so'raydi, keyin scope tanlatadi.\n"
         "Company code/password GitHub Secrets'dan olinadi.\n"
+        "Yakuniy Telegram xabarda AI xulosa ham chiqadi.\n"
         "Test jarayonda bo'lsa yangi /run bloklanadi."
     )
 

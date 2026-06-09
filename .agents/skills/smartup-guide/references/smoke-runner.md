@@ -31,6 +31,7 @@ Tags: smoke, setup, dependency, data-store
 - Har bir group boshida user bir marta login qiladi; group ichidagi test/flowlar shu oynada davom etadi va group tugaganda yoki failed/skip bo'lganda fixture oynani yopadi.
 - Full runnerda har group uchun alohida `group_page` ochiladi; alohida group runner faylida testlar `group_user_page` module-scoped fixture bilan bitta login/page ishlatadi.
 - Har bir group runner ichida `*_GROUP_TEST_SCENARIO` ko'rinishida group-level test ssenariy yoziladi va `run_*_group_chain` uni Allure description'ga beradi; foydalanuvchi group qaysi biznes ssenariyni qamrab olishini runnerdan ko'rishi kerak.
+- B-group leaf testlari bittadan pytest testli alohida fayllarda turadi; `test_b_group_runner.py` ularni `run_*` helper funksiyalari orqali bitta B-group zanjiriga yig'adi.
 - `code` fixture full/setup runnerda yoki `--new-code` bilan yangi random 4 xonali qiymat beradi; yakka/group debugda `--reuse-code` yoki default orqali `test-results/data/data_store.json` dan o'qiladi.
 - `test_01_authorization` `save_data("code", code)` orqali yangi code ni keyingi yakka/debug testlar uchun saqlaydi.
 - Smoke runner `data_store.json` ni tozalab qayta yaratmaydi; faqat `code` yozadi. Shu sabab group testlardan qolgan eski `contract_*` yoki `order_id` qiymatlarini smoke setupning hozirgi code qiymati bilan bir xil deb qabul qilmaslik kerak.
@@ -64,17 +65,17 @@ Tags: smoke, entity, naming
 - Company server code: `autotest{code}`; login suffix sifatida `@autotest{code}` ishlatiladi.
 - Legal person: `cod_lg_pw{code}` / Faker company name + `legal_person-pw{code}` suffix.
 - Legal person owner: `cod_owner_lg_pw{code}` / Faker company name + `legal_owner-pw{code}` suffix.
-- Legal person director: `director_np_pw{code}` natural person, Faker F.I.O.
+- Legal person director: `director_np_pw{code}` natural person, Faker F.I.O.; Legal Person regression buni Natural Person helper orqali yaratadi.
+- Employee natural person code: `natural_person_pw{code}`; ko'rinadigan nom: `natural_person-pw{code}`.
+- Client natural person code: `natural_client_pw{code}`; ko'rinadigan nom: `natural_client-pw{code}`.
 - Legal person contact position: `contact_position_pw{code}` / `Директор по развитию-pw{code}`.
 - Filial/organization: `filial-pw{code}`; yuridik shaxs `cod_lg_pw{code}` ga ulanadi.
 - Room/work zone: `code_room_pw{code}` / `room-pw{code}`.
 - Robot/staff: `code_robot-pw{code}` / `robot-pw{code}`.
-- Employee natural person: `natural_person-pw{code}`.
 - User: `user-pw{code}@<active_company_code>`; active company code company testi yaratgan `company_code`, bo'lmasa `--company-code`; password kod ichidagi test user default qiymati.
 - Price type: `code_price_type_uzb_pw{code}` / `Price Type UZB-pw{code}`.
 - Sector/TMC set: `code_sector_pw{code}` / `sector-pw{code}`.
 - Product/TMC: `code_product-pw{code}` / `product-pw{code}`; price `7000`.
-- Client natural person: `natural_client-pw{code}`.
 - Init balance document number: `{code}`; quantity `100`, price `5000`, expected posting sum `500 000`.
 
 ## Testlar Tartibi Va Vazifasi
@@ -102,7 +103,7 @@ Tags: legal-person, setup, owner, director, data-store
 - Fayl: `tests/smoke/test_setup/test_legal_person.py`.
 - Navigation: `Справочники` -> `Юридические лица`.
 - Smoke: minimal branch. Faqat `cod_lg_pw{code}` va `legal_person-pw{code}` uchun asosiy maydonlar to'ldiriladi, saqlanadi va listda `Код`, `Название`, `Активный` tekshiriladi.
-- Regression: to'liq branch. Avval `Собственник` (`cod_owner_lg_pw{code}`), `Руководитель` (`director_np_pw{code}`) va `contact_position_pw{code}` yaratiladi, so‘ng asosiy legal personga bog'lanadi. `Собственник`, `Руководитель`, `GPS`, bank, kontakt, qo'shimcha tablar to'ldiriladi.
+- Regression: to'liq branch. Avval `Собственник` (`cod_owner_lg_pw{code}`), Natural Person helper orqali `Руководитель` (`director_np_pw{code}`) va `contact_position_pw{code}` yaratiladi, so‘ng asosiy legal personga bog'lanadi. `Собственник`, `Руководитель`, `GPS`, bank, kontakt, qo'shimcha tablar to'ldiriladi.
 - GPS: map modalida `41.2994958,69.2400734` search qilib `d.latlng=41.2994958,69.2400734,12` saqlanadi.
 - Bank account: `МФО=00001` yozib `Tab` bosilganda bank auto-fill `Центр расчетов Центрального банка по г. Ташкенту`; valyuta `Узбекский сум`.
 - Data store: smoke rejimda `legal_person_code/name` va regression uchun owner/director/accountant, `tin`, `phone`, `email`, `region`, `gps`, bank account va contact person/lavozim qiymatlari saqlanadi (smoke branch uchun regression-only kalitlar nullga o'chiriladi).
@@ -139,8 +140,10 @@ Tags: natural-person, employee
 - Fayl: `tests/smoke/test_setup/test_natural_person.py`.
 - Precondition: `filial-pw{code}` filialiga o'tadi.
 - Navigation: `Справочники` -> `Физические лица`.
-- Nima yaratadi: xodim uchun `natural_person-pw{code}` jismoniy shaxs.
-- Tekshiruv: save confirmdan keyin ro'yxatda nom va `Активный` status ko'rinadi; `Просмотр` viewda nom va status tekshiriladi.
+- Nima yaratadi: xodim uchun `natural_person_pw{code}` code va `natural_person-pw{code}` ko'rinadigan nomli jismoniy shaxs.
+- Smoke: majburiy `d.first_name`, `d.code` va `Активный` minimal path; list va viewda nom/status tekshiriladi.
+- Regression: birthday, passport, region, address/post address, phone, tin, telegram, email, web to'ldiriladi; viewda asosiy kiritilgan qiymatlar tekshiriladi.
+- Arxitektura: Natural Person helperlari shu test faylida turadi; Legal Person direktor yaratishda shu helperlarni import qiladi.
 
 ### 07 User
 Tags: user, robot, natural-person
@@ -154,7 +157,8 @@ Tags: user, robot, natural-person
 Tags: user, permissions, forms
 - Fayl: `tests/smoke/test_setup/test_user.py`.
 - Nima qiladi: user view ichida `Формы` sahifasini ochib `Формы`, `Отчеты`, `Накладные`, `Внешние системы` tablaridagi mavjud elementlarni userga ulaydi.
-- Muhim pattern: page size `1000` qilinadi, `BasePage.click_first_visible_checkbox()` orqali real checkbox/select all bosiladi, `#biruniConfirm` orqali tasdiqlanadi.
+- Muhim pattern: har bir tabda page size `1000` qilinadi, `BasePage.click_first_visible_checkbox()` orqali real checkbox/select all bosiladi, `#biruniConfirm` orqali tasdiqlanadi.
+- Qayta run: bo'limda `нет данных` bo'lsa attach qadam no-op bo'lib o'tadi; bu qadam mavjud companyda permissionlarni qayta qo'llash uchun idempotent bo'lishi kerak.
 - Tekshiruv: har bo'limda `Доступные` ro'yxati `нет данных` bo'lishi kerak.
 
 ### 09 Role
@@ -222,8 +226,8 @@ Tags: tmc, product, price
 ### 18 Natural Person For Client 1
 Tags: natural-person, client
 - Fayl: `tests/smoke/test_setup/test_natural_person.py`.
-- Nima yaratadi: `natural_client-pw{code}` jismoniy shaxs, `Клиент` belgisi yoqiladi.
-- Tekshiruv: avval `Физические лица` list va `Просмотр` viewda nom/status tekshiriladi, keyin `Клиенты` ro'yxatida ko'rinadi.
+- Nima yaratadi: `natural_client_pw{code}` code va `natural_client-pw{code}` ko'rinadigan nomli jismoniy shaxs, `Клиент` belgisi yoqiladi.
+- Tekshiruv: avval `Физические лица` list va `Просмотр` viewda nom/status tekshiriladi, keyin `Клиенты` ro'yxatida ko'rinadi; regressionda natural person qo'shimcha maydonlari ham to'ldiriladi.
 
 ### 19 Room Attachment
 Tags: room, payment-type, warehouse, cashbox, client

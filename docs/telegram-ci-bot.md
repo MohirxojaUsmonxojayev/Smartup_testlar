@@ -47,8 +47,9 @@ Test tugagach /run yana ishlaydi.
 ```
 
 Workflow tugagach `.github/workflows/daily-smoke.yml` yakuniy test summary
-xabarini Telegramga yuboradi. Failed bo'lsa oxirgi screenshot ham yuboriladi,
-screenshot topilmasa artifact linki beriladi.
+xabarini Telegramga yuboradi. Xabarda Gemini AI yozgan qisqa xulosa ham
+chiqadi. Failed bo'lsa oxirgi screenshot ham yuboriladi, screenshot topilmasa
+artifact linki beriladi.
 
 Final xabarda test yaratgan user login ham chiqadi:
 
@@ -74,6 +75,17 @@ Actions secrets orqali olinadi:
 smartup.online -> SMARTUP_COMPANY_CODE / SMARTUP_COMPANY_PASSWORD
 app3.greenwhite.uz/xtrade -> APP3_COMPANY_CODE / APP3_COMPANY_PASSWORD
 ```
+
+AI xulosa uchun GitHub repository secrets ichida quyidagisi bo'lishi kerak:
+
+```text
+GEMINI_API_KEY
+```
+
+Bu key bot ishlayotgan Windows serverda emas, GitHub Actions secrets ichida
+turadi. Key bo'lmasa test baribir ishlaydi, lekin AI xulosa skipped bo'ladi.
+To'liq AI xulosa `daily-smoke-test-results` artifact ichida va Allure reportda
+`AI Test Summary` sifatida saqlanadi.
 
 ## Required Environment Variables
 
