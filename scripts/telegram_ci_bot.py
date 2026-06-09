@@ -350,14 +350,12 @@ def active_run_text(active: ActiveRun) -> str:
     return f"Test jarayonda: {elapsed_text}. Run: {active.workflow_run.html_url}"
 
 
-def process_message_ids(active: ActiveRun | None) -> tuple[int, ...]:
+def transient_status_message_ids(active: ActiveRun | None) -> tuple[int, ...]:
+    # Only the throwaway "test jarayonda" reminder replies. The main progress
+    # message (status_message_id) becomes the final report and must be kept.
     if active is None:
         return ()
-    message_ids = []
-    if active.status_message_id is not None:
-        message_ids.append(active.status_message_id)
-    message_ids.extend(active.extra_status_message_ids)
-    return tuple(message_ids)
+    return tuple(active.extra_status_message_ids)
 
 
 def safe_delete_message(telegram: TelegramClient, chat_id: str, message_id: int | None) -> None:
@@ -369,10 +367,10 @@ def safe_delete_message(telegram: TelegramClient, chat_id: str, message_id: int 
         print(f"Telegram process message delete failed: {exc}", file=sys.stderr)
 
 
-def safe_delete_process_messages(telegram: TelegramClient, active: ActiveRun | None) -> None:
+def safe_delete_transient_messages(telegram: TelegramClient, active: ActiveRun | None) -> None:
     if active is None:
         return
-    for message_id in process_message_ids(active):
+    for message_id in transient_status_message_ids(active):
         safe_delete_message(telegram, active.chat_id, message_id)
 
 
@@ -540,7 +538,7 @@ def monitor_run(
             if status_errors >= STATUS_POLL_ERROR_LIMIT:
                 active = active_store.get()
                 active_store.clear(workflow_run.run_id)
-                safe_delete_process_messages(telegram, active)
+                safe_delete_transient_messages(telegram, active)
                 telegram.send_message(
                     chat_id,
                     (
@@ -558,7 +556,7 @@ def monitor_run(
         if status == "completed":
             active = active_store.get()
             active_store.clear(workflow_run.run_id)
-            safe_delete_process_messages(telegram, active)
+            safe_delete_transient_messages(telegram, active)
             return
 
         time.sleep(STATUS_POLL_INTERVAL_SECONDS)
