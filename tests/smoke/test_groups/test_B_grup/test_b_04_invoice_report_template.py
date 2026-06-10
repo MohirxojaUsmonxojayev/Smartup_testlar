@@ -2,7 +2,6 @@ import json
 import re
 import time
 from pathlib import Path
-from typing import Any
 
 import allure
 import pytest
@@ -21,8 +20,12 @@ pytestmark = [
 ]
 
 
-CUSTOM_REPORT_DOWNLOAD_TIMEOUT = 180_000
-DOWNLOAD_POLL_INTERVAL = 500
+# Custom invoice report fayl download bo'lmaydi — OnlyOffice spreadsheet editorda
+# (office.smartup.online) yangi popupda ochiladi; shuning uchun download emas, editor
+# popup ochilishi tekshiriladi.
+CUSTOM_REPORT_EDITOR_TIMEOUT = 120_000
+EDITOR_POLL_INTERVAL = 500
+ONLYOFFICE_EDITOR_HOST = "office.smartup.online"
 
 
 def _search_grid(page: Page, text: str) -> None:
@@ -42,65 +45,6 @@ def _grid_row_is_visible(page: Page, text: str, timeout: int = 2_000) -> bool:
         return True
     except (AssertionError, PlaywrightTimeoutError):
         return False
-
-
-def _safe_download_filename(filename: str) -> str:
-    safe_name = Path(filename).name.strip()
-    safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", safe_name).strip(" .")
-    return safe_name or "custom_invoice_report.xlsx"
-
-
-def _unique_download_path(download_dir: Path, filename: str) -> Path:
-    target_path = download_dir / _safe_download_filename(filename)
-    if not target_path.exists():
-        return target_path
-
-    suffix = target_path.suffix
-    stem = target_path.stem or "custom_invoice_report"
-    return download_dir / f"{stem}-{int(time.time() * 1000)}{suffix}"
-
-
-def _save_downloaded_report(download) -> str:
-    failure = download.failure()
-    if failure:
-        raise AssertionError(f"Custom invoice report download xato bilan tugadi: {failure}")
-
-    suggested_filename = download.suggested_filename
-    if not suggested_filename:
-        raise AssertionError("Custom invoice report download filename qaytarmadi")
-
-    download_dir = Path("test-results/downloads")
-    download_dir.mkdir(parents=True, exist_ok=True)
-    target_path = _unique_download_path(download_dir, suggested_filename)
-    download.save_as(target_path)
-    if not target_path.exists() or target_path.stat().st_size == 0:
-        raise AssertionError(f"Custom invoice report fayli bo'sh yoki saqlanmadi: {target_path}")
-
-    allure.attach(
-        json.dumps(
-            {
-                "suggested_filename": suggested_filename,
-                "saved_filename": target_path.name,
-                "path": str(target_path),
-                "size": target_path.stat().st_size,
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        name="custom-invoice-report-download",
-        attachment_type=allure.attachment_type.JSON,
-    )
-    return suggested_filename
-
-
-def _remove_event_listener(emitter: Any, event_name: str, handler) -> None:
-    remove_listener = getattr(emitter, "remove_listener", None)
-    if remove_listener is None:
-        return
-    try:
-        remove_listener(event_name, handler)
-    except Exception:
-        pass
 
 
 def _visible_error_texts(page: Page) -> list[str]:
@@ -130,16 +74,25 @@ def _visible_error_texts(page: Page) -> list[str]:
     return texts
 
 
-def _attach_download_timeout_diagnostics(page: Page, template_name: str, popups: list[Page]) -> None:
-    popup_data = []
-    for popup in popups:
+def _find_onlyoffice_editor_frame(report_page: Page):
+    """Report popupida OnlyOffice spreadsheet editor iframe'ini qaytaradi (topilmasa None)."""
+    for frame in report_page.frames:
+        url = frame.url or ""
+        if ONLYOFFICE_EDITOR_HOST in url and "spreadsheeteditor" in url:
+            return frame
+    return None
+
+
+def _attach_editor_open_diagnostics(report_page: Page, template_name: str) -> None:
+    frame_urls = []
+    for frame in report_page.frames:
         try:
-            popup_data.append({"url": popup.url, "closed": popup.is_closed()})
+            frame_urls.append(frame.url)
         except Exception:
-            popup_data.append({"url": "<unavailable>", "closed": True})
+            pass
 
     try:
-        body_text = page.locator("body").inner_text(timeout=1_000)
+        body_text = report_page.locator("body").inner_text(timeout=1_000)
     except Exception:
         body_text = ""
 
@@ -147,22 +100,22 @@ def _attach_download_timeout_diagnostics(page: Page, template_name: str, popups:
         json.dumps(
             {
                 "template_name": template_name,
-                "page_url": page.url,
-                "popup_pages": popup_data,
-                "visible_errors": _visible_error_texts(page),
+                "report_page_url": report_page.url if not report_page.is_closed() else "<closed>",
+                "frame_urls": frame_urls,
+                "visible_errors": _visible_error_texts(report_page),
                 "body_excerpt": body_text[:1500],
             },
             ensure_ascii=False,
             indent=2,
         ),
-        name="custom-invoice-report-download-timeout",
+        name="custom-invoice-report-editor-diagnostics",
         attachment_type=allure.attachment_type.JSON,
     )
 
     try:
         allure.attach(
-            page.screenshot(full_page=True),
-            name="custom-invoice-report-download-timeout-screenshot",
+            report_page.screenshot(full_page=True),
+            name="custom-invoice-report-editor-screenshot",
             attachment_type=allure.attachment_type.PNG,
         )
     except Exception:
@@ -181,46 +134,55 @@ def _clickable_dropdown_option(option):
     return option
 
 
-def _click_custom_report_and_save_download(page: Page, report_option, template_name: str) -> str:
-    downloads = []
-    popups: list[Page] = []
-
-    def on_download(download) -> None:
-        downloads.append(download)
-
-    def on_page(new_page: Page) -> None:
-        if new_page == page:
-            return
-        popups.append(new_page)
-        new_page.on("download", on_download)
-
-    page.on("download", on_download)
-    page.context.on("page", on_page)
+def _open_custom_report_in_editor_and_assert(page: Page, report_option, template_name: str) -> str:
+    """
+    Custom invoice report fayl download bo'lmaydi — option bosilganda yangi popup
+    ochilib, report OnlyOffice spreadsheet editorida (office.smartup.online) ko'rsatiladi.
+    Shu popup ochilib, OnlyOffice editor iframe yuklanganini tekshiradi.
+    """
+    with page.context.expect_page(timeout=60_000) as report_info:
+        _clickable_dropdown_option(report_option).click(timeout=30_000)
+    report_page = report_info.value
 
     try:
-        _clickable_dropdown_option(report_option).click(timeout=30_000)
-        deadline = time.monotonic() + (CUSTOM_REPORT_DOWNLOAD_TIMEOUT / 1000)
+        report_page.wait_for_load_state("domcontentloaded", timeout=60_000)
+
+        editor_frame = None
+        deadline = time.monotonic() + (CUSTOM_REPORT_EDITOR_TIMEOUT / 1000)
         while time.monotonic() < deadline:
-            if downloads:
-                return _save_downloaded_report(downloads[0])
+            if report_page.is_closed():
+                break
+            editor_frame = _find_onlyoffice_editor_frame(report_page)
+            if editor_frame is not None:
+                break
+            report_page.wait_for_timeout(EDITOR_POLL_INTERVAL)
 
-            for popup in list(popups):
-                if popup.is_closed():
-                    continue
-                try:
-                    popup.wait_for_load_state("domcontentloaded", timeout=250)
-                except PlaywrightTimeoutError:
-                    pass
+        if editor_frame is None:
+            _attach_editor_open_diagnostics(report_page, template_name)
+            raise AssertionError(
+                f"{template_name} bosildi, lekin {CUSTOM_REPORT_EDITOR_TIMEOUT // 1000} sekund ichida "
+                f"OnlyOffice spreadsheet editor ({ONLYOFFICE_EDITOR_HOST}) ochilmadi"
+            )
 
-            page.wait_for_timeout(DOWNLOAD_POLL_INTERVAL)
-
-        _attach_download_timeout_diagnostics(page, template_name, popups)
-        raise AssertionError(
-            f"{template_name} bosildi, lekin {CUSTOM_REPORT_DOWNLOAD_TIMEOUT // 1000} sekund ichida download boshlanmadi"
+        editor_frame.wait_for_load_state("domcontentloaded", timeout=60_000)
+        report_page_url = report_page.url
+        allure.attach(
+            json.dumps(
+                {
+                    "template_name": template_name,
+                    "report_page_url": report_page_url,
+                    "editor_frame_url": editor_frame.url,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            name="custom-invoice-report-editor",
+            attachment_type=allure.attachment_type.JSON,
         )
+        return report_page_url
     finally:
-        _remove_event_listener(page, "download", on_download)
-        _remove_event_listener(page.context, "page", on_page)
+        if not report_page.is_closed():
+            report_page.close()
 
 
 def run_b_group_create_custom_invoice_report_template(
@@ -238,7 +200,7 @@ def run_b_group_create_custom_invoice_report_template(
     4. data/test_invoice_report.xlsx faylini templatega upload qilish.
     5. Template'ni Админ rolega detach/attach qilib qayta ulash.
     6. Admin profildan chiqib user bilan kirish.
-    7. Order list rowidagi Счет-фактуры buttonidan custom template download bo'lishini tekshirish.
+    7. Order list rowidagi Счет-фактуры buttonidan custom template OnlyOffice spreadsheet editorda ochilishini tekshirish.
     """
     template_name = f"Test_invoice_report-{code}"
     form_name = "Накладная (заказ)"
@@ -357,7 +319,7 @@ def run_b_group_create_custom_invoice_report_template(
         expect(page).to_have_url(re.compile(r".*/template_list"))
         expect(page.locator("body")).to_contain_text("Шаблоны накладных")
 
-    with allure.step("4 - User order listda Счет-фактуры custom template downloadini tekshiradi"):
+    with allure.step("4 - User order listda Счет-фактуры custom template OnlyOffice'da ochilishini tekshiradi"):
         created_order_client = load_data("b_group_consignment_order_client") or f"natural_client-pw{code}"
 
         logout(page)
@@ -386,7 +348,7 @@ def run_b_group_create_custom_invoice_report_template(
             has_text=re.compile(rf"^\s*{re.escape(template_name)}\s*$")
         ).first
         expect(report_option).to_be_visible()
-        _click_custom_report_and_save_download(page, report_option, template_name)
+        _open_custom_report_in_editor_and_assert(page, report_option, template_name)
 
 
 @allure.title("B-04 - Custom invoice report template yaratish va orderda tekshirish")
