@@ -155,8 +155,13 @@ class BasePage:
         b_input = self.page.locator(f'b-input:has(input[ng-model="{ng_model}"])')
         b_input.locator("input").click()
         if clear:
-            b_input.locator(".edit").click()
-        b_input.locator("div.hint").get_by_text(option_text).click()
+            edit = b_input.locator(".edit")
+            if edit.count() > 0 and edit.first.is_visible():
+                edit.first.click()
+                b_input.locator("input").click()
+        option = b_input.locator("div.hint").get_by_text(option_text, exact=True).first
+        expect(option).to_be_visible()
+        option.click()
 
     # ------------------------------------------------------------------------------------------------------------------
 

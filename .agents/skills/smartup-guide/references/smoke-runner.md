@@ -182,6 +182,7 @@ Tags: license, admin, balance
 - Oyning boshida yoki shu oy uchun birinchi xaridda `Smartup ERP: Базовый пользователь (Обязательный)` alohida row chiqadi; bu rowda quantity `5` disabled/auto-filled bo'ladi, avval shu majburiy license olinadi, keyin oddiy `Smartup ERP: Базовый пользователь` rowdan 1 ta license olinadi. Shu oy keyingi runlarda majburiy row chiqmasligi mumkin.
 - Standalone `test_buy_license` blank `page` bilan boshlanishi mumkin; faol sessiya headeri ko'rinsa logout qilinadi, aks holda logout skip qilinib admin login qilinadi.
 - Kerakli ma'lumotlar: payer `AUTOTEST GWS`, contract `Договор № bn от 01.01.2025`, begin date today.
+- Debug note: payer/contract `b-input` bo'sh bo'lsa `.edit` clear icon `ng-hide` bo'ladi; optionlar ko'rinib turgan bo'lsa ham yashirin `.edit`ni bosish `Locator.click TimeoutError` beradi. `clear=True` helperlari `.edit` faqat visible bo'lsa bosishi kerak.
 - Log: balans musbat bo'lsa `Balans musbat — Success`, sotib olinsa `Litsenziya olindi`.
 
 ### 12 Attach License
