@@ -1,5 +1,14 @@
 # Claude uchun Ko'rsatmalar — Playwright Loyihasi
 
+## Bilim Bazasi — `.agents` (Yagona Ishonchli Manba)
+
+Smartup domain bilimlari uchun **yagona source of truth** — `.agents/skills/`. Doim shu yerdan **o'qi va shu yerga yoz**:
+
+- **O'qish:** Smartup sahifa, forma, contract, order, locator, modal, grid yoki UI xatti-harakati ustida ishlashdan oldin avval `.agents/skills/smartup-guide/SKILL.md` ni (index) o'qi, so'ng kerakli `references/...` yoki forma uchun `references/forms/<slug>.md` dossierini o'qi.
+- **Yozish:** Yangi biznes qoida, UI xatti-harakati, locator yoki xato sababi topilsa — uni `.agents/skills/smartup-guide/` ichidagi mos reference yoki form dossier fayliga yoz (boshqa joyga emas). Forma screenshotlari `references/forms/screenshots/<slug>/` ichida arxivlanadi.
+- `smartup-guide` Skill tool ro'yxatida bo'lmasligi mumkin — shunda ham yuqoridagi fayllarni to'g'ridan-to'g'ri Read bilan o'qi.
+- `.claude/skills/` va `.agents/skills/` da bir xil skill nusxalari farq qilsa, **`.agents` ustun**.
+
 ## Avtomatik O'rganish
 
 Foydalanuvchi quyidagi narsalarni aytganda `/learn` skillini **o'zing, so'ralmay** ishlat:
