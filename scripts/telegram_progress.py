@@ -174,13 +174,21 @@ def failed_block(state: dict[str, Any]) -> list[str]:
     failed = first_failed_result(state)
     if not failed:
         return []
+    reason = failed.get("reason") or failed.get("message")
     pairs = [
         ("Group", failed.get("group")),
         ("Runner", failed.get("runner")),
         ("Test", failed.get("inner_test") or failed.get("display") or failed.get("title")),
         ("Step", failed.get("failed_step") or failed.get("step")),
+        ("Page", failed.get("before_page")),
+        ("Action", failed.get("action")),
+        ("Expected", failed.get("expected")),
+        ("Actual", failed.get("actual")),
+        ("UI error", failed.get("ui_error")),
         ("Error", failed.get("error_type")),
-        ("Reason", failed.get("message") or failed.get("reason")),
+        ("Reason", reason),
+        ("Location", failed.get("location")),
+        ("Next", failed.get("next_action")),
     ]
     lines = ["", "❌ Failed:"]
     for label, value in pairs:
@@ -361,6 +369,14 @@ def failed_details_from_system_summary() -> dict[str, str]:
         "inner_test": str(first.get("inner_test") or ""),
         "failed_step": str(first.get("failed_step") or ""),
         "error_type": str(first.get("error_type") or ""),
+        "reason": str(first.get("reason") or ""),
+        "next_action": str(first.get("next_action") or ""),
+        "location": str(first.get("location") or ""),
+        "before_page": str(first.get("before_page") or ""),
+        "action": str(first.get("action") or ""),
+        "expected": str(first.get("expected") or ""),
+        "actual": str(first.get("actual") or ""),
+        "ui_error": str(first.get("ui_error") or ""),
     }
 
 

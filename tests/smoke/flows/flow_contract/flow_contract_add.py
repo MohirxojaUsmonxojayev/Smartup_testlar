@@ -41,10 +41,14 @@ def flow_contract_add_page(
 
 def flow_contract_save(page: Page) -> None:
     with allure.step("Contract Add: contractni saqlash"):
-        page.get_by_role("button", name="Сохранить", exact=True).click()
-        BasePage(page).wait_for_loader()
+        BasePage(page).save_and_expect_heading(
+            "Договоры",
+            action="Договор (создание) -> Сохранить",
+            before_state="Договор (создание)",
+            expected_state="Договоры list ochilishi",
+            location_hint="tests/smoke/flows/flow_contract/flow_contract_add.py::flow_contract_save",
+        )
         expect(page).to_have_url(re.compile(r".*/anor/mkf/contract_list"))
-        expect(page.get_by_role("heading")).to_contain_text("Договоры")
 
 
 def flow_contract_assert_list_row(

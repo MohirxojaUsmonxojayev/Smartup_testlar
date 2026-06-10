@@ -1,6 +1,7 @@
 import allure
 from playwright.sync_api import Page, expect
 from tests.smoke.flows.flow_navigate import navigate_to
+from utils.base_page import BasePage
 
 pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("Robot")]
 
@@ -24,8 +25,13 @@ def run_robot(page: Page, code, scope: str = "smoke") -> None:
         expect(page.get_by_text("Активный")).to_be_visible()
 
     with allure.step("3 - Saqlash va ro'yxatda tekshirish"):
-        page.get_by_role("button", name="Сохранить").click()
-        expect(page.get_by_role("heading")).to_contain_text("Штат")
+        BasePage(page).save_and_expect_heading(
+            "Штат",
+            action="Штат (создание) -> Сохранить",
+            before_state="Штат (создание)",
+            expected_state="Штат list ochilishi",
+            location_hint="tests/smoke/test_setup/test_robot.py::run_robot",
+        )
         expect(page.get_by_text(f"code_robot-pw{code}")).to_be_visible()
         expect(page.get_by_text(f"robot-pw{code}", exact=True)).to_be_visible()
 

@@ -68,13 +68,19 @@ def run_order_basic(page, code, save_data, scope: str = "smoke") -> None:
         save_data("order_id", order_data["ИД заказа"])
 
     with allure.step("Order View: Assert Values"):
-        assert order_data["Дата заказа"]   == delivery_date, f'Expected: "{delivery_date}", Actual: {order_data["Дата заказа"]}'
-        assert order_data["Дата отгрузки"] == delivery_date,                 f'Expected: "{delivery_date}", Actual: {order_data["Дата отгрузки"]}'
-        assert order_data["Статус"]       == "Черновик",                 f'Expected: "Черновик", Actual: {order_data["Статус"]}'
-        assert order_data["Рабочая зона"] == f"room-pw{code}",           f'Expected: f"room-pw{code}", Actual: {order_data["Рабочая зона"]}'
-        assert order_data["Штат"]         == f"robot-pw{code}",          f'Expected: f"robot-pw{code}", Actual: {order_data["Штат"]}'
-        assert order_data["Клиент"]       == f"natural_client-pw{code}", f'Expected: f"natural_client-pw{code}", Actual: {order_data["Клиент"]}'
-        assert order_data["Тип оплаты"]   == "Наличные деньги",          f'Expected: "Наличные деньги", Actual: {order_data["Тип оплаты"]}'
+        expected_view_data = {
+            "Дата заказа": deal_time,
+            "Дата отгрузки": delivery_date,
+            "Статус": "Черновик",
+            "Рабочая зона": f"room-pw{code}",
+            "Штат": f"robot-pw{code}",
+            "Клиент": f"natural_client-pw{code}",
+            "Тип оплаты": "Наличные деньги",
+        }
+        actual_view_data = {key: order_data.get(key) for key in expected_view_data}
+        assert actual_view_data == expected_view_data, (
+            f"Order view qiymatlari mos kelmadi.\nExpected: {expected_view_data}\nActual: {actual_view_data}"
+        )
 
     with allure.step("Order List: Edit Button"):
         flow_order_list(page, edit=True)

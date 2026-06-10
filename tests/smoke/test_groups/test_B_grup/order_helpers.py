@@ -13,6 +13,7 @@ from tests.smoke.flows.flow_order.flow_order_add import (
     flow_order_product_page,
 )
 from tests.smoke.flows.flow_order.flow_order_list import flow_open_order_list, flow_order_list
+from utils.base_page import BasePage
 
 B_GROUP_ORDER_INVOICE_REPORT_OPTIONS = [
     "Загрузочный лист",
@@ -237,29 +238,15 @@ def _save_visible_confirm_if_open(page: Page) -> None:
 
 
 def _input_by_label_text(page: Page, label: str, index: int = 0):
-    label_locator = page.get_by_text(label, exact=True).nth(index)
-    expect(label_locator).to_be_visible()
-    field = label_locator.locator(
-        "xpath=ancestor::*[contains(@class,'form-group') or contains(@class,'col') or contains(@class,'form-row')][1]"
-    )
-    if field.count() == 0:
-        field = label_locator.locator("xpath=..")
-    input_el = field.locator("input:not([type='checkbox']):not([type='radio'])").first
-    expect(input_el).to_be_visible()
-    return input_el
+    return BasePage(page).input_by_label_text(label, index)
 
 
 def _fill_input_by_label_text(page: Page, label: str, value: str, index: int = 0) -> None:
-    input_el = _input_by_label_text(page, label, index)
-    input_el.click()
-    input_el.press("ControlOrMeta+A")
-    input_el.press("Backspace")
-    input_el.fill(value)
-    input_el.press("Tab")
+    BasePage(page).fill_input_by_label_text(label, value, index)
 
 
 def _input_value_by_label_text(page: Page, label: str, index: int = 0) -> str:
-    return _input_by_label_text(page, label, index).input_value()
+    return BasePage(page).input_value_by_label_text(label, index)
 
 
 def _input_validation_state_by_label_text(page: Page, label: str, index: int = 0) -> dict[str, str]:
@@ -280,37 +267,6 @@ def _input_has_non_neutral_border_by_label_text(page: Page, label: str, neutral_
         except AssertionError:
             continue
     return True
-
-
-def _set_switch_by_label_text(page: Page, label: str, enabled: bool) -> None:
-    label_locator = page.get_by_text(label, exact=True).first
-    expect(label_locator).to_be_visible()
-    field = label_locator.locator(
-        "xpath=ancestor::*[contains(@class,'form-group') or contains(@class,'col') or contains(@class,'form-row')][1]"
-    )
-    if field.count() == 0:
-        field = label_locator.locator("xpath=..")
-    checkbox = field.locator("input[type='checkbox']").first
-    if checkbox.is_checked() != enabled:
-        switch = field.locator("[role='switch'], .switch span").first
-        if switch.count() > 0:
-            expect(switch).to_be_visible()
-            switch.click()
-        else:
-            expect(checkbox).to_be_visible()
-            checkbox.click()
-    expect(checkbox).to_be_checked() if enabled else expect(checkbox).not_to_be_checked()
-
-
-def _switch_checked_by_label_text(page: Page, label: str) -> bool:
-    label_locator = page.get_by_text(label, exact=True).first
-    expect(label_locator).to_be_visible()
-    field = label_locator.locator(
-        "xpath=ancestor::*[contains(@class,'form-group') or contains(@class,'col') or contains(@class,'form-row')][1]"
-    )
-    if field.count() == 0:
-        field = label_locator.locator("xpath=..")
-    return field.locator("input[type='checkbox']").first.is_checked()
 
 
 def _page_text_is_present(page: Page, text: str, timeout: int = 3_000) -> bool:
@@ -351,11 +307,16 @@ def _close_error_dialog(page: Page, expected_text: str | None = None) -> None:
 
 
 def _save_order_from_final_page(page: Page) -> None:
-    page.get_by_role("button", name="Сохранить").click()
-    confirm = page.get_by_role("dialog").filter(has=page.get_by_role("button", name="да"))
-    expect(confirm).to_be_visible()
-    confirm.get_by_role("button", name="да").click()
-    confirm.wait_for(state="hidden")
+    BasePage(page).save_and_expect_heading(
+        "Заказы",
+        action="Заказ final page -> Сохранить",
+        before_state="Заказ final page",
+        expected_state="Заказы list ochilishi",
+        confirm_text="",
+        # Order wizard save tugmasi ikonkali: exact accessible name mos kelmaydi
+        exact_button=False,
+        location_hint="tests/smoke/test_groups/test_B_grup/order_helpers.py::_save_order_from_final_page",
+    )
 
 
 def _assert_save_blocked_without_confirm(page: Page, expected_date: str | None = None) -> None:
@@ -431,19 +392,17 @@ def _open_order_settings(page: Page) -> None:
 
 def _enable_consignment_for_orders(page: Page) -> None:
     _open_order_settings(page)
+    base = BasePage(page)
 
-    _set_switch_by_label_text(page, "Разрешить выдачу консигнации", True)
+    base.set_switch_by_label_text("Разрешить выдачу консигнации", True)
     _fill_input_by_label_text(page, "Лимит консигнации (в днях)", "30")
-    if _input_value_by_label_text(page, "Лимит консигнации (в днях)") != "30":
-        raise AssertionError("Лимит консигнации (в днях) qiymati 30 bo'lmadi")
+    expect(_input_by_label_text(page, "Лимит консигнации (в днях)")).to_have_value("30")
 
     page.get_by_role("button", name="Сохранить").first.click()
     _save_visible_confirm_if_open(page)
 
-    if not _switch_checked_by_label_text(page, "Разрешить выдачу консигнации"):
-        raise AssertionError("Разрешить выдачу консигнации yoqilmadi")
-    if _input_value_by_label_text(page, "Лимит консигнации (в днях)") != "30":
-        raise AssertionError("Лимит консигнации (в днях) saqlangandan keyin 30 emas")
+    expect(base.switch_checkbox_by_label_text("Разрешить выдачу консигнации")).to_be_checked()
+    expect(_input_by_label_text(page, "Лимит консигнации (в днях)")).to_have_value("30")
 
 
 def _cancel_existing_client_orders_if_any(page: Page, code: str) -> None:
@@ -529,12 +488,10 @@ def run_b_group_create_order_with_consignment_limit(page: Page, code: str, save_
 
     with allure.step("6 - Konsignatsiya date/amount, tip oplati va status to'ldirilib saqlanadi"):
         _fill_input_by_label_text(page, "Дата оплаты по консигнации", expected_limit_date)
-        if _input_value_by_label_text(page, "Дата оплаты по консигнации") != expected_limit_date:
-            raise AssertionError("Дата оплаты по консигнации qiymati to'g'ri kiritilmadi")
+        expect(_input_by_label_text(page, "Дата оплаты по консигнации")).to_have_value(expected_limit_date)
 
         _fill_input_by_label_text(page, "Сумма консигнации", "35000")
-        if _input_value_by_label_text(page, "Сумма консигнации") != "35 000":
-            raise AssertionError("Сумма консигнации qiymati 35 000 formatiga kelmadi")
+        expect(_input_by_label_text(page, "Сумма консигнации")).to_have_value("35 000")
 
         flow_order_final_page(
             page,
@@ -619,36 +576,29 @@ def run_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_da
             page,
             "Общая сумма консигнаций не должна быть больше суммы заказа",
         )
-        if _input_value_by_label_text(page, "Дата оплаты по консигнации") != "":
-            raise AssertionError("Дата оплаты по консигнации clear bo'lmadi")
-        if _input_value_by_label_text(page, "Сумма консигнации") != "":
-            raise AssertionError("Сумма консигнации clear bo'lmadi")
+        expect(_input_by_label_text(page, "Дата оплаты по консигнации")).to_have_value("")
+        expect(_input_by_label_text(page, "Сумма консигнации")).to_have_value("")
         _expect_text_visible(page, "ИТОГО")
         _expect_text_visible(page, "28 000")
 
     with allure.step("5 - 30 kundan katta konsignatsiya sanasi save qilinmaydi"):
         _fill_input_by_label_text(page, "Дата оплаты по консигнации", invalid_date)
         _fill_input_by_label_text(page, "Сумма консигнации", "28000")
-        if _input_value_by_label_text(page, "Дата оплаты по консигнации") != invalid_date:
-            raise AssertionError("Invalid konsignatsiya sanasi inputga kiritilmadi")
-        if _input_value_by_label_text(page, "Сумма консигнации") != "28 000":
-            raise AssertionError("Invalid date tekshiruv summasi 28 000 formatiga kelmadi")
+        expect(_input_by_label_text(page, "Дата оплаты по консигнации")).to_have_value(invalid_date)
+        expect(_input_by_label_text(page, "Сумма консигнации")).to_have_value("28 000")
         _assert_save_blocked_without_confirm(page, expected_date=invalid_date)
         expect(page).to_have_url(re.compile(r".*/order\+edit"))
 
     with allure.step("6 - Konsignatsiya + orqali 2 ta sanaga bo'linadi"):
         _fill_input_by_label_text(page, "Дата оплаты по консигнации", first_split_date)
         _fill_input_by_label_text(page, "Сумма консигнации", "14000")
-        if _input_value_by_label_text(page, "Сумма консигнации") != "14 000":
-            raise AssertionError("Birinchi konsignatsiya summasi 14 000 formatiga kelmadi")
+        expect(_input_by_label_text(page, "Сумма консигнации")).to_have_value("14 000")
 
         _click_consignment_add_button(page)
         _fill_input_by_label_text(page, "Дата оплаты по консигнации", limit_date, index=1)
         _fill_input_by_label_text(page, "Сумма консигнации", "14000", index=1)
-        if _input_value_by_label_text(page, "Дата оплаты по консигнации", index=1) != limit_date:
-            raise AssertionError("Ikkinchi konsignatsiya sanasi to'g'ri kiritilmadi")
-        if _input_value_by_label_text(page, "Сумма консигнации", index=1) != "14 000":
-            raise AssertionError("Ikkinchi konsignatsiya summasi 14 000 formatiga kelmadi")
+        expect(_input_by_label_text(page, "Дата оплаты по консигнации", index=1)).to_have_value(limit_date)
+        expect(_input_by_label_text(page, "Сумма консигнации", index=1)).to_have_value("14 000")
 
     with allure.step("7 - Order save qilinadi"):
         _save_order_from_final_page(page)

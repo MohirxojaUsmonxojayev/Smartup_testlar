@@ -33,11 +33,15 @@ def flow_create_initial_balance(
         page.locator('input[ng-model="item.price"]').first.fill(price)
 
     with allure.step("Inventory: boshlang'ich qoldiqni saqlash"):
-        page.get_by_role("button", name="Сохранить").click()
-        BasePage(page).confirm_biruni("Сохранить?")
-        BasePage(page).wait_for_loader()
+        BasePage(page).save_and_expect_heading(
+            "Ввод начальных остатков ТМЦ",
+            action="Ввод начальных остатков ТМЦ (создание) -> Сохранить",
+            before_state="Ввод начальных остатков ТМЦ (создание)",
+            expected_state="Ввод начальных остатков ТМЦ list ochilishi",
+            confirm_text="Сохранить?",
+            location_hint="tests/smoke/flows/flow_inventory/flow_init_balance.py::flow_create_initial_balance",
+        )
         expect(page).to_have_url(re.compile(r".*/init_inventory_balance_list"))
-        expect(page.get_by_role("heading")).to_have_text("Ввод начальных остатков ТМЦ")
 
     with allure.step("Inventory: boshlang'ich qoldiq hujjatini o'tkazish"):
         BasePage(page).click_grid_row(document_number)

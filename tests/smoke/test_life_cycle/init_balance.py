@@ -32,11 +32,15 @@ def run_init_balance(page: Page, code, scope: str = "smoke") -> None:
         page.locator('input[ng-model="item.price"]').first.fill("5000")
 
     with allure.step("3 - Saqlash va tasdiqlash"):
-        page.get_by_role("button", name="Сохранить").click()
-        BasePage(page).confirm_biruni("Сохранить?")
-        BasePage(page).wait_for_loader()
+        BasePage(page).save_and_expect_heading(
+            "Ввод начальных остатков ТМЦ",
+            action="Ввод начальных остатков ТМЦ (создание) -> Сохранить",
+            before_state="Ввод начальных остатков ТМЦ (создание)",
+            expected_state="Ввод начальных остатков ТМЦ list ochilishi",
+            confirm_text="Сохранить?",
+            location_hint="tests/smoke/test_life_cycle/init_balance.py::run_init_balance",
+        )
         expect(page).to_have_url(re.compile(r".*/init_inventory_balance_list"))
-        expect(page.get_by_role("heading")).to_have_text("Ввод начальных остатков ТМЦ")
 
     with allure.step("4 - Hujjatni o'tkazish (провести)"):
         BasePage(page).click_grid_row(f"{code}")

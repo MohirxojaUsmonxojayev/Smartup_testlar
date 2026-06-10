@@ -84,8 +84,8 @@ Yechim: <nima qilish kerak>
 - Test yozish/debug iteratsiyasida precondition entity `data_store.json` da mavjud bo'lsa, masalan contract yaratilgan va code/name saqlangan bo'lsa, keyingi order xatosini tekshirish uchun contract testni qayta run qilish shart emas; mavjud qiymatdan foydalan.
 
 ### Form screenshot arxivi
-- Smartup formalarini debug qilganda avval `.agents/skills/smartup-guide/references/forms/screenshots/<form-slug>/` ichida shu forma uchun screenshot bor-yo'qligini tekshir.
-- Agar kerakli screenshot bo'lmasa yoki UI o'zgargan bo'lsa, formani ochib skill arxiviga saqla: `.agents/skills/smartup-guide/references/forms/screenshots/<form-slug>/<form-slug>__<state>__desktop-1920x1080.png`.
+- Smartup formalarini debug qilganda avval `skills/smartup-guide/references/forms/screenshots/<form-slug>/` ichida shu forma uchun screenshot bor-yo'qligini tekshir.
+- Agar kerakli screenshot bo'lmasa yoki UI o'zgargan bo'lsa, formani ochib skill arxiviga saqla: `skills/smartup-guide/references/forms/screenshots/<form-slug>/<form-slug>__<state>__desktop-1920x1080.png`.
 - `test-results/screens/smartup/` forma/debug screenshot arxivi uchun ishlatilmasin; `test-results/allure-results` faqat pytest/Allure failure attachment outputi.
 - Yangi formaga kirilganda yoki URL/form state o'zgarganda screenshotni skill arxivida yangilab borish keyingi locator/debug ishlari uchun majburiy odat bo'lsin.
 

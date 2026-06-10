@@ -106,10 +106,17 @@ def run_a_group_contract_limit_validation_and_valid_order(
         expect(page.locator("#kt_content")).to_contain_text(contract_name)
 
     with allure.step("7 - 7000 summali zakaz muvaffaqiyatli saqlanadi"):
-        page.get_by_role("button", name="Сохранить").click()
-        BasePage(page).confirm_biruni("Сохранить?")
+        BasePage(page).save_and_expect_heading(
+            "Заказы",
+            action="Заказ final page -> Сохранить",
+            before_state="Заказ final page",
+            expected_state="Заказы list ochilishi",
+            confirm_text="Сохранить?",
+            # Order wizard save tugmasi ikonkali: exact accessible name mos kelmaydi
+            exact_button=False,
+            location_hint="tests/smoke/test_groups/test_A_grup/test_order.py::run_a_group_contract_limit_validation_and_valid_order",
+        )
         expect(page).to_have_url(re.compile(r".*/order_list"))
-        expect(page.get_by_role("heading")).to_contain_text("Заказы")
 
     with allure.step("8 - Zakaz list va view oynasida contract bilan tekshiriladi"):
         expect(page.locator("b-grid")).to_contain_text("7 000")

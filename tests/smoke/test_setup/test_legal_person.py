@@ -6,6 +6,14 @@ from faker import Faker
 from playwright.sync_api import Page, expect
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
+from tests.smoke.flows.flow_form import (
+    assert_visible_page_text,
+    fill_input,
+    fill_textarea,
+    select_b_input_by_search,
+    select_tashkent_region,
+    set_checkbox,
+)
 from tests.smoke.flows.flow_navigate import navigate_to
 from tests.smoke.test_setup.test_natural_person import create_natural_person_record, natural_person_values
 from utils.base_page import BasePage
@@ -104,57 +112,6 @@ def _contact_person_values(code: str) -> dict[str, str]:
     }
 
 
-def _fill_input(page: Page, ng_model: str, value: str) -> None:
-    field = page.locator(f'input[ng-model="{ng_model}"]:visible').first
-    expect(field).to_be_visible()
-    field.fill(value)
-    expect(field).to_have_value(value)
-
-
-def _fill_textarea(page: Page, ng_model: str, value: str) -> None:
-    field = page.locator(f'textarea[ng-model="{ng_model}"]:visible').first
-    expect(field).to_be_visible()
-    field.fill(value)
-    expect(field).to_have_value(value)
-
-
-def _select_tashkent_region(page: Page) -> None:
-    search = page.locator('b-tree-select:visible input[ng-model="_$bTree.searchValue"]').first
-    expect(search).to_be_visible()
-    search.click()
-    search.fill("Ташкент")
-    hint = page.locator("b-tree-select:visible .hint").first
-    expect(hint).to_be_visible(timeout=5_000)
-
-    for option_text in ("город Ташкент", "Ташкент"):
-        options = (
-            hint.get_by_text(option_text, exact=True).first,
-            hint.locator("label").filter(has_text=option_text).first,
-            hint.locator(".jstree-anchor").filter(has_text=option_text).first,
-        )
-        for option in options:
-            try:
-                expect(option).to_be_visible(timeout=5_000)
-                option.click()
-                expect(search).to_have_value(re.compile("Ташкент"))
-                return
-            except (AssertionError, PlaywrightTimeoutError):
-                continue
-
-    raise AssertionError("Region option 'город Ташкент' not found")
-
-
-def _select_b_input_by_search(page: Page, ng_model: str, search_text: str, expected_value: str) -> None:
-    b_input = page.locator(f'b-input:has(input[ng-model="{ng_model}"])').first
-    search = b_input.get_by_placeholder("Поиск").first
-    search.click()
-    search.fill(search_text)
-    option = b_input.locator("div.hint").filter(has_text=search_text).first
-    expect(option).to_be_visible()
-    option.click()
-    expect(search).to_have_value(re.compile(re.escape(expected_value)))
-
-
 def _select_gps_coordinates(page: Page, search_value: str, expected_value: str) -> None:
     latlng = page.locator('input[ng-model="d.latlng"]').first
     expect(latlng).to_be_visible()
@@ -176,45 +133,6 @@ def _select_gps_coordinates(page: Page, search_value: str, expected_value: str) 
         pass
 
 
-def _modal_fill_input(modal, ng_model: str, value: str) -> None:
-    field = modal.locator(f'input[ng-model="{ng_model}"]:visible').first
-    expect(field).to_be_visible()
-    field.fill(value)
-    expect(field).to_have_value(value)
-
-
-def _modal_fill_textarea(modal, ng_model: str, value: str) -> None:
-    field = modal.locator(f'textarea[ng-model="{ng_model}"]:visible').first
-    expect(field).to_be_visible()
-    field.fill(value)
-    expect(field).to_have_value(value)
-
-
-def _modal_select_b_input_by_search(modal, ng_model: str, search_text: str, expected_value: str) -> None:
-    b_input = modal.locator(f'b-input:has(input[ng-model="{ng_model}"])').first
-    search = b_input.get_by_placeholder("Поиск").first
-    search.click()
-    search.fill(search_text)
-    option = b_input.locator("div.hint").filter(has_text=search_text).first
-    expect(option).to_be_visible()
-    option.click()
-    expect(search).to_have_value(re.compile(re.escape(expected_value)))
-
-
-def _modal_set_checkbox(modal, ng_model: str, checked: bool) -> None:
-    checkbox = modal.locator(f'input[ng-model="{ng_model}"]').first
-    if checkbox.is_checked() != checked:
-        control = checkbox.locator(
-            "xpath=ancestor::*[contains(@class,'checkbox') or contains(@class,'switch')][1]"
-        )
-        if control.count() > 0 and control.first.is_visible():
-            control.first.click()
-        else:
-            expect(checkbox).to_be_visible()
-            checkbox.click()
-    expect(checkbox).to_be_checked() if checked else expect(checkbox).not_to_be_checked()
-
-
 def _open_legal_person_add(page: Page) -> None:
     navigate_to(page, tab="Справочники", name="Юридические лица")
     expect(page.get_by_role("heading")).to_contain_text("Юридические лица")
@@ -223,48 +141,48 @@ def _open_legal_person_add(page: Page) -> None:
 
 
 def _fill_legal_person_main_fields(page: Page, values: dict[str, str]) -> None:
-    _fill_input(page, "d.code", values["code"])
-    _fill_input(page, "d.details.web", values["web"])
-    _fill_input(page, "d.details.barcode", values["barcode"])
-    _fill_input(page, "d.details.zip_code", values["zip_code"])
-    _fill_input(page, "d.name", values["name"])
-    _fill_input(page, "d.short_name", values["short_name"])
+    fill_input(page, "d.code", values["code"])
+    fill_input(page, "d.details.web", values["web"])
+    fill_input(page, "d.details.barcode", values["barcode"])
+    fill_input(page, "d.details.zip_code", values["zip_code"])
+    fill_input(page, "d.name", values["name"])
+    fill_input(page, "d.short_name", values["short_name"])
     expect(page.get_by_text("Активный")).to_be_visible()
-    _fill_input(page, "d.details.main_phone", values["phone"])
-    _fill_input(page, "d.details.telegram", values["telegram"])
-    _fill_input(page, "d.email", values["email"])
-    _select_tashkent_region(page)
-    _fill_textarea(page, "d.details.address", values["address"])
-    _fill_textarea(page, "d.details.post_address", values["post_address"])
-    _fill_input(page, "d.details.tin", values["tin"])
-    _fill_input(page, "d.details.cea", values["cea"])
-    _fill_input(page, "d.details.vat_code", values["vat_code"])
+    fill_input(page, "d.details.main_phone", values["phone"])
+    fill_input(page, "d.details.telegram", values["telegram"])
+    fill_input(page, "d.email", values["email"])
+    select_tashkent_region(page)
+    fill_textarea(page, "d.details.address", values["address"])
+    fill_textarea(page, "d.details.post_address", values["post_address"])
+    fill_input(page, "d.details.tin", values["tin"])
+    fill_input(page, "d.details.cea", values["cea"])
+    fill_input(page, "d.details.vat_code", values["vat_code"])
     _select_gps_coordinates(page, values["gps_search"], values["gps"])
-    _fill_textarea(page, "d.details.address_guide", values["address_guide"])
+    fill_textarea(page, "d.details.address_guide", values["address_guide"])
 
 
 def _fill_legal_person_smoke_fields(page: Page, values: dict[str, str]) -> None:
-    _fill_input(page, "d.code", values["code"])
-    _fill_input(page, "d.name", values["name"])
+    fill_input(page, "d.code", values["code"])
+    fill_input(page, "d.name", values["name"])
     expect(page.get_by_text("Активный")).to_be_visible()
 
 
 def _fill_legal_person_extra_tabs(page: Page, values: dict[str, str], director: dict[str, str]) -> None:
     page.locator("a:visible").filter(has_text="Примечание").first.click()
-    _fill_textarea(page, "d.details.note", values["note"])
+    fill_textarea(page, "d.details.note", values["note"])
 
     accountant_first_name = fake_ru.first_name_female()
     accountant_last_name = fake_ru.last_name_female()
     accountant_middle_name = fake_ru.middle_name_female()
 
     page.locator("a:visible").filter(has_text="Руководящие должности").first.click()
-    _fill_input(page, "d.details.director_first_name", director["first_name"])
-    _fill_input(page, "d.details.director_last_name", director["last_name"])
-    _fill_input(page, "d.details.director_middle_name", director["middle_name"])
-    _fill_input(page, "d.details.director_tin", director["tin"])
-    _fill_input(page, "d.details.accountant_first_name", accountant_first_name)
-    _fill_input(page, "d.details.accountant_last_name", accountant_last_name)
-    _fill_input(page, "d.details.accountant_middle_name", accountant_middle_name)
+    fill_input(page, "d.details.director_first_name", director["first_name"])
+    fill_input(page, "d.details.director_last_name", director["last_name"])
+    fill_input(page, "d.details.director_middle_name", director["middle_name"])
+    fill_input(page, "d.details.director_tin", director["tin"])
+    fill_input(page, "d.details.accountant_first_name", accountant_first_name)
+    fill_input(page, "d.details.accountant_last_name", accountant_last_name)
+    fill_input(page, "d.details.accountant_middle_name", accountant_middle_name)
 
     values["accountant_full_name"] = f"{accountant_last_name} {accountant_first_name} {accountant_middle_name}"
 
@@ -275,14 +193,14 @@ def _fill_bank_account_tab(page: Page, values: dict[str, str]) -> None:
 
     modal = page.locator(".modal.show").last
     expect(modal).to_be_visible()
-    _modal_fill_input(modal, "p.data.bank_account_name", values["name"])
-    _modal_fill_input(modal, "p.data.bank_code", values["mfo"])
+    fill_input(modal, "p.data.bank_account_name", values["name"])
+    fill_input(modal, "p.data.bank_code", values["mfo"])
     modal.locator('input[ng-model="p.data.bank_code"]').press("Tab")
     expect(modal.locator('input[ng-model="p.data.bank_name"]')).to_have_value(values["bank_name"])
-    _modal_fill_input(modal, "p.data.bank_account_code", values["account_code"])
-    _modal_set_checkbox(modal, "p.data.is_main", True)
-    _modal_select_b_input_by_search(modal, "p.data.currency_name", values["currency"], values["currency"])
-    _modal_fill_textarea(modal, "p.data.note", values["note"])
+    fill_input(modal, "p.data.bank_account_code", values["account_code"])
+    set_checkbox(modal, "p.data.is_main", True)
+    select_b_input_by_search(modal, "p.data.currency_name", values["currency"], expected_value=values["currency"])
+    fill_textarea(modal, "p.data.note", values["note"])
     modal.get_by_role("button", name="Создать и закрыть", exact=True).click()
     modal.wait_for(state="hidden")
     expect(page.get_by_text(values["account_code"]).first).to_be_visible()
@@ -298,26 +216,30 @@ def _fill_contact_person_tab(
 
     modal = page.locator(".modal.show").last
     expect(modal).to_be_visible()
-    _modal_fill_input(modal, "p.data.contact_name", contact_values["full_name"])
-    _modal_select_b_input_by_search(
+    fill_input(modal, "p.data.contact_name", contact_values["full_name"])
+    select_b_input_by_search(
         modal,
         "p.data.position_name",
         position_values["name"],
-        position_values["name"],
+        expected_value=position_values["name"],
     )
-    _modal_fill_input(modal, "p.data.phone_number", contact_values["phone"])
-    _modal_fill_input(modal, "p.data.birthday", contact_values["birthday"])
-    _modal_fill_textarea(modal, "p.data.note", contact_values["note"])
+    fill_input(modal, "p.data.phone_number", contact_values["phone"])
+    fill_input(modal, "p.data.birthday", contact_values["birthday"])
+    fill_textarea(modal, "p.data.note", contact_values["note"])
     modal.get_by_role("button", name="Создать и закрыть", exact=True).click()
     modal.wait_for(state="hidden")
     expect(page.get_by_text(contact_values["full_name"]).first).to_be_visible()
 
 
 def _save_add_form(page: Page, list_heading: str, confirm_text: str | None = "Сохранить") -> None:
-    page.get_by_role("button", name="Сохранить").click()
-    BasePage(page).confirm_biruni(confirm_text)
-    BasePage(page).wait_for_loader()
-    expect(page.get_by_role("heading")).to_contain_text(list_heading)
+    BasePage(page).save_and_expect_heading(
+        list_heading,
+        action="Юридическое лицо (создание) -> Сохранить",
+        before_state="Юридическое лицо (создание)",
+        expected_state=f"{list_heading} list ochilishi",
+        confirm_text=confirm_text,
+        location_hint="tests/smoke/test_setup/test_legal_person.py::_save_add_form",
+    )
 
 
 def _assert_legal_person_list_row(page: Page, values: dict[str, str], scope: str = "smoke") -> None:
@@ -342,12 +264,6 @@ def _open_selected_legal_person_view(page: Page, values: dict[str, str]) -> None
     expect(page.get_by_role("heading").filter(has_text="Юридическое лицо (просмотр)").first).to_be_visible()
 
 
-def _assert_visible_page_text(page: Page, *values: str) -> None:
-    content = page.locator("b-page")
-    for value in values:
-        expect(content).to_contain_text(value)
-
-
 def _open_view_tab(page: Page, tab_name: str) -> None:
     page.locator("a:visible").filter(has_text=tab_name).first.click()
     BasePage(page).wait_for_loader()
@@ -363,7 +279,7 @@ def _assert_legal_person_view(
     position_values: dict[str, str] | None,
 ) -> None:
     _open_view_tab(page, "Основная информация")
-    _assert_visible_page_text(
+    assert_visible_page_text(
         page,
         main_values["name"],
         main_values["short_name"],
@@ -374,7 +290,7 @@ def _assert_legal_person_view(
     )
 
     _open_view_tab(page, "Дополнительная информация")
-    _assert_visible_page_text(
+    assert_visible_page_text(
         page,
         director_values["full_name"],
         main_values["phone"],
@@ -391,7 +307,7 @@ def _assert_legal_person_view(
     )
 
     _open_view_tab(page, "Расчетный счет")
-    _assert_visible_page_text(
+    assert_visible_page_text(
         page,
         bank_values["bank_name"],
         bank_values["name"],
@@ -401,7 +317,7 @@ def _assert_legal_person_view(
     )
 
     _open_view_tab(page, "Контактные лица")
-    _assert_visible_page_text(
+    assert_visible_page_text(
         page,
         contact_values["full_name"],
         position_values["name"],
@@ -421,7 +337,7 @@ def _create_support_legal_person(page: Page, values: dict[str, str]) -> None:
     _open_legal_person_add(page)
     _fill_legal_person_main_fields(page, values)
     page.locator("a:visible").filter(has_text="Примечание").first.click()
-    _fill_textarea(page, "d.details.note", values["note"])
+    fill_textarea(page, "d.details.note", values["note"])
     _save_add_form(page, list_heading="Юридические лица")
 
 
@@ -439,11 +355,15 @@ def _create_contact_position(page: Page, values: dict[str, str]) -> None:
     add_button.click(force=True)
 
     expect(page.get_by_role("heading")).to_contain_text("Должности (создание)")
-    _fill_input(page, "d.name", values["name"])
-    _fill_input(page, "d.code", values["code"])
-    page.get_by_role("button", name="Сохранить").click()
-    BasePage(page).wait_for_loader()
-    expect(page.get_by_role("heading").filter(has_text="Юридическое лицо (создание)").first).to_be_visible()
+    fill_input(page, "d.name", values["name"])
+    fill_input(page, "d.code", values["code"])
+    BasePage(page).save_and_expect_heading(
+        "Юридическое лицо (создание)",
+        action="Должности (создание) -> Сохранить",
+        before_state="Должности (создание)",
+        expected_state="Юридическое лицо (создание) sahifasiga qaytish",
+        location_hint="tests/smoke/test_setup/test_legal_person.py::_create_contact_position",
+    )
     modal = page.locator(".modal.show").last
     try:
         expect(modal).to_be_visible(timeout=2_000)
@@ -518,8 +438,8 @@ def run_legal_person(page: Page, code, save_data=None, scope: str = "smoke") -> 
         _open_legal_person_add(page)
         if scope == "regression":
             _fill_legal_person_main_fields(page, main_values)
-            _select_b_input_by_search(page, "d.parent_person_name", owner_values["code"], owner_values["name"])
-            _select_b_input_by_search(page, "d.primary_person_name", director_values["code"], director_values["full_name"])
+            select_b_input_by_search(page, "d.parent_person_name", owner_values["code"], expected_value=owner_values["name"])
+            select_b_input_by_search(page, "d.primary_person_name", director_values["code"], expected_value=director_values["full_name"])
             _fill_bank_account_tab(page, bank_values)
             _fill_contact_person_tab(page, contact_values, position_values)
             _fill_legal_person_extra_tabs(page, main_values, director_values)

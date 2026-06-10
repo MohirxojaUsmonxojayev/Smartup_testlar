@@ -1,5 +1,12 @@
 # Codex uchun Ko'rsatmalar — Playwright Loyihasi
 
+## Bilim Bazasi — `skills/` (Yagona Ishonchli Manba)
+
+Barcha skilllar va Smartup domain bilimlari uchun **yagona source of truth** — repo root'idagi `skills/`. `.agents/skills/` (Codex) va `.claude/skills/` (Claude Code) — shu papkaga `../../skills/<name>` symlink qiluvchi entry-point'lar; ikkalasi ham aslida bir xil `skills/` faylini o'qiydi va yozadi, shuning uchun data bo'linmaydi.
+
+- **O'qish/Yozish:** Smartup bilimlari uchun `skills/smartup-guide/SKILL.md` (index) dan boshla; yangi bilim topilsa shu papkadagi mos `references/...` yoki `references/forms/<slug>.md` ga yoz. Forma screenshotlari `skills/smartup-guide/references/forms/screenshots/<slug>/` ichida.
+- **Yangi skill qo'shish:** papkani `skills/<name>/` ichida yarat, so'ng ikkala entry-point'da symlink qo'sh — `.agents/skills/<name> -> ../../skills/<name>` va `.claude/skills/<name> -> ../../skills/<name>`.
+
 ## Avtomatik O'rganish
 
 Foydalanuvchi quyidagi narsalarni aytganda `/learn` skillini **o'zing, so'ralmay** ishlat:

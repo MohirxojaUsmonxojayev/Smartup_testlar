@@ -162,8 +162,13 @@ def run_user(page: Page, code, scope: str = "smoke") -> None:
         expect(page.get_by_text("Админ", exact=True)).to_be_visible()
 
     with allure.step("3 - Saqlash va ro'yxatda tekshirish"):
-        page.get_by_role("button", name="Сохранить").click()
-        expect(page.get_by_role("heading")).to_contain_text("Пользователи")
+        BasePage(page).save_and_expect_heading(
+            "Пользователи",
+            action="Пользователь (создание) -> Сохранить",
+            before_state="Пользователь (создание)",
+            expected_state="Пользователи list ochilishi",
+            location_hint="tests/smoke/test_setup/test_user.py::run_user",
+        )
         expect(page.get_by_text(f"natural_person-pw{code}").first).to_be_visible()
         expect(page.get_by_text(user_email_for(code))).to_be_visible()
 
@@ -236,9 +241,14 @@ def run_role(page: Page, scope: str = "smoke") -> None:
             clicked += 1
 
     with allure.step("3 - Saqlash va natijani tekshirish"):
-        page.get_by_role("button", name="Сохранить").click()
-        BasePage(page).wait_for_loader(timeout=600_000)
-        expect(page.get_by_role("heading")).to_contain_text("Роли")
+        BasePage(page).save_and_expect_heading(
+            "Роли",
+            action="Роль (изменение) -> Сохранить",
+            before_state="Роль (изменение)",
+            expected_state="Роли list ochilishi",
+            timeout=600_000,
+            location_hint="tests/smoke/test_setup/test_user.py::run_role",
+        )
 
 # ----------------------------------------------------------------------------------------------------------------------
 

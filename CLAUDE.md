@@ -1,13 +1,13 @@
 # Claude uchun Ko'rsatmalar — Playwright Loyihasi
 
-## Bilim Bazasi — `.agents` (Yagona Ishonchli Manba)
+## Bilim Bazasi — `skills/` (Yagona Ishonchli Manba)
 
-Smartup domain bilimlari uchun **yagona source of truth** — `.agents/skills/`. Doim shu yerdan **o'qi va shu yerga yoz**:
+Barcha skilllar va Smartup domain bilimlari uchun **yagona source of truth** — repo root'idagi `skills/`. `.claude/skills/` (Claude Code) va `.agents/skills/` (Codex) — shu papkaga `../../skills/<name>` symlink qiluvchi entry-point'lar; ikkalasi ham aslida bir xil `skills/` faylini o'qiydi va yozadi, shuning uchun data bo'linmaydi. Doim `skills/` ni manba deb bil:
 
-- **O'qish:** Smartup sahifa, forma, contract, order, locator, modal, grid yoki UI xatti-harakati ustida ishlashdan oldin avval `.agents/skills/smartup-guide/SKILL.md` ni (index) o'qi, so'ng kerakli `references/...` yoki forma uchun `references/forms/<slug>.md` dossierini o'qi.
-- **Yozish:** Yangi biznes qoida, UI xatti-harakati, locator yoki xato sababi topilsa — uni `.agents/skills/smartup-guide/` ichidagi mos reference yoki form dossier fayliga yoz (boshqa joyga emas). Forma screenshotlari `references/forms/screenshots/<slug>/` ichida arxivlanadi.
+- **O'qish:** Smartup sahifa, forma, contract, order, locator, modal, grid yoki UI xatti-harakati ustida ishlashdan oldin avval `skills/smartup-guide/SKILL.md` ni (index) o'qi, so'ng kerakli `references/...` yoki forma uchun `references/forms/<slug>.md` dossierini o'qi.
+- **Yozish:** Yangi biznes qoida, UI xatti-harakati, locator yoki xato sababi topilsa — uni `skills/smartup-guide/` ichidagi mos reference yoki form dossier fayliga yoz (boshqa joyga emas). Forma screenshotlari `skills/smartup-guide/references/forms/screenshots/<slug>/` ichida arxivlanadi.
 - `smartup-guide` Skill tool ro'yxatida bo'lmasligi mumkin — shunda ham yuqoridagi fayllarni to'g'ridan-to'g'ri Read bilan o'qi.
-- `.claude/skills/` va `.agents/skills/` da bir xil skill nusxalari farq qilsa, **`.agents` ustun**.
+- **Yangi skill qo'shish:** papkani `skills/<name>/` ichida yarat, so'ng ikkala entry-point'da symlink qo'sh — `.claude/skills/<name> -> ../../skills/<name>` va `.agents/skills/<name> -> ../../skills/<name>`.
 
 ## Avtomatik O'rganish
 

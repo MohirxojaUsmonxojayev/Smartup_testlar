@@ -32,8 +32,13 @@ def run_room(page: Page, code, scope: str = "smoke") -> None:
         expect(page.get_by_text("Активный").first).to_be_visible()
 
     with allure.step("3 - Saqlash va ro'yxatda tekshirish"):
-        page.get_by_role("button", name="Сохранить").click()
-        expect(page.get_by_role("heading")).to_contain_text("Рабочие зоны")
+        BasePage(page).save_and_expect_heading(
+            "Рабочие зоны",
+            action="Рабочая зона (создание) -> Сохранить",
+            before_state="Рабочая зона (создание)",
+            expected_state="Рабочие зоны list ochilishi",
+            location_hint="tests/smoke/test_setup/test_room.py::run_room",
+        )
         expect(page.get_by_text(f"room-pw{code}")).to_be_visible()
         expect(page.get_by_text(f"code_room_pw{code}")).to_be_visible()
 

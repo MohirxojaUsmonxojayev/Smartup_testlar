@@ -15,7 +15,7 @@ from tests.smoke.flows.flow_navigate import navigate_to
 from utils.base_page import BasePage
 
 
-ARCHIVE_DIR = ROOT / ".agents/skills/smartup-guide/references/forms/screenshots/legal-person"
+ARCHIVE_DIR = ROOT / "skills/smartup-guide/references/forms/screenshots/legal-person"
 
 
 def sanitize(value: str) -> str:
@@ -34,7 +34,7 @@ def save_state(page, name: str, states: dict) -> None:
     page.screenshot(path=str(screenshot), full_page=True)
     states[name] = {
         "url": page.url,
-        "screenshot": str(screenshot.relative_to(ROOT / ".agents/skills/smartup-guide")),
+        "screenshot": str(screenshot.relative_to(ROOT / "skills/smartup-guide")),
         "body": page.evaluate("document.body.innerText"),
     }
 

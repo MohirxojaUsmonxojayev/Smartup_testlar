@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:
 
 from _debug_env import add_company_args, configure_company_env
 
-ARCHIVE_DIR = ROOT / ".agents/skills/smartup-guide/references/forms/screenshots/user"
+ARCHIVE_DIR = ROOT / "skills/smartup-guide/references/forms/screenshots/user"
 
 
 def collect_b_inputs(page) -> list[dict]:

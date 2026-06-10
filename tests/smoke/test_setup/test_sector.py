@@ -1,6 +1,7 @@
 import allure
 from playwright.sync_api import Page, expect
 from tests.smoke.flows.flow_navigate import navigate_to
+from utils.base_page import BasePage
 
 pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("Sector")]
 
@@ -22,8 +23,13 @@ def run_sector(page: Page, code, scope: str = "smoke") -> None:
         page.get_by_text(f"room-pw{code}").click()
 
     with allure.step("3 - Saqlash va ro'yxatda tekshirish"):
-        page.get_by_role("button", name="Сохранить").click()
-        expect(page.get_by_role("heading")).to_contain_text("Наборы ТМЦ")
+        BasePage(page).save_and_expect_heading(
+            "Наборы ТМЦ",
+            action="Набор ТМЦ (создание) -> Сохранить",
+            before_state="Набор ТМЦ (создание)",
+            expected_state="Наборы ТМЦ list ochilishi",
+            location_hint="tests/smoke/test_setup/test_sector.py::run_sector",
+        )
         expect(page.locator("b-grid")).to_contain_text(f"code_sector_pw{code}")
         expect(page.locator("b-grid")).to_contain_text(f"sector-pw{code}")
 

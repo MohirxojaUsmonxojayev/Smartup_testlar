@@ -95,7 +95,7 @@ def test_XX_<nomi>(session_page: Page, code):
 - Test add qilgan har bir element list formada ham, view formada ham ko'ringanini tekshirishi shart.
 - Agar qo'shilgan elementni list formadan topish uchun kerakli ustun yoki search yo'q bo'lsa, grid settingdan kerakli ustunni va shu ustun bo'yicha searchni yoq; Smartup listlarida bu umumiy pattern.
 - Add formaga kiritiladigan nom, kompaniya, shaxs, manzil kabi biznes qiymatlarni mantiqan `Faker` bilan generatsiya qil; testda qidirish/bog'lash oson bo'lishi uchun kerakli joyda `code` yoki saqlangan entity code qo'shimchasini saqla.
-- Smartup test yozish jarayonida yangi formaga kirilganda yoki URL/form state o'zgarganda screenshotni `.agents/skills/smartup-guide/references/forms/screenshots/<form-slug>/` ichiga saqla; `test-results/screens/smartup/` forma arxivi uchun ishlatilmasin.
+- Smartup test yozish jarayonida yangi formaga kirilganda yoki URL/form state o'zgarganda screenshotni `skills/smartup-guide/references/forms/screenshots/<form-slug>/` ichiga saqla; `test-results/screens/smartup/` forma arxivi uchun ishlatilmasin.
 - Natural Person alohida entity flow/test hisoblanadi; Legal Person regressionda director natural person kerak bo'lsa Natural Person helperini import qilib ishlatadi, natural person locator/fill/assert logikasini Legal Person ichida dublikat qilmaydi.
 
 ### Smoke va Regression farqi

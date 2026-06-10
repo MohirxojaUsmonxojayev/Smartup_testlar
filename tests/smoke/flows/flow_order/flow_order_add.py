@@ -124,8 +124,17 @@ def flow_order_final_page(page, check_form=False, payment_type=None, natural_cli
 
     if save:
         with allure.step("Final Page: Order save qilish"):
-            page.get_by_role("button", name="Сохранить").click()
-            BasePage(page).confirm_biruni("Сохранить?")
+            BasePage(page).save_and_expect_heading(
+                "Заказы",
+                action="Заказ final page -> Сохранить",
+                before_state="Заказ final page",
+                expected_state="Заказы list ochilishi",
+                confirm_text="Сохранить?",
+                # Order wizard tugmasida fa-save ikonka bor: ::before glyph accessible name'ga
+                # qo'shilib exact match buziladi, shuning uchun exact_button=False
+                exact_button=False,
+                location_hint="tests/smoke/flows/flow_order/flow_order_add.py::flow_order_final_page",
+            )
 
 # ----------------------------------------------------------------------------------------------------------------------
 

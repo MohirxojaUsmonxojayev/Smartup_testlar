@@ -12,7 +12,7 @@ if str(ROOT) not in sys.path:
 
 from _debug_env import add_company_args, configure_company_env
 
-ARCHIVE_DIR = ROOT / ".agents/skills/smartup-guide/references/forms/screenshots/company"
+ARCHIVE_DIR = ROOT / "skills/smartup-guide/references/forms/screenshots/company"
 
 
 def visible_texts(locator, limit: int = 50) -> list[str]:

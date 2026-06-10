@@ -6,6 +6,12 @@ from faker import Faker
 from playwright.sync_api import Page, expect
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
+from tests.smoke.flows.flow_form import (
+    assert_visible_page_text,
+    fill_input,
+    fill_textarea,
+    select_tashkent_region,
+)
 from tests.smoke.flows.flow_navigate import navigate_to, switch_filial
 from utils.base_page import BasePage
 
@@ -65,49 +71,9 @@ def natural_person_values(
     }
 
 
-def _fill_input(page: Page, ng_model: str, value: str) -> None:
-    field = page.locator(f'input[ng-model="{ng_model}"]:visible').first
-    expect(field).to_be_visible()
-    field.fill(value)
-    expect(field).to_have_value(value)
-
-
-def _fill_textarea(page: Page, ng_model: str, value: str) -> None:
-    field = page.locator(f'textarea[ng-model="{ng_model}"]:visible').first
-    expect(field).to_be_visible()
-    field.fill(value)
-    expect(field).to_have_value(value)
-
-
 def _fill_optional_input(page: Page, ng_model: str, value: str) -> None:
     if value:
-        _fill_input(page, ng_model, value)
-
-
-def _select_tashkent_region(page: Page) -> None:
-    search = page.locator('b-tree-select:visible input[ng-model="_$bTree.searchValue"]').first
-    expect(search).to_be_visible()
-    search.click()
-    search.fill("Ташкент")
-    hint = page.locator("b-tree-select:visible .hint").first
-    expect(hint).to_be_visible(timeout=5_000)
-
-    for option_text in ("город Ташкент", "Ташкент"):
-        options = (
-            hint.get_by_text(option_text, exact=True).first,
-            hint.locator("label").filter(has_text=option_text).first,
-            hint.locator(".jstree-anchor").filter(has_text=option_text).first,
-        )
-        for option in options:
-            try:
-                expect(option).to_be_visible(timeout=5_000)
-                option.click()
-                expect(search).to_have_value(re.compile("Ташкент"))
-                return
-            except (AssertionError, PlaywrightTimeoutError):
-                continue
-
-    raise AssertionError("Region option 'город Ташкент' not found")
+        fill_input(page, ng_model, value)
 
 
 def open_natural_person_list(page: Page) -> None:
@@ -122,29 +88,29 @@ def _open_natural_person_add(page: Page) -> None:
 
 def _fill_natural_person_name_fields(page: Page, values: dict[str, str]) -> None:
     _fill_optional_input(page, "d.last_name", values["last_name"])
-    _fill_input(page, "d.first_name", values["first_name"])
+    fill_input(page, "d.first_name", values["first_name"])
     _fill_optional_input(page, "d.middle_name", values["middle_name"])
 
 
 def _fill_natural_person_smoke_fields(page: Page, values: dict[str, str]) -> None:
     _fill_natural_person_name_fields(page, values)
-    _fill_input(page, "d.code", values["code"])
+    fill_input(page, "d.code", values["code"])
     expect(page.get_by_text("Активный")).to_be_visible()
 
 
 def _fill_natural_person_regression_fields(page: Page, values: dict[str, str]) -> None:
     _fill_natural_person_smoke_fields(page, values)
-    _fill_input(page, "d.birthday", values["birthday"])
-    _fill_input(page, "d.passport_series", values["passport_series"])
-    _fill_input(page, "d.passport_digits", values["passport_digits"])
-    _select_tashkent_region(page)
-    _fill_textarea(page, "d.address", values["address"])
-    _fill_textarea(page, "d.post_address", values["post_address"])
-    _fill_input(page, "d.main_phone", values["phone"])
-    _fill_input(page, "d.tin", values["tin"])
-    _fill_input(page, "d.telegram", values["telegram"])
-    _fill_input(page, "d.email", values["email"])
-    _fill_input(page, "d.web", values["web"])
+    fill_input(page, "d.birthday", values["birthday"])
+    fill_input(page, "d.passport_series", values["passport_series"])
+    fill_input(page, "d.passport_digits", values["passport_digits"])
+    select_tashkent_region(page)
+    fill_textarea(page, "d.address", values["address"])
+    fill_textarea(page, "d.post_address", values["post_address"])
+    fill_input(page, "d.main_phone", values["phone"])
+    fill_input(page, "d.tin", values["tin"])
+    fill_input(page, "d.telegram", values["telegram"])
+    fill_input(page, "d.email", values["email"])
+    fill_input(page, "d.web", values["web"])
 
 
 def fill_natural_person_add_form(
@@ -163,10 +129,14 @@ def fill_natural_person_add_form(
 
 
 def _save_natural_person_add(page: Page) -> None:
-    page.get_by_role("button", name="Сохранить").click()
-    BasePage(page).confirm_biruni()
-    BasePage(page).wait_for_loader()
-    expect(page.get_by_role("heading")).to_contain_text("Физические лица")
+    BasePage(page).save_and_expect_heading(
+        "Физические лица",
+        action="Физическое лицо (создание) -> Сохранить",
+        before_state="Физическое лицо (создание)",
+        expected_state="Физические лица list ochilishi",
+        confirm_text="",
+        location_hint="tests/smoke/test_setup/test_natural_person.py::_save_natural_person_add",
+    )
 
 
 def assert_natural_person_list_row(
@@ -209,18 +179,11 @@ def _open_natural_person_view(page: Page, values: dict[str, str]) -> None:
     expect(page.get_by_role("heading").filter(has_text="Физическое лицо (просмотр)").first).to_be_visible()
 
 
-def _assert_visible_page_text(page: Page, *values: str) -> None:
-    content = page.locator("b-page")
-    for value in values:
-        if value:
-            expect(content).to_contain_text(value)
-
-
 def _assert_natural_person_view(page: Page, values: dict[str, str], scope: str = "smoke") -> None:
-    _assert_visible_page_text(page, values["full_name"], "Активный")
+    assert_visible_page_text(page, values["full_name"], "Активный")
 
     if scope == "regression":
-        _assert_visible_page_text(
+        assert_visible_page_text(
             page,
             values["code"],
             values["birthday"],

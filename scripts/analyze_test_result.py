@@ -104,6 +104,8 @@ def _is_technical_target(target: str) -> bool:
 
 
 def _error_type(message: str) -> str:
+    if "Smartup transition failed" in message:
+        return "SmartupTransitionError"
     if "TimeoutError" in message:
         return "TimeoutError"
     if "AssertionError" in message:
@@ -233,7 +235,44 @@ def _failed_step_info(item: dict[str, Any]) -> dict[str, Any]:
     return {"inner_test": "", "failed_step": "", "failed_step_short": ""}
 
 
+def _structured_failure_details(text: str) -> dict[str, str]:
+    if "Smartup transition failed" not in text:
+        return {}
+
+    labels = {
+        "before_page": "Before page",
+        "action": "Action",
+        "expected": "Expected",
+        "actual": "Actual",
+        "ui_error": "UI error",
+        "location_hint": "Location hint",
+    }
+    details: dict[str, str] = {"kind": "Smartup transition failed"}
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("E "):
+            line = line[2:].strip()
+        if line.startswith("AssertionError:"):
+            line = line.split(":", 1)[1].strip()
+        for key, label in labels.items():
+            prefix = f"{label}:"
+            if line.startswith(prefix):
+                details[key] = line[len(prefix):].strip()
+                break
+    return details
+
+
 def _human_reason(message: str) -> str:
+    structured = _structured_failure_details(message)
+    if structured:
+        action = structured.get("action") or "save/transition action"
+        actual = structured.get("actual") or "expected state ochilmadi"
+        ui_error = structured.get("ui_error") or ""
+        reason = f"{action} vaqtida transition bajarilmadi. Actual: {actual}."
+        if ui_error:
+            reason += f" UI error: {ui_error}"
+        return _truncate(reason, 500)
+
     timeout = _timeout_text(message)
     target = _waited_target(message)
     if target and not _is_technical_target(target):
@@ -270,6 +309,11 @@ def _human_reason(message: str) -> str:
 
 
 def _human_next_action(message: str) -> str:
+    structured = _structured_failure_details(message)
+    if structured:
+        if structured.get("ui_error"):
+            return "Save bosilgan formadagi Biruni/UI error textni tekshir; test keyingi list/view kutishdan oldin shu error sabab to'xtagan."
+        return "Save bosilgandan keyingi transitionni tekshir: forma yopildimi, confirm bosildimi, loader tugadimi va expected list/view ochildimi."
     if "Timeout" in message and "Locator" in message:
         return "Allure screenshot/trace orqali sahifa to'g'ri ochilganini tekshir; element nomi o'zgargan bo'lsa locatorni yangila yoki kerakli kutishni qo'sh."
     if "Page.goto: Timeout" in message:
@@ -290,25 +334,32 @@ def _human_impact(item: dict[str, Any], skipped_count: int) -> str:
 
 def _humanize_failure(item: dict[str, Any], skipped_count: int) -> dict[str, Any]:
     message = str(item.get("message") or "")
-    trace_source = _inner_source_from_trace(str(item.get("trace") or ""))
+    trace = str(item.get("trace") or "")
+    structured = _structured_failure_details(f"{message}\n{trace}")
+    trace_source = _inner_source_from_trace(trace)
     step_info = _failed_step_info(item)
     runner_test = _runner_test(item)
     return {
         "name": item.get("name") or item.get("fullName") or "unknown",
         "status": item.get("status") or "unknown",
         "message": _truncate(message, 700),
-        "error_type": _error_type(message),
+        "error_type": _error_type(f"{message}\n{trace}"),
         "group": _group_name(item, runner_test),
         "runner_test": runner_test,
-        "location": trace_source.get("source") or _location(item),
+        "location": structured.get("location_hint") or trace_source.get("source") or _location(item),
         "source": trace_source.get("source") or "",
         "source_function": trace_source.get("function") or "",
         "inner_test": step_info.get("inner_test") or "",
         "failed_step": step_info.get("failed_step") or "",
         "failed_step_short": step_info.get("failed_step_short") or "",
-        "reason": _human_reason(message),
+        "before_page": structured.get("before_page") or "",
+        "action": structured.get("action") or "",
+        "expected": structured.get("expected") or "",
+        "actual": structured.get("actual") or "",
+        "ui_error": structured.get("ui_error") or "",
+        "reason": _human_reason(f"{message}\n{trace}"),
         "impact": _human_impact(item, skipped_count),
-        "next_action": _human_next_action(message),
+        "next_action": _human_next_action(f"{message}\n{trace}"),
     }
 
 
@@ -547,6 +598,11 @@ def render_markdown(
                     f"- Runner test: `{item.get('runner_test', '')}`",
                     f"- Inner test: `{item.get('inner_test', '')}`",
                     f"- Failed step: `{item.get('failed_step', '')}`",
+                    f"- Before page: `{item.get('before_page', '')}`",
+                    f"- Action: `{item.get('action', '')}`",
+                    f"- Expected: `{item.get('expected', '')}`",
+                    f"- Actual: `{item.get('actual', '')}`",
+                    f"- UI error: `{item.get('ui_error', '')}`",
                     f"- Error type: `{item.get('error_type', 'unknown')}`",
                     f"- Location: `{item.get('location', 'unknown')}`",
                     f"- Reason: {item.get('reason', '')}",

@@ -52,7 +52,8 @@ Tags: biruni, error, modal
 - Close button: `#biruniAlertExtended button.close`.
 - Qoida: ba'zan `Закрыть` textli button yo'q.
 - Qoida: Modal yopilmasa menu/list clicklari intercept bo'lishi mumkin.
-- Kelajak flow: error kutish, text tekshirish va modal yopish umumiy helper/flow bo'lishi kerak.
+- Save/transition debug: `Сохранить` bosilgandan keyin list/view heading kutishdan oldin umumiy Biruni error modal tekshirilsin; aks holda haqiqiy xato add/edit formdagi save error bo'lsa ham test keyingi list/viewda timeout bo'lgandek ko'rinadi.
+- Testda ishlatish: save helper xabari aralash formatda `Before page`, `Action`, `Expected`, `Actual`, `UI error`, `Location hint` maydonlarini chiqarsin.
 
 ### List va Grid Setting
 Tags: list, grid, search, column
@@ -65,7 +66,7 @@ Tags: list, grid, search, column
 Tags: screenshot, debug, url
 - Screenshotlar kelajakdagi visual regression/baseline taqqoslashga tayyor formatda saqlansin.
 - Saqlash joylari:
-  - `.agents/skills/smartup-guide/references/forms/screenshots/<form-slug>/` — forma bo'yicha doimiy screenshot va metadata arxivi.
+  - `skills/smartup-guide/references/forms/screenshots/<form-slug>/` — forma bo'yicha doimiy screenshot va metadata arxivi.
   - `test-results/allure-results/` — faqat pytest/Allure failure attachment outputi; forma bilim arxivi sifatida ishlatilmaydi.
   - `test-results/screens/smartup/` — ishlatilmasin, chunki run output tozalanishi mumkin va skill bilim manbasi emas.
 - Naming: `<form-slug>__<state>__<viewport>__<stable-id>.png`.
@@ -84,3 +85,16 @@ Tags: screenshot, debug, url
 - Qoida: yangi formaga kirilganda yoki URL/form state sezilarli o'zgarganda skill arxividagi screenshotni yangilab bor.
 - Debug tartibi: muammo chiqqanda avval mavjud screenshotlardan qaraladi; kerakli screen yo'q bo'lsa UI ochilib yangi screenshot olinadi.
 - Release visual check qo'shilganda current screenshot baseline bilan solishtiriladi; shuning uchun screenshotlar random modal/loader/dropdown ochiq holda emas, barqaror UI state’da olinishi kerak.
+
+### Umumiy Forma Helper'lari (DRY)
+Tags: locator, form, helper, setup
+- Qayerda: `tests/smoke/flows/flow_form.py` va `utils/base_page.py`.
+- Qoida: ng-model asosidagi forma amallari uchun yangi helper yozilmasin — `flow_form.py` dagi tayyorlari ishlatilsin: `fill_input`, `fill_textarea`, `set_checkbox`, `select_b_input_by_search`, `select_tashkent_region`, `assert_visible_page_text`. `root` sifatida `page` ham, modal locator (`.modal.show`) ham beriladi — alohida `_modal_*` variant kerak emas.
+- Qoida: label matni orqali input/switch bilan ishlash `BasePage` metodlari orqali: `input_by_label_text`, `fill_input_by_label_text`, `input_value_by_label_text`, `set_switch_by_label_text`, `switch_checkbox_by_label_text`, `switch_checked_by_label_text`.
+- Testda ishlatish: input qiymatini tekshirishda `input_value(...) != x` deb raise qilish o'rniga `expect(input_by_label_text(...)).to_have_value(x)` ishlatilsin — auto-retry bo'ladi.
+
+### Order Wizard Save Tugmasi — Exact Role Name Mos Kelmaydi
+Tags: order, locator, error
+- Qayerda: `order+add`/`order+edit` wizard, 3-step (Завершение). Tugma: `#anor279-button-next_step` — step 1-2 da "Далее", oxirgi stepda "Сохранить" ko'rsatadi.
+- Qoida: tugma ichida `<i class="fa fa-save">` ikonka bor; FontAwesome `::before` glyph accessible name'ga qo'shiladi, shuning uchun `get_by_role("button", name="Сохранить", exact=True)` 0 ta element topadi ("element(s) not found"). Exact'siz (substring) qidiruv topadi.
+- Testda ishlatish: order final page save uchun `save_and_expect_heading(..., exact_button=False)` ishlatilsin. Oddiy toolbar save tugmalari (setup/contract formalari, `b-toolbar` ichidagi matnli tugma) ikonkasiz — ularda default `exact_button=True` ishlayveradi.

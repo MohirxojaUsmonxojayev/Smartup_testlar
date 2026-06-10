@@ -14,7 +14,7 @@ from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_navigate import navigate_to
 from utils.base_page import BasePage
 
-ARCHIVE_DIR = ROOT / ".agents/skills/smartup-guide/references/forms/screenshots/filial"
+ARCHIVE_DIR = ROOT / "skills/smartup-guide/references/forms/screenshots/filial"
 
 
 def visible_texts(page, selector: str) -> list[str]:

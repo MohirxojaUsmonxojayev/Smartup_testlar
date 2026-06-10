@@ -13,7 +13,7 @@ from _debug_env import add_company_args, configure_company_env
 from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_navigate import navigate_to
 
-ARCHIVE_DIR = ROOT / ".agents/skills/smartup-guide/references/forms/screenshots/filial"
+ARCHIVE_DIR = ROOT / "skills/smartup-guide/references/forms/screenshots/filial"
 
 
 def collect_fields(page):

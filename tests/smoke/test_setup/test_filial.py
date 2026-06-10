@@ -2,6 +2,7 @@ import re
 
 import allure
 from playwright.sync_api import Page, expect
+from tests.smoke.flows.flow_form import fill_input, select_b_input_by_search, set_checkbox
 from tests.smoke.flows.flow_navigate import navigate_to
 from utils.base_page import BasePage
 
@@ -129,48 +130,6 @@ def _close_filial_view(page: Page) -> None:
     expect(page.get_by_role("heading")).to_contain_text("Организации")
 
 
-def _fill_input(page: Page, ng_model: str, value: str) -> None:
-    field = page.locator(f'input[ng-model="{ng_model}"]:visible').first
-    expect(field).to_be_visible()
-    field.fill(value)
-    expect(field).to_have_value(value)
-
-
-def _set_checkbox(page: Page, ng_model: str, checked: bool) -> None:
-    checkbox = page.locator(f'input[ng-model="{ng_model}"]').first
-    if checkbox.is_checked() != checked:
-        control = checkbox.locator(
-            "xpath=ancestor::*[contains(@class,'checkbox') or contains(@class,'switch')][1]"
-        )
-        if control.count() > 0 and control.first.is_visible():
-            control.first.click()
-        else:
-            expect(checkbox).to_be_visible()
-            checkbox.click()
-    expect(checkbox).to_be_checked() if checked else expect(checkbox).not_to_be_checked()
-
-
-def _select_b_input_by_search(
-    page: Page,
-    ng_model: str,
-    search_text: str,
-    option_text: str,
-    expected_value: str | None = None,
-) -> None:
-    b_input = page.locator(f'b-input:has(input[ng-model="{ng_model}"])').first
-    search = b_input.get_by_placeholder("Поиск").first
-    expect(search).to_be_visible()
-    search.click()
-    search.fill(search_text)
-    option = b_input.locator("div.hint").get_by_text(option_text, exact=True).first
-    expect(option).to_be_visible()
-    option.click()
-    if expected_value:
-        expect(search).to_have_value(re.compile(re.escape(expected_value)))
-    else:
-        expect(search).to_have_value(re.compile(r".+"))
-
-
 def _fill_filial_regression_fields(page: Page, code: str) -> dict[str, str]:
     order_no = str(int(code))
     timezone_name = "(+05:00) Ташкент"
@@ -178,17 +137,17 @@ def _fill_filial_regression_fields(page: Page, code: str) -> dict[str, str]:
     vat_percent = "12"
 
     with allure.step("2.1 - Regression: mavjud filial add maydonlarini to'ldirish"):
-        _select_b_input_by_search(
+        select_b_input_by_search(
             page,
             ng_model="d.timezone_name",
             search_text="Ташкент",
             option_text=timezone_code,
             expected_value="Ташкент",
         )
-        _fill_input(page, "d.order_no", order_no)
-        _set_checkbox(page, "d.vat_enabled", True)
-        _fill_input(page, "d.vat_percent", vat_percent)
-        _set_checkbox(page, "d.excise_enabled", True)
+        fill_input(page, "d.order_no", order_no)
+        set_checkbox(page, "d.vat_enabled", True)
+        fill_input(page, "d.vat_percent", vat_percent)
+        set_checkbox(page, "d.excise_enabled", True)
 
     return {
         "timezone": timezone_name,
@@ -219,9 +178,9 @@ def run_filial(
     with allure.step("2 - Yangi tashkilot formasini to'ldirish"):
         page.get_by_role("button", name="Создать").click()
         expect(page.get_by_role("heading")).to_contain_text("Организация (создание)")
-        _fill_input(page, "d.name", filial_name)
+        fill_input(page, "d.name", filial_name)
 
-        _select_b_input_by_search(
+        select_b_input_by_search(
             page,
             ng_model="d.base_currency_name",
             search_text="Узбекский сум",
@@ -230,7 +189,7 @@ def run_filial(
         )
         BasePage(page).confirm_biruni("Продолжить?")
 
-        _select_b_input_by_search(
+        select_b_input_by_search(
             page,
             ng_model="d.person_name",
             search_text=legal_person_code,
@@ -242,12 +201,16 @@ def run_filial(
             regression_values = _fill_filial_regression_fields(page, code)
 
     with allure.step("3 - Saqlash va tasdiqlash"):
-        page.get_by_role("button", name="Сохранить").click()
-        BasePage(page).confirm_biruni("Сохранить")
-        BasePage(page).wait_for_loader()
+        BasePage(page).save_and_expect_heading(
+            "Организации",
+            action="Организация (создание) -> Сохранить",
+            before_state="Организация (создание)",
+            expected_state="Организации list ochilishi",
+            confirm_text="Сохранить",
+            location_hint="tests/smoke/test_setup/test_filial.py::run_filial",
+        )
 
     with allure.step("4 - Ro'yxatda yaratilganini tekshirish"):
-        expect(page.get_by_role("heading")).to_contain_text("Организации")
         page.get_by_role("searchbox", name="Поиск").fill(filial_name)
         page.get_by_role("searchbox", name="Поиск").press("Enter")
         BasePage(page).wait_for_loader()

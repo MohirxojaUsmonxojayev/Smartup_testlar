@@ -23,8 +23,13 @@ def run_product(page: Page, code, scope: str = "smoke") -> None:
         page.get_by_text("Товар", exact=True).click()
 
     with allure.step("3 - Saqlash va ro'yxatda tekshirish"):
-        page.get_by_role("button", name="Сохранить").click()
-        expect(page.get_by_role("heading")).to_contain_text("ТМЦ")
+        BasePage(page).save_and_expect_heading(
+            "ТМЦ",
+            action="ТМЦ (создание) -> Сохранить",
+            before_state="ТМЦ (создание)",
+            expected_state="ТМЦ list ochilishi",
+            location_hint="tests/smoke/test_setup/test_product.py::run_product:create",
+        )
         expect(page.get_by_text(f"code_product-pw{code}")).to_be_visible()
 
     with allure.step("4 - Mahsulotga narx belgilash"):
@@ -32,10 +37,14 @@ def run_product(page: Page, code, scope: str = "smoke") -> None:
         page.get_by_role("button", name="Установить цены").click()
         expect(page.get_by_role("heading")).to_contain_text("ТМЦ (установка цен)")
         page.locator("b-pg-grid").get_by_role("textbox").fill("7000")
-        page.get_by_role("button", name="Сохранить").click()
-        BasePage(page).confirm_biruni("Сохранить?")
-        BasePage(page).wait_for_loader()
-        expect(page.get_by_role("heading")).to_contain_text("ТМЦ")
+        BasePage(page).save_and_expect_heading(
+            "ТМЦ",
+            action="ТМЦ (установка цен) -> Сохранить",
+            before_state="ТМЦ (установка цен)",
+            expected_state="ТМЦ list ochilishi",
+            confirm_text="Сохранить?",
+            location_hint="tests/smoke/test_setup/test_product.py::run_product:set_price",
+        )
 
 # ----------------------------------------------------------------------------------------------------------------------
 
