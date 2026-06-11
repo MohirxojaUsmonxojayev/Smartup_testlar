@@ -15,7 +15,7 @@ if (-not $env:TELEGRAM_RUN_PASSWORD) {
 
 # Avto-run xabarlari uchun maqsad chat (ixtiyoriy, lekin avto-run uchun kerak).
 if (-not $env:TELEGRAM_CHAT_ID -and -not $env:TELEGRAM_ALLOWED_CHAT_IDS) {
-    Write-Warning "TELEGRAM_CHAT_ID berilmagan — avto-run xabarlari yuborilmaydi."
+    Write-Warning "TELEGRAM_CHAT_ID berilmagan - avto-run xabarlari yuborilmaydi."
 }
 
 if (-not $env:GITHUB_TOKEN -and -not $env:GITHUB_PAT) {
