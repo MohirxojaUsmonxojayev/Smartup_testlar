@@ -8,8 +8,14 @@ if (-not $env:TELEGRAM_BOT_TOKEN) {
     throw "TELEGRAM_BOT_TOKEN environment variable is required."
 }
 
+# Botdan hamma foydalana oladi; testni run qilish faqat to'g'ri parol bilan ochiladi.
+if (-not $env:TELEGRAM_RUN_PASSWORD) {
+    throw "TELEGRAM_RUN_PASSWORD environment variable is required (test run paroli)."
+}
+
+# Avto-run xabarlari uchun maqsad chat (ixtiyoriy, lekin avto-run uchun kerak).
 if (-not $env:TELEGRAM_CHAT_ID -and -not $env:TELEGRAM_ALLOWED_CHAT_IDS) {
-    throw "TELEGRAM_CHAT_ID or TELEGRAM_ALLOWED_CHAT_IDS environment variable is required."
+    Write-Warning "TELEGRAM_CHAT_ID berilmagan — avto-run xabarlari yuborilmaydi."
 }
 
 if (-not $env:GITHUB_TOKEN -and -not $env:GITHUB_PAT) {

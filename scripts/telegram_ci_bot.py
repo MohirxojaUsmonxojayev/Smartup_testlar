@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import sys
@@ -101,9 +102,39 @@ class ActiveRunStore:
 
 
 @dataclass(frozen=True)
+class PendingRun:
+    request: RunRequest
+    prompt_message_id: int
+
+
+class PendingRunStore:
+    """Server+scope tanlangach parol kutilayotgan run so'rovlarini chat bo'yicha saqlaydi."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._pending: dict[str, PendingRun] = {}
+
+    def set(self, chat_id: str, pending: PendingRun) -> None:
+        with self._lock:
+            self._pending[chat_id] = pending
+
+    def get(self, chat_id: str) -> PendingRun | None:
+        with self._lock:
+            return self._pending.get(chat_id)
+
+    def has(self, chat_id: str) -> bool:
+        with self._lock:
+            return chat_id in self._pending
+
+    def clear(self, chat_id: str) -> None:
+        with self._lock:
+            self._pending.pop(chat_id, None)
+
+
+@dataclass(frozen=True)
 class BotConfig:
     telegram_token: str
-    allowed_chat_ids: set[str]
+    run_password: str
     github_token: str
     repository: str
     workflow: str
@@ -177,17 +208,16 @@ def server_keys_from_env(value: str) -> set[str]:
 
 
 def load_config() -> BotConfig:
-    allowed_chat_ids = set(
-        split_csv(os.getenv("TELEGRAM_ALLOWED_CHAT_IDS", "") or os.getenv("TELEGRAM_CHAT_ID", ""))
-    )
-    if not allowed_chat_ids:
-        raise ConfigError("Set TELEGRAM_ALLOWED_CHAT_IDS or TELEGRAM_CHAT_ID to restrict bot access.")
-
     allowed_server_keys = server_keys_from_env(os.getenv("ALLOWED_SERVER_URLS", ""))
 
+    # Botdan hamma foydalana oladi; testni run qilish faqat to'g'ri parol bilan ochiladi.
+    run_password = env_required("TELEGRAM_RUN_PASSWORD")
+
+    # Auto-run xabarlari uchun maqsad chat (ixtiyoriy: TELEGRAM_CHAT_ID yoki ro'yxatdagi birinchisi).
     auto_run_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
     if not auto_run_chat_id:
-        auto_run_chat_id = sorted(allowed_chat_ids)[0] if allowed_chat_ids else ""
+        fallback = split_csv(os.getenv("TELEGRAM_ALLOWED_CHAT_IDS", ""))
+        auto_run_chat_id = fallback[0] if fallback else ""
 
     auto_run_server_key = resolve_server_key(env_value("AUTO_RUN_SERVER", "smartup"))
     auto_run_scope = env_value("AUTO_RUN_SCOPE", "smoke").lower()
@@ -202,7 +232,7 @@ def load_config() -> BotConfig:
 
     return BotConfig(
         telegram_token=env_required("TELEGRAM_BOT_TOKEN"),
-        allowed_chat_ids=allowed_chat_ids,
+        run_password=run_password,
         github_token=env_required("GITHUB_TOKEN", "GITHUB_PAT"),
         repository=env_value("GITHUB_REPOSITORY", DEFAULT_REPOSITORY),
         workflow=env_value("GITHUB_WORKFLOW_FILE", DEFAULT_WORKFLOW),
@@ -368,10 +398,58 @@ def help_text() -> str:
     return (
         "Test run qilish uchun /run yuboring.\n\n"
         "Bot avval serverni so'raydi, keyin scope tanlatadi.\n"
+        "So'ngra parol so'raladi — to'g'ri parol kiritilsa test ishga tushadi.\n"
         "Company code/password GitHub Secrets'dan olinadi.\n"
         "Yakuniy test natijasini GitHub Actions workflow yuboradi.\n"
         "Test jarayonda bo'lsa yangi /run bloklanadi.\n"
-        "Avto-run har soatda mustaqil ishga tushadi (run ketayotgan bo'lsa o'tkazib yuboriladi)."
+        "Avto-run har soatda mustaqil ishga tushadi (run ketayotgan bo'lsa o'tkazib yuboriladi).\n\n"
+        "To'liq qo'llanma uchun /start yuboring."
+    )
+
+
+def start_text(config: BotConfig) -> str:
+    servers = "\n".join(f"  • {SERVERS[key]}" for key in sorted(config.allowed_server_keys))
+    interval_minutes = max(1, config.auto_run_interval_seconds // 60)
+    auto_run = (
+        f"Har {interval_minutes} daqiqada avtomatik {config.auto_run_request.scope} run "
+        "ishga tushadi (run ketayotgan bo'lsa o'tkazib yuboriladi)."
+        if config.auto_run_enabled
+        else "Avto-run hozir o'chirilgan."
+    )
+    return (
+        "👋 Salom! Bu — Playwright smoke testlarini GitHub Actions orqali ishga tushiradigan CI bot.\n"
+        "\n"
+        "📌 Nima qiladi:\n"
+        "Testlarni GitHub Actions workflowda ishga tushiradi va natijani shu chatga yuboradi. "
+        "Company code/parol GitHub Secrets'da saqlanadi — bu yerda kiritilmaydi.\n"
+        "\n"
+        "🚀 Qanday run qilinadi:\n"
+        "1. /run yuboring\n"
+        "2. Bot serverni so'raydi — tugmadan tanlang\n"
+        "3. Scope tanlang: smoke yoki regression\n"
+        "4. Bot parol so'raydi — to'g'ri parolni kiriting (parol QA jamoasida)\n"
+        "5. Parol to'g'ri bo'lsa test boshlanadi, bitta xabar jonli yangilanadi\n"
+        "6. Tugagach yakuniy natija (passed/failed) shu xabarda chiqadi\n"
+        "\n"
+        "🌐 Serverlar:\n"
+        f"{servers}\n"
+        "\n"
+        "🎚 Scope:\n"
+        "  • smoke — minimal asosiy yo'l, tez tekshiruv\n"
+        "  • regression — to'liq formalar, list/view checklar (chuqurroq)\n"
+        "\n"
+        "🧪 Nima test qilinadi (target=all):\n"
+        "User setup → A group → B group → C group → Report group ketma-ket.\n"
+        "\n"
+        "📊 Natija xabari:\n"
+        "Status, hozirgi qadam, passed ro'yxati; failed bo'lsa Group / Runner test / "
+        "Ichki test / Step / Error turi ko'rsatiladi.\n"
+        "\n"
+        f"⏱ Avto-run:\n{auto_run}\n"
+        "\n"
+        "⚠️ Bir vaqtda faqat bitta run — test ketayotganda yangi /run bloklanadi.\n"
+        "\n"
+        "Buyruqlar: /run  /servers  /help  /start"
     )
 
 
@@ -440,24 +518,78 @@ def show_run_start(
     telegram.send_message(chat_id, "Qaysi serverda run qilamiz?", reply_markup=server_keyboard(config))
 
 
-def handle_message(
+def password_matches(expected: str, provided: str) -> bool:
+    return hmac.compare_digest(expected, (provided or "").strip())
+
+
+def verify_run_password(
     telegram: TelegramClient,
+    github: GitHubActionsClient,
     config: BotConfig,
     active_store: ActiveRunStore,
+    pending_store: PendingRunStore,
     chat_id: str,
     text: str,
+    user_message_id: int | None,
 ) -> None:
-    if chat_id not in config.allowed_chat_ids:
-        telegram.send_message(chat_id, "This chat is not allowed to run CI.")
+    """Parol kutilayotgan chatda kelgan matnni parol sifatida tekshiradi."""
+    pending = pending_store.get(chat_id)
+    if pending is None:
         return
 
+    # Parol xabari chatda qolmasligi uchun foydalanuvchi yuborgan matnni o'chiramiz.
+    safe_delete_message(telegram, chat_id, user_message_id)
+
+    active = active_store.get()
+    if active is not None:
+        pending_store.clear(chat_id)
+        telegram.edit_message(chat_id, pending.prompt_message_id, active_run_text(active))
+        return
+
+    if password_matches(config.run_password, text):
+        pending_store.clear(chat_id)
+        start_run(telegram, github, chat_id, pending.prompt_message_id, pending.request, active_store)
+    else:
+        telegram.edit_message(
+            chat_id,
+            pending.prompt_message_id,
+            "❌ Parol noto'g'ri. Qaytadan parolni yuboring yoki /run bilan boshidan boshlang.",
+        )
+
+
+def handle_message(
+    telegram: TelegramClient,
+    github: GitHubActionsClient,
+    config: BotConfig,
+    active_store: ActiveRunStore,
+    pending_store: PendingRunStore,
+    chat_id: str,
+    text: str,
+    message_id: int | None,
+) -> None:
+    is_command = text.startswith("/")
+
+    # Parol kutilayotgan bo'lsa va bu buyruq bo'lmasa — matnni parol urinishi deb qaraymiz.
+    if pending_store.has(chat_id) and not is_command:
+        verify_run_password(
+            telegram, github, config, active_store, pending_store, chat_id, text, message_id
+        )
+        return
+
+    # Buyruq kelsa, oldingi parol kutish holatini bekor qilamiz.
+    if is_command:
+        pending_store.clear(chat_id)
+
     command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
-    if command in {"/start", "/help"}:
+    if command == "/start":
+        telegram.send_message(chat_id, start_text(config))
+        return
+    if command == "/help":
         telegram.send_message(chat_id, help_text())
         return
     if command == "/servers":
         lines = [SERVERS[key] for key in sorted(config.allowed_server_keys)]
-        telegram.send_message(chat_id, "Ruxsat berilgan serverlar:\n" + "\n".join(lines))
+        telegram.send_message(chat_id, "Mavjud serverlar:\n" + "\n".join(lines))
         return
     if command == "/run":
         show_run_start(telegram, chat_id, config, active_store)
@@ -471,6 +603,7 @@ def handle_callback(
     github: GitHubActionsClient,
     config: BotConfig,
     active_store: ActiveRunStore,
+    pending_store: PendingRunStore,
     callback: dict[str, Any],
 ) -> None:
     callback_id = str(callback.get("id", ""))
@@ -480,9 +613,6 @@ def handle_callback(
     chat_id = str(chat.get("id", ""))
     message_id = message.get("message_id")
 
-    if chat_id not in config.allowed_chat_ids:
-        telegram.answer_callback(callback_id, "Not allowed")
-        return
     if not isinstance(message_id, int):
         telegram.answer_callback(callback_id)
         return
@@ -512,9 +642,14 @@ def handle_callback(
         if server_key not in config.allowed_server_keys or server_key not in SERVERS or scope not in SCOPES:
             telegram.answer_callback(callback_id, "Invalid selection")
             return
-        telegram.answer_callback(callback_id, "Run boshlanyapti")
+        telegram.answer_callback(callback_id, "Parol kerak")
         request = RunRequest(scope=scope, server_key=server_key, server_url=SERVERS[server_key])
-        start_run(telegram, github, chat_id, message_id, request, active_store)
+        pending_store.set(chat_id, PendingRun(request=request, prompt_message_id=message_id))
+        telegram.edit_message(
+            chat_id,
+            message_id,
+            f"🔒 {SERVERS[server_key]} / {scope}\n\nTestni run qilish uchun parolni yuboring:",
+        )
         return
 
     telegram.answer_callback(callback_id, "Unknown action")
@@ -667,6 +802,7 @@ def main() -> int:
     telegram = TelegramClient(config.telegram_token)
     github = GitHubActionsClient(config.github_token, config.repository, config.workflow, config.ref)
     active_store = ActiveRunStore()
+    pending_store = PendingRunStore()
 
     offset: int | None = None
     print(f"Telegram CI bot started for {config.repository}/{config.workflow} on {config.ref}")
@@ -697,13 +833,23 @@ def main() -> int:
                     chat = message.get("chat") or {}
                     chat_id = str(chat.get("id", ""))
                     text = message.get("text")
+                    message_id = message.get("message_id")
                     if isinstance(text, str):
-                        handle_message(telegram, config, active_store, chat_id, text.strip())
+                        handle_message(
+                            telegram,
+                            github,
+                            config,
+                            active_store,
+                            pending_store,
+                            chat_id,
+                            text.strip(),
+                            message_id if isinstance(message_id, int) else None,
+                        )
                     continue
 
                 callback = update.get("callback_query")
                 if isinstance(callback, dict):
-                    handle_callback(telegram, github, config, active_store, callback)
+                    handle_callback(telegram, github, config, active_store, pending_store, callback)
         except KeyboardInterrupt:
             print("Stopping Telegram CI bot.")
             return 0
