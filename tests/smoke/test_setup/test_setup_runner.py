@@ -181,7 +181,7 @@ def run_setup_chain(
         title="14 - Price Type",
         display="test_14_price_type",
     ):
-        run_price_type_uzb(session_page, code, logger, scope=scope)
+        run_price_type_uzb(session_page, code, logger, save_data=save_data, scope=scope)
     with progress_step(
         group="Setup",
         runner=SETUP_RUNNER_TEST,
@@ -306,8 +306,8 @@ def test_13_change_password(session_page: Page, code, test_scope):
     run_change_password(session_page, code, scope=test_scope)
 
 @allure.title("14 - Price Type")
-def test_14_price_type(session_page: Page, code, logger, test_scope):
-    run_price_type_uzb(session_page, code, logger, scope=test_scope)
+def test_14_price_type(session_page: Page, code, logger, save_data, test_scope):
+    run_price_type_uzb(session_page, code, logger, save_data=save_data, scope=test_scope)
 
 @allure.title("15 - Payment Type")
 def test_15_payment_type(session_page: Page, test_scope):

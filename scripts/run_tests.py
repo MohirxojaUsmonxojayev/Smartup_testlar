@@ -27,6 +27,8 @@ TARGETS = {
     "company": ("tests/smoke/test_setup/test_setup_runner.py::test_00_company", "--new-code"),
     "group-a": ("tests/smoke/test_groups/test_A_grup/test_a_group_runner.py", "--reuse-code"),
     "group-b": ("tests/smoke/test_groups/test_B_grup/test_b_group_runner.py", "--reuse-code"),
+    "group-c": ("tests/smoke/test_groups/test_C_grup/test_c_group_runner.py", "--reuse-code"),
+    "group-report": ("tests/smoke/test_groups/test_report_grup/test_report_group_runner.py", "--reuse-code"),
 }
 
 
@@ -121,7 +123,7 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
         "target",
         nargs="?",
         default="all",
-        help="Default: all. Debug uchun: setup, company, group-a, group-b yoki pytest target path.",
+        help="Default: all. Debug uchun: setup, company, group-a, group-b, group-c, group-report yoki pytest target path.",
     )
     parser.add_argument("--url", required=True, help="Majburiy server URL. Masalan: https://app3.greenwhite.uz/xtrade")
     parser.add_argument("--company-code", help="Mavjud company code. --create-company bo'lmasa majburiy.")
@@ -170,7 +172,7 @@ def main() -> int:
     if args.disable_license_policy and not args.create_company:
         print("--disable-license-policy faqat --create-company bilan ishlaydi", file=sys.stderr)
         return 2
-    if args.create_company and args.target in {"group-a", "group-b"}:
+    if args.create_company and args.target in {"group-a", "group-b", "group-c", "group-report"}:
         print("--create-company group-a/group-b targetlari bilan ishlamaydi; all, setup yoki company ishlating", file=sys.stderr)
         return 2
     if args.target == "company" and not args.create_company:

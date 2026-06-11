@@ -8,7 +8,7 @@ pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("Price
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_price_type_uzb(page: Page, code, logger, scope: str = "smoke") -> None:
+def run_price_type_uzb(page: Page, code, logger, save_data=None, scope: str = "smoke") -> None:
     with allure.step("0 - NPS Survey modalini o'tkazib yuborish"):
         fill_nps_survey(page, logger)
 
@@ -37,9 +37,11 @@ def run_price_type_uzb(page: Page, code, logger, scope: str = "smoke") -> None:
         page.get_by_role("searchbox", name="Поиск").fill(f"Price Type UZB-pw{code}")
         page.get_by_role("searchbox", name="Поиск").press("Enter")
         expect(page.get_by_text(f"Price Type UZB-pw{code}").first).to_be_visible()
+        if save_data:
+            save_data("price_type_name_UZB", f"Price Type UZB-pw{code}")
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 @allure.title("Narx turi (UZB) yaratish")
-def test_price_type_uzb(page: Page, code, logger, test_scope) -> None:
-    run_price_type_uzb(page, code, logger, scope=test_scope)
+def test_price_type_uzb(page: Page, code, logger, save_data, test_scope) -> None:
+    run_price_type_uzb(page, code, logger, save_data=save_data, scope=test_scope)

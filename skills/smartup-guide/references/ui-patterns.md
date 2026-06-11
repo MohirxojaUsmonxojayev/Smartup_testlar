@@ -31,6 +31,17 @@ Tags: b-input, locator
   - `BasePage.expect_b_input_value_by_label(label, expected_value)`
 - Eslatma: ba'zi input value'lar sahifa textiga kirmaydi; input value assert qilish kerak.
 
+### b-input Server-Search (report group)
+Tags: b-input, server-search, hint, clear
+- Ba'zi `b-input`lar client-side emas, server-side qidiradi (masalan `price_types`).
+- Placeholder `"Поиск..."` (nuqta bilan) yoki `"Поиск"` bo'lishi mumkin — locator sifatida `b_input.locator("input[placeholder]").first` ishlatiladi.
+- Allaqachon tanlangan qiymat bo'lsa: X tugmasi `.edit` (Angular `ng-hide`) — `is_visible()` tekshirish kerak, `count() > 0` emas.
+- Agar `.edit` ko'rinsa — avval clear qil, keyin yoz; ko'rinmasa — to'g'ri click qil.
+- Server-search uchun `press_sequentially(search_text, delay=50)` ishlatiladi (debounce trigger); client-search uchun oddiy `fill()` yetarli.
+- Dropdown locator: `b_input.locator(".hint-item").filter(has_text=option).first` — `expect(...).to_be_visible(timeout=30_000)`.
+- Radio button ustida label span tursa `label:has(input[value="..."])` orqali click qilinadi (force=True ishlamaydi — Angular ng-model update bo'lmaydi).
+- Shared helper: `report_helpers.select_b_input_option(page, b_input_name, option, search_text=None)`.
+
 ### Masked Date/Amount Inputs
 Tags: input, mask, date, amount
 - Qoida: date/amount mask inputlarda qiymatni almashtirishdan oldin focus + `ControlOrMeta+A` + `Backspace` qiling; faqat `fill(new_value)` ba'zan eski invalid qiymatga append qiladi.

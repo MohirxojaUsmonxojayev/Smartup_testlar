@@ -59,5 +59,6 @@ Tags: contract, order, payment-type, grid, error, setup, locator
 ## Asosiy Eslatma
 
 - Smartup bo'yicha yangi biznes qoida, UI xatti-harakati, xato sababi yoki locator topilsa, shu skillning mos reference fayliga yoz.
+- Reference/dossierlarga **statik/literal test data yozilmaydi** (masalan `user-pw5963@autotest`, `product-pw5963`, `room-pw5963`, `autotest`). Bunday qiymatlar doim `code`'dan derive bo'ladigan ko'rinishda yoziladi: `user-pw{code}@<company>`, `product-pw{code}`, `room-pw{code}`. Konkret session qiymatlari `data_store.json` da turadi, dossierda emas.
 - Dublikat kod, noto'g'ri testcase yoki flowga ajratilishi kerak bo'lgan takrorlanish ko'rinsa, foydalanuvchiga alohida xabar ber.
 - Har bir Smartup/test vazifasi yakunida bajarilgan ish xulosasi, o'rganilgan biznes/UI bilimlar, muhim locatorlar, screenshot pathlari va debug notes mos form dossier yoki reference faylga tartibli yozib qo'yilsin.

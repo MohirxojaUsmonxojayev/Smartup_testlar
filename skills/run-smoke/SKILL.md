@@ -35,6 +35,8 @@ Debug uchun setup yoki group:
 python scripts/run_tests.py setup --url <server_url> --company-code <company_code> --company-password <company_password>
 python scripts/run_tests.py group-a --url <server_url> --company-code <company_code> --company-password <company_password>
 python scripts/run_tests.py group-b --url <server_url> --company-code <company_code> --company-password <company_password>
+python scripts/run_tests.py group-c --url <server_url> --company-code <company_code> --company-password <company_password>
+python scripts/run_tests.py group-report --url <server_url> --company-code <company_code> --company-password <company_password>
 ```
 
 Browser ochilishi kerak bo'lsa `HEADLESS=1` yoki `--headless` ishlatma; `--headless` berilsa browser ko'rinmasligi to'g'ri holat.

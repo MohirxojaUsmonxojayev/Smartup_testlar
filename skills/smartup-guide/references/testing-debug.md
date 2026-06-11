@@ -59,6 +59,17 @@ Tags: setup, group, dependency
 - Grouplar orasida browser/page state leak bo'lmasligi uchun full runner group wrapperlari `session_page` emas, `group_page` fixture ishlatadi; har group alohida context/page oladi.
 - Alohida group runner faylida group ichidagi testlar `group_user_page` fixture bilan bitta module-scoped page ishlatadi; login group boshida bir marta qilinadi, group tugaganda yoki failed bo'lganda fixture oynani yopadi.
 - A-group testlari `tests/smoke/test_groups/test_A_grup/` ichida.
+- Group ichidagi testlar bir-biriga bog'liq bo'lmasa `pytest.mark.smoke_group("X", independent=True)` ishlatiladi — bitta test failed bo'lsa ham qolganlar skip qilinmaydi. Report group shu sababli `independent=True` bilan belgilangan.
+
+### Report Group
+Tags: report, group, integration, download
+- Report testlar: `tests/smoke/test_groups/test_report_grup/` — CisLink, Integration Three, SalesWork, Optimum, Spot 2d, Integration Two.
+- Alohida run: `python scripts/run_tests.py group-report --url ... --company-code ... --company-password ...`
+- Report testlar `independent=True` — biri yiqilsa qolganlari davom etadi.
+- Integration Two faqat "Администрирование" filialida ishlaydi — admin login, switch_filial yo'q.
+- Integration Two Тип цены: user_setup `price_type_name_UZB` kaliti `data_store.json`ga saqlaydi; yo'q bo'lsa test `pytest.skip` qiladi.
+- Download testlarida `generate_and_verify_download(page, trigger, expected_prefix, save_name)` helper ishlatiladi — fayl `test-results/downloads/` ga saqlanadi.
+- Biruní alert (integration_two) generate'dan keyin chiqishi normal — fake URL bilan ishlanganda; `_close_alert_if_open` Escape bilan yopadi.
 
 ### Runner Va Debug Helper Qoidalari
 Tags: runner, debug, modal, data-store

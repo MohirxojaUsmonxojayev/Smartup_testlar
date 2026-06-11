@@ -222,11 +222,13 @@ Bu buyruq macOS, Linux va Windowsda ishlaydi. `.env` ishlatilmaydi.
 | `--show-trace` | Testdan keyin oxirgi Playwright trace viewerini ochadi. |
 | `--ai-summary` | Gemini orqali qo'shimcha AI xulosa yozadi. Default: off. |
 | `--dry-run` | Testni ishga tushirmaydi, faqat pytest commandni ko'rsatadi. |
-| `all` | Default target. Setup + A group + B group ishlaydi. |
+| `all` | Default target. Setup + A + B + C + Report group ishlaydi. |
 | `setup` | Faqat setup runner ishlaydi. |
 | `company` | Faqat yangi company yaratish testi ishlaydi. |
 | `group-a` | Faqat A group ishlaydi. |
 | `group-b` | Faqat B group ishlaydi. |
+| `group-c` | Faqat C group ishlaydi. |
+| `group-report` | Faqat Report group ishlaydi. |
 
 ### <a id="asosiy-run-yollari"></a>Asosiy run yo'llari
 
@@ -277,6 +279,22 @@ python scripts/run_tests.py group-b --url <server_url> --company-code <company_c
 ```
 
 Nima qiladi: saqlangan setup data bilan B group testlarini ishlatadi.
+
+#### Faqat C group
+
+```bash
+python scripts/run_tests.py group-c --url <server_url> --company-code <company_code> --company-password <company_password>
+```
+
+Nima qiladi: saqlangan setup data bilan C group (aksiya) testlarini ishlatadi.
+
+#### Faqat Report group
+
+```bash
+python scripts/run_tests.py group-report --url <server_url> --company-code <company_code> --company-password <company_password>
+```
+
+Nima qiladi: saqlangan setup data bilan Report group testlarini ishlatadi (CisLink, Integration Three, SalesWork, Optimum, Spot 2d, Integration Two). Report testlar bir-biriga bog'liq emas — biri yiqilsa qolganlari davom etadi.
 
 ### <a id="qoshimcha-buyruqlar"></a>Qo'shimcha buyruqlar
 
@@ -351,13 +369,15 @@ Default target `all`, ya'ni full suite.
 
 | Target | Buyruq namunasi | Nima ishlaydi |
 |--------|------------------|---------------|
-| `all` | `python scripts/run_tests.py --url <url> --company-code <code> --company-password <pass>` | Setup + A group + B group |
+| `all` | `python scripts/run_tests.py --url <url> --company-code <code> --company-password <pass>` | Setup + A + B + C + Report group |
 | `setup` | `python scripts/run_tests.py setup --url <url> --company-code <code> --company-password <pass>` | Faqat user setup |
 | `company` | `python scripts/run_tests.py company --url <url> --create-company --head-email <email> --head-password <pass>` | Faqat company yaratish testi |
 | `group-a` | `python scripts/run_tests.py group-a --url <url> --company-code <code> --company-password <pass>` | Faqat A group |
 | `group-b` | `python scripts/run_tests.py group-b --url <url> --company-code <code> --company-password <pass>` | Faqat B group |
+| `group-c` | `python scripts/run_tests.py group-c --url <url> --company-code <code> --company-password <pass>` | Faqat C group |
+| `group-report` | `python scripts/run_tests.py group-report --url <url> --company-code <code> --company-password <pass>` | Faqat Report group |
 
-`--create-company` faqat `all`, `setup`, `company` targetlari bilan ishlatiladi. `group-a` yoki `group-b` uchun avval mavjud company va setup data kerak.
+`--create-company` faqat `all`, `setup`, `company` targetlari bilan ishlatiladi. Group targetlari uchun avval mavjud company va setup data kerak.
 
 ### <a id="pytest-orqali-debug"></a>Pytest Orqali Debug
 
@@ -382,7 +402,7 @@ Yangi company bilan:
 
 ## <a id="test-qamrovi"></a>Test qamrovi
 
-`tests/smoke/test_all_runner.py` — barcha runnerlarni jamlaydi va mavjud runner fayllarini ketma-ket chaqiradi: user setup, keyin A va B group runnerlar.
+`tests/smoke/test_all_runner.py` — barcha runnerlarni jamlaydi va mavjud runner fayllarini ketma-ket chaqiradi: user setup, keyin A, B, C va Report group runnerlar.
 
 `tests/smoke/test_setup/test_setup_runner.py` — user setup testlari **bitta browser sessiyasida** ketma-ket ishlaydi.
 
@@ -417,12 +437,14 @@ Group runnerlar — har bir group boshida user sifatida bir marta login qiladi, 
 
 ### <a id="group-runnerlar"></a>Group runnerlar
 
-| Group | Testlar | Nima tekshiriladi |
-|-------|---------|-------------------|
-| A | A-01 ... A-05 | Contract yaratish, payment type sharti, contract limit validatsiyasi, order yaratish va edit qilish |
-| B | B-01 ... B-02 | Konsignatsiya limiti bilan order yaratish, edit qilish va konsignatsiya summasini bo'lish |
+| Group | Runner buyrug'i | Nima tekshiriladi |
+|-------|-----------------|-------------------|
+| A | `group-a` | Contract yaratish, payment type sharti, contract limit validatsiyasi, order yaratish va edit qilish |
+| B | `group-b` | Konsignatsiya limiti bilan order yaratish, edit qilish va konsignatsiya summasini bo'lish |
+| C | `group-c` | Aksiya (скидка 10% на 10 товаров) yaratish |
+| Report | `group-report` | CisLink, Integration Three, SalesWork, Optimum, Spot 2d, Integration Two — har biri mustaqil |
 
-> **Eslatma:** `test_setup_runner.py` user setup runner bo'lib, setup testlari bilan bir papkada turadi.
+> **Eslatma:** Report group testlari `independent=True` — biri yiqilsa qolganlari davom etadi. Qolgan grouplar zanjirli: biri yiqilsa shu groupning keyingi testlari skip qilinadi.
 
 ---
 

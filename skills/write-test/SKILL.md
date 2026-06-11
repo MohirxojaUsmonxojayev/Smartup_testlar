@@ -135,6 +135,9 @@ def test_XX_<nomi>(session_page: Page, code):
 - Group test ichida cleanup yoki oldingi recordlarni cancel qilish faqat optional bo'lsin: data topilmasa no-op bo'lib, test yangi record yaratib davom etishi kerak.
 - Yangi test yozishda u setup bosqichigami yoki qaysi mustaqil groupga tegishli ekanini aniq ajrat.
 - `tests/smoke/test_setup/test_setup_runner.py` ichidagi mavjud barcha testlar user setup testlari hisoblanadi; runner setup testlari bilan bir papkada turadi va ular yozib bo'lingan.
+- **user_setup yakunlangan**: `tests/smoke/test_setup/` ga YANGI test QO'SHILMAYDI. Yangi testlar `tests/smoke/test_life_cycle/` yoki yangi group (`tests/smoke/test_groups/test_<X>_grup/`) ichida yoziladi.
+- **authorization har test boshida chaqirilmaydi**: login faqat sessiya boshida (setup `session_page` chain) yoki group boshida bir marta (`group_user_page`/group chain wrapperi) bajariladi; `run_*` biznes funksiyalari `page` ni allaqachon login qilingan deb qabul qiladi.
+- **Yangi test ma'lumotlari `data_store.json` dan olinadi**: setup yaratgan entity nom/kodlari `load_data(...)` yoki `code` fixture orqali olinadi; test ichiga literal qiymat (`autotest`, `product-pw5963` kabi) hardcode qilinmaydi.
 - Endi A-group testlari boshlanmoqda; A-groupning birinchi testi order uchun contract yaratish testi.
 - A-group testlari `tests/smoke/test_groups/test_A_grup/` papkasiga yozib boriladi; masalan contract testi `tests/smoke/test_groups/test_A_grup/test_contract.py` ichida saqlanadi.
 - A-group contract testida `a_group_contract_code` bilan birga `a_group_contract_name` ham `data_store.json` ga saqlanadi; order formasidagi `Договор` maydoni contract code emas, contract name bilan tanlanadi.

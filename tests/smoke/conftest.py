@@ -178,6 +178,12 @@ def _smoke_group_name(item) -> str | None:
     return str(marker.args[0])
 
 
+def _smoke_group_independent(item) -> bool:
+    """smoke_group('X', independent=True) bo'lsa True — group ichida test yiqilsa qolganlar skip qilinmaydi."""
+    marker = item.get_closest_marker("smoke_group")
+    return bool(marker and marker.kwargs.get("independent", False))
+
+
 def _is_user_setup(item) -> bool:
     return item.get_closest_marker("user_setup") is not None
 
@@ -532,7 +538,7 @@ def pytest_runtest_setup(item):
     if _USER_SETUP_FAILED:
         pytest.skip("User setup failed bo'lgani uchun barcha group testlar skip qilindi")
 
-    if group_name in _FAILED_SMOKE_GROUPS:
+    if group_name in _FAILED_SMOKE_GROUPS and not _smoke_group_independent(item):
         pytest.skip(f"{group_name} group ichidagi oldingi test failed bo'lgani uchun skip qilindi")
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -578,7 +584,7 @@ def pytest_runtest_makereport(item, call):
             _USER_SETUP_FAILED = True
 
         group_name = _smoke_group_name(item)
-        if group_name:
+        if group_name and not _smoke_group_independent(item):
             _FAILED_SMOKE_GROUPS.add(group_name)
 
 # ----------------------------------------------------------------------------------------------------------------------
