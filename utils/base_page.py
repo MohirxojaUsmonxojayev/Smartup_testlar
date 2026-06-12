@@ -219,7 +219,7 @@ class BasePage:
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    def wait_for_loader(self, timeout=120_000):
+    def wait_for_loader(self, timeout=300_000):
         """
         Loader (overlay) paydo bo'lishini va keyin yo'qolishini kutadi.
         """

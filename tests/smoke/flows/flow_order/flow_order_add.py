@@ -68,9 +68,18 @@ def flow_order_product_page(
 
     if product and not check_form:
         with allure.step(f"Product Page: product -> '{product}' tanlash"):
-            page.locator("#anor279_input-b_input-product_name_goods0").get_by_role("textbox", name="Поиск").click()
-            page.get_by_text(product).click()
-            expect(page.locator("#anor279_input-b_input-product_name_goods0").locator("input")).to_have_value(product)
+            # Product b-input dropdownidagi option matni kombinatsiyalangan
+            # ("product-pw{code}  <ombor>  <price type>  <narx>"), shuning uchun
+            # page-wide get_by_text(product) bir nechta elementga tushib flaky bo'ladi.
+            # Dropdownni shu b-inputga scope qilib, hint-item ko'rinishini kutib bosamiz.
+            product_input = page.locator("#anor279_input-b_input-product_name_goods0")
+            search = product_input.get_by_role("textbox", name="Поиск")
+            search.click()
+            search.fill(product)
+            option = product_input.locator(".hint-item").filter(has_text=product).first
+            expect(option).to_be_visible()
+            option.click()
+            expect(product_input.locator("input").first).to_have_value(product)
 
     if quantity and not check_form:
         with allure.step(f"Product Page: quantity -> '{quantity}' kiritish"):

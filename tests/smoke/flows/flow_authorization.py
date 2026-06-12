@@ -9,6 +9,11 @@ USER_PASS = "123456789"
 
 DATA_STORE_PATH = Path("test-results/data/data_store.json")
 
+# Smartup sessiya timeout/lock overlayi (#closing-session) ni avtomatik yopish uchun:
+# har bir long-lived page (id bo'yicha) uchun oxirgi login paroli va handler o'rnatilgani.
+_session_passwords: dict[int, str] = {}
+_session_handler_pages: set[int] = set()
+
 
 def _normalize_company_code(value: str) -> str:
     return value.strip().lstrip("@")
@@ -74,10 +79,64 @@ def logout(page: Page) -> None:
 # ----------------------------------------------------------------------------------------------------------------------
 
 def login(page: Page, email: str | None = None, password: str | None = None) -> None:
+    email = email or admin_email()
+    password = password or company_password()
     page.goto(f"{company_url()}/login.html")
-    page.get_by_placeholder("Логин@компания").fill(email or admin_email())
-    page.get_by_role("textbox", name="Пароль").fill(password or company_password())
+    page.get_by_placeholder("Логин@компания").fill(email)
+    page.get_by_role("textbox", name="Пароль").fill(password)
     page.get_by_role("button", name="Войти").click()
+    install_session_keepalive(page, password)
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+def install_session_keepalive(page: Page, password: str) -> None:
+    """
+    Smartup sessiya timeout/lock overlayi (#closing-session) chiqsa, uni avtomatik yopadi.
+
+    Smartup belgilangan idle vaqtdan keyin "Закрытие сессии" overlayini ko'rsatadi
+    (`.cs-backdrop.open` barcha kliklarni intercept qiladi) — test o'rtasida menu/list
+    clicklari timeout bo'lib yiqiladi. add_locator_handler orqali bu overlay har qanday
+    action paytida avtomatik hal qilinadi:
+      1. "Продолжить" (`sessionStay`) ko'rinsa — parolsiz bosib sessiyani uzaytiradi (timeout-warning holati).
+      2. Aks holda re-login: parol kiritib "Войти" (`relogin`) bosadi (lock/expired holati).
+    MCP bilan smartup.online da tekshirilgan; DOM: #closing-session > .cs-backdrop.open + .cs-lock/.cs-timeout.
+    """
+    _session_passwords[id(page)] = password
+    if id(page) in _session_handler_pages:
+        return
+    _session_handler_pages.add(id(page))
+
+    overlay = page.locator("#closing-session")
+    backdrop_open = page.locator("#closing-session .cs-backdrop.open")
+
+    def _resolve_session_lock() -> None:
+        try:
+            # Timeout-warning holati (.cs-timeout): parolsiz "Продолжить" (sessionStay) sessiyani uzaytiradi.
+            stay = overlay.get_by_role("button", name="Продолжить")
+            if stay.count() > 0 and stay.first.is_visible():
+                stay.first.click()
+            else:
+                # Lock/expired holati (.cs-lock): parol + "Войти" (relogin).
+                pwd = overlay.locator("input[type=password]").first
+                if pwd.is_visible():
+                    pwd.fill(_session_passwords.get(id(page), password))
+                    # Tab — ng-model (a.session.si.rePassword) commit bo'lsin; aks holda relogin bo'sh parol
+                    # bilan ketib overlay yopilmaydi (MCP bilan tasdiqlangan).
+                    pwd.press("Tab")
+                    overlay.get_by_role("button", name="Войти", exact=True).first.click()
+            # relogin/sessionStay async — overlay yopilguncha kutamiz. Aks holda Playwright
+            # action'ni qayta tekshirib handlerni qayta chaqiradi va davom etayotgan relogin'ni uzadi.
+            backdrop_open.wait_for(state="hidden", timeout=60_000)
+        except Exception:
+            # Handler hech qachon test action'ini buzmasligi kerak; overlay yo'qolmasa
+            # Playwright o'zi keyingi tekshiruvni qiladi.
+            pass
+
+    page.add_locator_handler(
+        page.locator("#closing-session .cs-backdrop.open"),
+        _resolve_session_lock,
+        no_wait_after=True,
+    )
 
 # ----------------------------------------------------------------------------------------------------------------------
 

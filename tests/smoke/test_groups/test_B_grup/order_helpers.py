@@ -419,11 +419,35 @@ def _cancel_existing_client_orders_if_any(page: Page, code: str) -> None:
         raise AssertionError(f"natural_client-pw{code} uchun active orderlar tozalanmadi")
 
 
-def _consignment_limit_state(page: Page) -> dict[str, str]:
-    return {
-        "limit": "30",
-        "max_date": (datetime.today() + timedelta(days=30)).strftime("%d.%m.%Y"),
-    }
+def _consignment_day_limit(page: Page) -> str:
+    """
+    Order final (3-) formasidagi AngularJS scope'dan haqiqiy konsignatsiya kun limitini o'qiydi.
+
+    Limit DOM textida yoki date input atributida ko'rinmaydi — u faqat scope'dagi
+    `q.consignment_day_limit` da turadi (MCP bilan tasdiqlangan). Eski stub `today + 30` ni
+    `delivery_date + 30` bilan solishtirib, ikki sana mos kelmaganda flaky fail berardi.
+    """
+    limit = page.evaluate(
+        """() => {
+            if (typeof angular === 'undefined') return null;
+            const el = Array.from(document.querySelectorAll('input[ng-model="item.consignment_date"]'))
+                .find(node => node.offsetParent !== null);
+            if (!el) return null;
+            let scope = angular.element(el).scope();
+            while (scope) {
+                if (scope.q && scope.q.consignment_day_limit !== undefined && scope.q.consignment_day_limit !== '') {
+                    return String(scope.q.consignment_day_limit);
+                }
+                scope = scope.$parent;
+            }
+            return null;
+        }"""
+    )
+    if not limit:
+        raise AssertionError(
+            "Konsignatsiya kun limiti (q.consignment_day_limit) order final formasida topilmadi"
+        )
+    return limit
 
 
 def run_b_group_create_order_with_consignment_limit(page: Page, code: str, save_data, scope: str = "smoke", login: bool = True) -> None:
@@ -475,16 +499,14 @@ def run_b_group_create_order_with_consignment_limit(page: Page, code: str, save_
         _expect_text_visible(page, "Сумма консигнации")
         _expect_text_visible(page, "ИТОГО")
 
-        consignment_state = _consignment_limit_state(page)
+        consignment_day_limit = _consignment_day_limit(page)
+        if consignment_day_limit != "30":
+            raise AssertionError(f"Expected consignment day limit 30, got {consignment_day_limit!r}")
+        # Max valid konsignatsiya sanasi formadagi haqiqiy delivery_date'dan hisoblanadi
+        # (today emas) — limit kunini ham scope'dan o'qilgan qiymatdan olamiz.
         expected_limit_date = (
-            datetime.strptime(delivery_date, "%d.%m.%Y") + timedelta(days=30)
+            datetime.strptime(delivery_date, "%d.%m.%Y") + timedelta(days=int(consignment_day_limit))
         ).strftime("%d.%m.%Y")
-        if consignment_state["limit"] != "30":
-            raise AssertionError(f"Expected consignment limit 30, got {consignment_state['limit']}")
-        if consignment_state["max_date"] != expected_limit_date:
-            raise AssertionError(
-                f"Expected max consignment date {expected_limit_date}, got {consignment_state['max_date']}"
-            )
 
     with allure.step("6 - Konsignatsiya date/amount, tip oplati va status to'ldirilib saqlanadi"):
         _fill_input_by_label_text(page, "Дата оплаты по консигнации", expected_limit_date)

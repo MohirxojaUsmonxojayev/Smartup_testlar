@@ -470,7 +470,7 @@ def code(request):
     )
 
     if is_full_run:
-        return str(random.randint(1000, 9999))
+        return str(random.randint(100000, 999999))
 
     saved = _load_data_file().get("code")
     if saved:

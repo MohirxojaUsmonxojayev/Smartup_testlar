@@ -62,7 +62,7 @@ Tags: order, consignment, settings, view
 - Fresh DB qoida: konsignatsiya default o'chirilgan bo'ladi; B-group konsignatsiya testi order yaratishdan oldin shu settingni yoqib, limitni `30` qilib saqlashi kerak.
 - Qoida: limit `30` saqlansa, order add final/3-formasida `Дата оплаты по консигнации` va `Сумма консигнации` kartasi ko'rinadi.
 - Create test maqsadi keyingi edit case uchun precondition ham yaratadi: quantity `5`, total/konsignatsiya `35 000` bo'lsin; quantity `1` bilan keyingi testda totalni kamaytirib bo'lmaydi.
-- Testda ishlatish: final formadagi Angular state `q.consignment_day_limit == "30"` va `d.max_consignment_date == delivery_date + 30 days` bo'lishi kerak.
+- Testda ishlatish: final formadagi Angular scope'dan **`q.consignment_day_limit == "30"`** o'qiladi (limit DOM textida/input `max` atributida ko'rinmaydi). `d.max_consignment_date` degan field **YO'Q** — max sana `delivery_date + limit` qilib client-side hisoblanadi; assertni `today` emas, formadagi haqiqiy `delivery_date`'dan hisoblash kerak (`order_helpers._consignment_day_limit`). Batafsil: [forms/order-add.md](forms/order-add.md).
 - View assert: order viewda visible `Консигнация` textini bosib, visible text orqali consignment date va `35 000` summa tekshiriladi.
 - B-group order helper fayli: `tests/smoke/test_groups/test_B_grup/order_helpers.py`.
 - B-group leaf testlari alohida fayllarda turadi: `test_b_01_*`, `test_b_02_*`, `test_b_03_*`; har bir faylda faqat bitta pytest test bo'ladi.
