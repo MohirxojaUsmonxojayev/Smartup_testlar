@@ -94,6 +94,17 @@ allure serve test-results/allure-results
 - Telegram CI progress eventlari real-time ko'rinishi uchun GitHub Actions pytestni `-s` bilan, progress wrapperni esa `python -u` bilan ishlatadi; aks holda pytest stdout capture sabab progress xabar `browser o'rnatildi`da qolib ketishi mumkin.
 - Telegram CI final xabarida `test-results/data/data_store.json` ichidagi `code` va tanlangan company code asosida `User login: user-pw<code>@<company>` ko'rsatiladi; password xabarga chiqarilmaydi.
 - Telegram CI bot GitHub run statusini olishdagi vaqtinchalik network/API xatolarini retry qiladi; faqat ketma-ket 5 marta status olinmasa Telegramga xato yuboradi.
+- Botdan hamma foydalana oladi (chat_id allow-list yo'q); `/run` -> server -> scope tanlangach bot parol so'raydi. Faqat to'g'ri `TELEGRAM_RUN_PASSWORD` (hmac.compare_digest) kiritilsa test ishga tushadi; parol xabari qabul qilingach chatdan o'chiriladi, noto'g'ri bo'lsa qayta urinish mumkin (`PendingRunStore`).
+- `/start` hammага to'liq qo'llanma (server/scope/parol qadami), `/help` qisqa eslatma; `TELEGRAM_RUN_PASSWORD` env majburiy (kodda literal yo'q).
+- `TELEGRAM_CHAT_ID` endi faqat soatlik avto-run xabari boradigan chatni belgilaydi (ixtiyoriy); avto-run parolsiz ishlaydi.
+
+### Telegram bot — Windows server deploy
+- Bot Windows serverda `scripts/run_telegram_ci_bot.ps1` orqali yoki to'g'ridan-to'g'ri `.venv\Scripts\python.exe scripts\telegram_ci_bot.py` bilan ishga tushadi; ikkinchisi har ikkala shellda (CMD/PowerShell) ishlaydi va kod default'lari (repo/workflow/ref/serverlar) yetarli.
+- `.ps1` faylni CMD ishga tushira olmaydi (faqat ochadi); `.ps1` faqat PowerShell'da, yoki CMD'dan `powershell -ExecutionPolicy Bypass -File ...` bilan.
+- Windows PowerShell 5.1 `.ps1` faylni system ANSI codepage bilan o'qiydi; faylda non-ASCII belgi (masalan uzun tire `—`) bo'lsa "missing terminating quote / missing }" parser xatosini beradi. `.ps1` fayllar faqat ASCII bo'lsin.
+- Maxfiy env'lar (`TELEGRAM_BOT_TOKEN`, `GITHUB_TOKEN`/`GITHUB_PAT`, `TELEGRAM_RUN_PASSWORD`) `User` darajada saqlanadi; bot accept qiladigan GitHub token `GITHUB_TOKEN` yoki `GITHUB_PAT` nomida bo'lishi mumkin.
+- Doimiy ishlashi uchun Task Scheduler: action `D:\Playwright\.venv\Scripts\python.exe`, args `scripts\telegram_ci_bot.py`, "Рабочая папка" `D:\Playwright`; "Останавливать дольше" belgisini olib tashlash kerak (bot doim ishlaydi).
+- Task Scheduler "вне зависимости от регистрации" parol so'raydi va xato bersa, "только для зарегистрированных пользователей" variantini ishlatish parol talab qilmaydi (sessiya ochiq turganda ishlaydi); env'lar `User` darajada bo'lgani uchun task ham shu user nomidan ishlasin.
 
 ## Test dependency modeli
 

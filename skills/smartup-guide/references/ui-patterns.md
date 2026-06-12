@@ -16,6 +16,12 @@ Tags: locator, angular
   - `page.get_by_role(...)`
 - Sabab: UI Angular migratsiya/yangilanishlarida semantik locatorlar barqarorroq.
 
+### Heading Tekshirish — Ko'p Heading Muammosi
+Tags: locator, heading, get_by_role
+- `expect(page.get_by_role("heading")).to_contain_text("...")` faqat sahifada bitta ko'rinadigan heading bo'lganda ishonchli (masalan oddiy list/create forma).
+- Wizard yoki ko'p bo'limli formalarda bir vaqtda bir nechta ko'rinadigan heading bo'ladi (masalan Акция create: `Акция (создание)`, `Главное`, `Условия`); bunda nomsiz `get_by_role("heading")` bir nechta elementga to'g'ri kelib `to_contain_text` fail bo'ladi.
+- Yechim: sarlavhani aniq nom bilan nishonla — `expect(page.get_by_role("heading", name="Акция (создание)")).to_be_visible()` (substring match; `exact=True` ishlatma, list heading'larda ko'pincha oldida icon/probel bo'ladi).
+
 ### Form Field Discovery
 Tags: form, discovery, checkbox, switch, radio
 - Yangi add/edit forma o'rganilganda faqat `input[type=text]`, `textarea`, `select` va `b-input`larni yig'ish yetarli emas.
