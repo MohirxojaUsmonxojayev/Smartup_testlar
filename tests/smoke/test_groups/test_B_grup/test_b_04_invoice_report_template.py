@@ -330,7 +330,8 @@ def run_b_group_create_custom_invoice_report_template(
         flow_order_list(page, find_row=created_order_client)
 
         invoice_button = page.locator("button:visible, a:visible").filter(
-            has_text=re.compile(r"Счет-?фактуры", re.IGNORECASE)
+            # Order-row buttoni "Счёт-фактуры" (ё) deb yoziladi; е/ё ikkalasini ham qabul qil.
+            has_text=re.compile(r"Сч[её]т-?фактуры", re.IGNORECASE)
         ).first
         expect(invoice_button).to_be_visible()
         invoice_button.click()

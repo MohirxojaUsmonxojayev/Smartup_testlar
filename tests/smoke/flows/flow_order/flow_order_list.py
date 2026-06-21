@@ -64,7 +64,8 @@ def flow_order_list(page, add=False, find_row=None, view=False, edit=False, stat
             flow_modal.dialog_status(page)
 
             page.get_by_role("link", name=status).click()
-            BasePage(page).confirm_biruni(f"Изменить на {status}?")
+            # Smartup confirm matni: "Изменить статус на {status}?" (ilgari "Изменить на ...").
+            BasePage(page).confirm_biruni(f"Изменить статус на {status}?")
             BasePage(page).wait_for_loader()
 
             if page.locator("#dropdown").count() > 0:

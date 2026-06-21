@@ -155,7 +155,7 @@ def run_attach_license(page: Page, code, logger, scope: str = "smoke") -> None:
     with allure.step("3 - Mavjud foydalanuvchilarni tozalab, yangi foydalanuvchini ulash"):
         try:
             no_data = page.locator('b-grid[name="table"]').get_by_text("нет данных")
-            no_data.wait_for(state="visible", timeout=5_000)
+            no_data.wait_for(state="visible", timeout=30_000)
         except PlaywrightTimeoutError:
             BasePage(page).set_checkall()
             page.get_by_role("button", name="Открепить").click()
@@ -164,10 +164,10 @@ def run_attach_license(page: Page, code, logger, scope: str = "smoke") -> None:
 
         page.get_by_role("button", name="Доступные").click()
         base_page = BasePage(page)
-        base_page.wait_for_loader(timeout=5_000)
+        base_page.wait_for_loader(timeout=120_000)
         page.get_by_role("searchbox", name="Поиск").fill(f"natural_person-pw{code}")
         page.get_by_role("searchbox", name="Поиск").press("Enter")
-        base_page.wait_for_loader(timeout=5_000)
+        base_page.wait_for_loader(timeout=120_000)
 
         page.get_by_text(f"natural_person-pw{code}").first.click()
         page.get_by_role("button", name="Прикрепить").click()

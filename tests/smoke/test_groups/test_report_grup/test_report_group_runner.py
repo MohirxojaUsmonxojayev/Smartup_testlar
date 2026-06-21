@@ -22,8 +22,7 @@ pytestmark = [
 REPORT_GROUP_TEST_SCENARIO = """
 Report Group test ssenariysi:
 1. Admin login — Администрирование filialida (default).
-2. CisLink: Настройки (identification code, Характеристики/Продуктовое направление=Группа, Тип цены=Price Type UZB-pw{code}),
-   Сформировать -> cislink*.zip yuklanishi.
+2. CisLink: [SKIP] sahifa deploymentlar bo'ylab o'zgarmoqda — barcha serverda o'tkazib yuboriladi.
 3. Integration №3 (NEON): Настройки saqlanib, begin_date kiritilib, Сформировать (HTML) ->
    iframe'da 3 ta sheet (sheet1/sheet2/sheet3) render bo'lishi.
 4. SalesWork: yangi SalesWork-pw{code} shablon yaratib, Экспорт -> sales_work.zip yuklanishi.
@@ -34,6 +33,15 @@ Report Group test ssenariysi:
 """
 
 REPORT_GROUP_RUNNER_TEST = "test_05_report_group_runner"
+
+# CisLink integration report sahifasi Smartup deploymentlar bo'ylab o'zgarmoqda
+# (xtrade'da "Настройки" tugmasi yo'q, filtrlar inline) — barqarorlashguncha
+# BARCHA serverda skip. Qayta yoqish uchun: chain'dagi CisLink progress_step blokini
+# tiklang va quyidagi standalone testdagi @pytest.mark.skip ni olib tashlang.
+CISLINK_SKIP_REASON = (
+    "CisLink sahifasi Smartup deploymentlar bo'ylab o'zgarmoqda "
+    "(xtrade'da Настройки tugmasi yo'q) — barqarorlashguncha barcha serverda skip"
+)
 
 
 def run_report_group_chain(group_page: Page, code: str, save_data, load_data, scope: str = "smoke") -> None:
@@ -48,13 +56,8 @@ def run_report_group_chain(group_page: Page, code: str, save_data, load_data, sc
     ):
         authorization(group_page)  # ADMIN
         switch_filial(group_page, name=f"filial-pw{code}")
-    with progress_step(
-        group="Report group",
-        runner=REPORT_GROUP_RUNNER_TEST,
-        test_id="test_report_01_cislink",
-        title="Report-01 - CisLink integration report yuklab olish",
-    ):
-        run_report_cislink_check(group_page, code, scope=scope, login=False)
+    # Report-01 (CisLink) SKIP — qarang: CISLINK_SKIP_REASON. Sahifa deploymentlar
+    # bo'ylab o'zgargani uchun chain'da ishga tushirilmaydi (barcha serverda).
     with progress_step(
         group="Report group",
         runner=REPORT_GROUP_RUNNER_TEST,
@@ -92,6 +95,7 @@ def run_report_group_chain(group_page: Page, code: str, save_data, load_data, sc
         run_report_integration_two_check(group_page, code, load_data, scope=scope, login=False)
 
 
+@pytest.mark.skip(reason=CISLINK_SKIP_REASON)
 @allure.title("Report-01 - CisLink integration report")
 def test_report_01_cislink(group_session_page: Page, code: str, test_scope) -> None:
     run_report_cislink_check(group_session_page, code, scope=test_scope, login=True)

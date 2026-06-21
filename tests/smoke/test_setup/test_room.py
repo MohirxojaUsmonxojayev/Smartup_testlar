@@ -19,6 +19,12 @@ def _select_grid_checkall(page: Page, grid_name: str) -> None:
 # ----------------------------------------------------------------------------------------------------------------------
 
 def run_room(page: Page, code, scope: str = "smoke") -> None:
+    """Testcase: yangi ish zonasi (room) yaratish.
+
+    1. filial-pw{code} ga o'tib, Справочники -> Рабочие зоны ro'yxatini ochish.
+    2. "Создать" -> code (code_room_pw{code}) va nom (room-pw{code}) ni kiritish.
+    3. Saqlab, ro'yxatda room nomi va kodi ko'rinishini tekshirish.
+    """
     with allure.step("1 - Ish zonalari ro'yxatiga o'tish"):
         switch_filial(page, name=f"filial-pw{code}")
         navigate_to(page, tab="Справочники", name="Рабочие зоны")
@@ -45,6 +51,17 @@ def run_room(page: Page, code, scope: str = "smoke") -> None:
 # ----------------------------------------------------------------------------------------------------------------------
 
 def run_room_attachment(page: Page, code, scope: str = "smoke") -> None:
+    """Testcase: oldingi setup testlari yaratgan narsalarni ish zonasiga (room) ulash.
+
+    1. User sifatida kirib, room-pw{code} ning "Прикрепление" sahifasini ochish.
+    2. To'lov turlarini (Типы оплат) ulash.
+    3. Omborni (Склады) ulash.
+    4. Kassani (Кассы) ulash.
+    5. Mijozni (Физические лица: natural_client-pw{code}) ulash.
+    6. "Акция" narx turini (Тип цены) ulash — bu C-group aksiya chegirmasi order'da
+       ishlashi uchun zarur (room'ga ulanmasa, order'da aksiya chiqmaydi).
+    7. Sahifani yopib, "Рабочие зоны" ro'yxatiga qaytishni tekshirish.
+    """
     with allure.step("1 - Foydalanuvchi sifatida kirish va ish zonasini ochish"):
         authorization(page, email=user_email_for(code), password=USER_PASS)
         navigate_to(page, tab="Справочники", name="Рабочие зоны")
@@ -93,7 +110,38 @@ def run_room_attachment(page: Page, code, scope: str = "smoke") -> None:
         page.get_by_role("button", name="Прикрепленные").click()
         expect(page.locator("b-page")).to_contain_text(f"natural_client-pw{code}")
 
-    with allure.step("6 - Sahifani yopish"):
+    with allure.step("6 - 'Акция' narx turini ulash (Тип цены tab)"):
+        # "Акция" narx turi C-group aksiya chegirmasi orderda ishlashi uchun room'ga ulanadi.
+        # Ulanish 2 bosqichli: avval "Создать тип цены" orqali "Доступные" ro'yxatiga qo'shiladi,
+        # so'ng "Доступные"da belgilab "Прикрепить" qilinadi (MCP bilan 2026-06-16 tasdiqlangan).
+        page.get_by_role("link", name="Тип цены").click()
+        expect(page.locator("b-page")).to_contain_text("Тип цены")
+
+        # 1) Katalogdan "Акция"ni room "Доступные" ro'yxatiga qo'shish
+        page.get_by_role("button", name="Доступные").click()
+        BasePage(page).wait_for_loader()
+        page.get_by_role("button", name="Создать тип цены").click()
+        expect(page.get_by_role("heading", name="Цены (прикрепление)")).to_be_visible()
+        BasePage(page).wait_for_loader()
+        page.get_by_text("Акция", exact=True).first.click()
+        page.get_by_role("button", name="Прикрепить", exact=True).click()
+        BasePage(page).confirm_biruni("Прикрепить Акция?")
+        BasePage(page).wait_for_loader()
+
+        # 2) "Доступные"da "Акция"ni belgilab "Прикрепить" -> "Прикрепленные"ga o'tadi
+        page.get_by_role("link", name="Тип цены").click()
+        page.get_by_role("button", name="Доступные").click()
+        BasePage(page).wait_for_loader()
+        page.get_by_text("Акция", exact=True).first.click()
+        page.get_by_role("button", name="Прикрепить", exact=True).click()
+        BasePage(page).confirm_biruni("Прикрепить Акция?")
+        BasePage(page).wait_for_loader()
+
+        page.get_by_role("button", name="Прикрепленные").click()
+        BasePage(page).wait_for_loader()
+        expect(page.locator("b-page")).to_contain_text("Акция")
+
+    with allure.step("7 - Sahifani yopish"):
         page.get_by_role("button", name="Закрыть").click()
         expect(page.get_by_role("heading")).to_contain_text("Рабочие зоны")
 

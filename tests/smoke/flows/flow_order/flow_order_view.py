@@ -12,7 +12,9 @@ def flow_order_view(page, get_value=None):
         keys = get_value if isinstance(get_value, list) else [get_value]
         for key in keys:
             with allure.step(f"Order View: value -> '{key}' olindi"):
-                result[key] = page.locator(f'//t[contains(text(),"{key}")]/../../span').inner_text().strip()
+                # Exact label mosligi: contains() endi "Статус" ni "Статус заказов, которые более 90 (дней)"
+                # kabi yangi matnlarga ham moslab strict mode violation berardi.
+                result[key] = page.locator(f'//t[normalize-space()="{key}"]/../../span').inner_text().strip()
 
     page.get_by_role("button", name="Закрыть").click()
 

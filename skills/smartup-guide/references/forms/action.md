@@ -41,12 +41,25 @@ Forma moduli barqaror: `#anor718-input-...`; ro'yxat grid moduli `#anor717-input
 Bu kompaniyada odatda 1 ta product (`product-pw{code}`) bo'ladi, shuning uchun "10 ta product" = **miqdor** deb talqin qilinadi:
 
 - Тип акции = **Кол-во**
-- Условие "Все ТМЦ": `rule.main_value` = **10** (10 dona olinganda ishga tushadi)
+- Условие: `rule.main_value` = **10** (10 dona olinganda ishga tushadi)
+- **Условие producti SHART**: shart qatorini "Все ТМЦ" holatida QOLDIRMA — `#rule_products` (Поиск) orqali `product-pw{code}` ni tanla. Aks holda order'da aksiya umuman chiqmaydi (pastга qara).
 - Бонус: `bonus.bonus_kind` = **Скидка**, ТМЦ = `product-pw{code}`, `product.value` = **10**
 - Ro'yxatda: `Скидка 10% ... | Кол-во | Активный`
 - Screenshot: `skills/smartup-guide/references/forms/screenshots/action/action__list-created__desktop-1200x660__20260610.png`
 
+## Aksiyaning order'da ishlashi (end-to-end, MCP bilan 2026-06-16 tasdiqlangan)
+
+Aksiya chegirmasi order'da qo'llanishi uchun **uchta** shart bir vaqtda bajarilishi kerak:
+
+1. **Условие producti** = `product-pw{code}` (yuqorida). "Все ТМЦ" qolsa, order'ning "Акции" tabida `Тип цены акции не прикреплен к рабочей зоне или клиенту или штат` xatosi chiqadi va chegirma bo'lmaydi.
+2. **Room'ga "Акция" narx turi prikrep qilingan** bo'lishi kerak (`run_room_attachment` step 6 — qarang [room.md] yoki test_room.py). Ulanish 2 bosqichli: `Тип цены tab -> Доступные -> Создать тип цены -> "Акция" -> Прикрепить -> Прикрепить Акция? да` (Доступныега qo'shadi), so'ng yana `Доступные -> "Акция" -> Прикрепить -> да` (Прикрепленныега o'tkazadi). Faqat 1-bosqich qilinsa, "Акция" Доступныеда qolib ketadi va order'da aksiya chiqmaydi.
+3. **Order'da bonusni yoqish**: ТМЦ sahifasida product (qty=10) qo'shilgach, **"Акции" tab** paydo bo'ladi (badge bilan). Unda aksiya ko'rinadi (`Получить бонус`); chegirma avtomatik qo'llanmaydi — **"Получить" toggle**ни yoqish kerak. Toggle styled switch: `input[ng-model="condition.get"]` oddiy/force click bilan bosilmaydi, **native DOM `.click()`** (`page.evaluate`) ishonchli (ng-change orqali qayta hisoblanadi).
+
+Natija (10 × 7 000 = 70 000, 10% skidka): **Товар** qatorida `Сумма скидки/наценки = -7 000`, `Сумма к оплате/ИТОГО = 63 000`; final sahifa va view'da ham `-7 000` / `63 000`; order list jami `63 000 сум`.
+
+> Eslatma: aksiya formasidagi **"Тип цены"** maydoni (Главное) sotuv narx turini (`Price Type UZB-pw{code}`) beradi, **"Акция" emas** — bu C-01 da bo'sh qoldiriladi va chegirmaga ta'sir qilmaydi.
+
 ## Login / data eslatma
 
 - Aksiya user profil bilan yaratiladi: `user-pw{code}@<company>`, parol USER_PASS. `code` va konkret qiymatlar `data_store.json` dan olinadi (dossierга literal yozilmaydi).
-- Test: `tests/smoke/test_groups/test_C_grup/` (C-group), leaf `run_c_group_create_action(...)`.
+- Testlar: `tests/smoke/test_groups/test_C_grup/test_action.py` — C-01 `run_c_group_create_action(...)` (aksiya yaratish), C-02 `run_c_group_order_action_discount(...)` (order'da chegirmani tekshirish). Runner: `test_c_group_runner.py`.

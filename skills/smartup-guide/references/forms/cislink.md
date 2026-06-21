@@ -1,5 +1,7 @@
 # CisLink integration report (trade/rep/integration/cislink)
 
+> **STATUS: SKIP (barcha serverda) — 2026-06-12.** CisLink sahifasi Smartup deploymentlar bo'ylab o'zgarmoqda (pastdagi "Server farqi" bo'limiga qarang), shuning uchun test barcha serverda o'tkazib yuborilgan. Joyi: `test_report_group_runner.py` — chain'dan CisLink progress_step bloki olib tashlangan, standalone `test_report_01_cislink` ga `@pytest.mark.skip(reason=CISLINK_SKIP_REASON)` qo'yilgan. Qayta yoqish: chain blokini tiklab, skip markerni olib tashlash (sahifa barqarorlashganda).
+
 CisLink — sotuv/qoldiq ma'lumotlarini tashqi tizim (CisLink) uchun `.txt` fayllar jamlangan **.zip** ko'rinishida eksport qiluvchi integration report.
 
 ## Navigatsiya
@@ -47,6 +49,16 @@ Mavjud group variantlari (autotest'da): person — `Группа/Категор�
 - **Price type nomi**: checklistda `Цена продажи UZB-{cod}` — bu eski Selenium loyiha nomi. Bu loyihada `Price Type UZB-pw{code}` (test_price_type yaratgan nom). `Цена продажи` — narx turi (kind), nom emas.
 - **Login**: checklist admin login talab qiladi → `authorization(page)` (admin@`<company>`). Lekin user (`user-pw{code}`) ham sahifaga kira oladi.
 - Generatsiyada confirm modal chiqmaydi — to'g'ridan-to'g'ri download bo'ladi.
+
+## Server farqi: app3.greenwhite.uz/xtrade ≠ smartup.online (MUHIM)
+
+Yuqoridagi flow **`smartup.online`** deployment uchun to'g'ri. **`app3.greenwhite.uz/xtrade`** (CI'da `--url https://app3.greenwhite.uz/xtrade`, APP3 company) deploymentida CisLink sahifasi **boshqacha versiya** — test shu yerda yiqiladi:
+
+- **`Настройки` tugmasi YO'Q.** Filtrlar modal ortida emas, to'g'ridan-to'g'ri asosiy sahifada inline ko'rsatiladi: `Шаблон` (template tanlash), `Тип периода` (`Последние 45 дней` / `Пользовательский период`), `До` (sana). `identification_code`, `person_groups`, `product_groups`, `price_types` maydonlari bu versiyada yo'q.
+- Asosiy sahifada ikkita generatsiya tugmasi: **`Сформировать`** va **`Сформировать(CISLINK)`** (online'da `Сформировать(MQ)` edi), hamda `Шаблоны`, `Закрыть`.
+- Natija: `run_report_cislink_check` step 2'da `get_by_role("button", name="Настройки", exact=True).click()` → `TimeoutError` (10s), chunki tugma sahifada mavjud emas. Heading `CisLink(NNNN)` esa ko'rinadi (step 1 o'tadi).
+- Dalil: CI run 27402337118 (2026-06-12), trace screenshot `CisLink(7008)` sahifasi.
+- Xulosa: bu **test bug emas**, ikki Smartup deploymentining UI versiyasi farqi. Test online uchun yozilgan; xtrade'da CisLink reportni qo'llab-quvvatlash kerak bo'lsa, sahifa layoutiga qarab branch qilish (Настройки bormi → modal, yo'q bo'lsa → inline Шаблон/период) kerak.
 
 ## Test
 

@@ -22,6 +22,11 @@ Tags: locator, heading, get_by_role
 - Wizard yoki ko'p bo'limli formalarda bir vaqtda bir nechta ko'rinadigan heading bo'ladi (masalan Акция create: `Акция (создание)`, `Главное`, `Условия`); bunda nomsiz `get_by_role("heading")` bir nechta elementga to'g'ri kelib `to_contain_text` fail bo'ladi.
 - Yechim: sarlavhani aniq nom bilan nishonla — `expect(page.get_by_role("heading", name="Акция (создание)")).to_be_visible()` (substring match; `exact=True` ishlatma, list heading'larda ko'pincha oldida icon/probel bo'ladi).
 
+### View (Просмотр) label→value olish — exact match
+Tags: locator, order-view, label, xpath
+- `flow_order_view` view sahifasida label→value ni `//t[normalize-space()="{key}"]/../../span` orqali oladi.
+- `contains(text(),"{key}")` ISHLATMA: ilova label'larga yangi uzun matn qo'shsa (masalan `Статус` yoniga `Статус заказов, которые более 90 (дней)` tooltip/label qo'shilgan — 2026-06-21), `contains` ikkala `<t>` ga mos kelib strict mode violation beradi. Aniq (`normalize-space()=`) moslik shart.
+
 ### Form Field Discovery
 Tags: form, discovery, checkbox, switch, radio
 - Yangi add/edit forma o'rganilganda faqat `input[type=text]`, `textarea`, `select` va `b-input`larni yig'ish yetarli emas.
@@ -62,6 +67,7 @@ Tags: biruni, confirm, modal
   - `confirm.get_by_role("button", name="да").click()`
   - `confirm.wait_for(state="hidden")`
 - Qoida: `да` button har doim confirm modal ichida scope qilinadi.
+- Order status o'zgartirish confirm matni: `Изменить статус на {status}?` (masalan `Изменить статус на Отменен?`). Ilgari `Изменить на {status}?` edi — 2026-06-21 da ilova matni o'zgargan, `confirm_biruni` `to_contain_text` mosligi buzilgan (modal ochiq qolib ketgan ko'rinadi). `flow_order_list` shu yangi matnga moslangan.
 
 ### Biruni Error
 Tags: biruni, error, modal

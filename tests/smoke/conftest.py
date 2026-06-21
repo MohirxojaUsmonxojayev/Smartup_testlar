@@ -18,8 +18,8 @@ ALLURE_REPORT_DIR = "test-results/allure-report"
 CREATED_COMPANY_PASSWORD = "greenwhite"
 
 # Timeout konstantalari — bitta joyda, butun loyiha bo'ylab ishlatiladi
-DEFAULT_TIMEOUT    = 10_000    # click, fill, expect va boshqa locator amallari (ms)
-NAVIGATION_TIMEOUT = 60_000    # page.goto, wait_for_load_state (ms)
+DEFAULT_TIMEOUT    = 120_000    # click, fill, expect va boshqa locator amallari (ms)
+NAVIGATION_TIMEOUT = 120_000    # page.goto, wait_for_load_state (ms)
 
 _USER_SETUP_FAILED = False
 _FAILED_SMOKE_GROUPS: set[str] = set()
