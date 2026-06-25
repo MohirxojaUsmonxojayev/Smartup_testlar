@@ -1,3 +1,16 @@
+# ==========================================================
+# ⚠️  MUHIM QOIDALAR — O'ZGARTIRISHDAN AVVAL O'QI
+# ==========================================================
+# 1. expect() → DOIM try/except Exception ga o'ra
+# 2. except AssertionError YETARLI EMAS → except Exception
+# 3. Fallback locator (button,tab,span) QO'SHMA → sekinlashadi
+# 4. Angular forma → app-mbi-report-constructor
+#    Eski forma  → b-page
+#    Aralash     → angular.count() > 0 tekshir
+# 5. Yangi locator → AVVAL codegen bilan tekshir
+# 6. Batafsil: tests/regression/TESTING_RULES.md
+# ==========================================================
+
 import json
 import os
 import random
