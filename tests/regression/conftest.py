@@ -244,10 +244,12 @@ def page(browser: Browser, request) -> Generator[Page, Any, None]:
     safe_name = request.node.nodeid.replace("/", "_").replace("::", "__")
     trace_path = os.path.join(TRACE_DIR, f"{safe_name}.zip")
 
-    failed = getattr(getattr(request.node, "rep_call", None), "failed", False)
+    hard_failed = getattr(getattr(request.node, "rep_call", None), "failed", False)
+    from utils.telegram_reporter import _session_soft_failures
+    soft_failed = bool(_session_soft_failures)
 
-    if failed:
-        # FAIL: trace saqlanadi va Allure ga biriktiriladi
+    if hard_failed or soft_failed:
+        # HARD yoki SOFT xato bo'lsa — trace saqlanadi va Allure ga biriktiriladi
         context.tracing.stop(path=trace_path)
         try:
             with open(trace_path, "rb") as _tf:
@@ -259,7 +261,7 @@ def page(browser: Browser, request) -> Generator[Page, Any, None]:
                 )
         except Exception:
             pass
-        # Fail paytidagi sahifa screenshoti
+        # Xato paytidagi sahifa screenshoti
         try:
             allure.attach(page_obj.url, name="current-url", attachment_type=allure.attachment_type.TEXT)
             screenshot = page_obj.screenshot(full_page=True)
@@ -267,7 +269,7 @@ def page(browser: Browser, request) -> Generator[Page, Any, None]:
         except Exception:
             pass
     else:
-        # PASS: trace diskga saqlanmaydi (disk tejaladi)
+        # Hech qanday xato yo'q — trace saqlanmaydi (disk tejaladi)
         context.tracing.stop()
         # Yakuniy holat screenshoti (1 ta)
         try:
