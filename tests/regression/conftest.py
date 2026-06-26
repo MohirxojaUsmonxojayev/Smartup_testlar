@@ -369,9 +369,9 @@ def logger(request) -> Generator[TestLogger, Any, None]:
 
 
 @pytest.fixture
-def soft() -> Generator[SoftAssert, Any, None]:
+def soft(page) -> Generator[SoftAssert, Any, None]:
     """Soft assertion — test to'xtamasdan xatolarni yig'adi, oxirida assert_all() chaqiriladi."""
-    s = SoftAssert()
+    s = SoftAssert(page=page)
     yield s
     s.assert_all()
 
