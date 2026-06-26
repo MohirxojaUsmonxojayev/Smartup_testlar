@@ -17,12 +17,14 @@ from utils.telegram_sender import send_telegram
 _final_results: dict = {}
 _call_counts: dict = {}
 _start_time: float = 0.0
+_session_soft_failures: list = []
 
 
 class TelegramReporter:
 
     def pytest_sessionstart(self, session) -> None:
         global _start_time
+        _session_soft_failures.clear()
         _start_time = time.time()
         server = os.getenv("COMPANY_URL", "app3.greenwhite.uz/xtrade")
         send_telegram(
@@ -90,7 +92,14 @@ def _send_summary(elapsed: float) -> None:
     skipped = [r for r in results if r[1] == "skipped"]
     total   = len(results)
 
-    verdict = "✅ MUVAFFAQIYATLI" if not failed else "❌ XATOLIKLAR BOR"
+    soft_failures = list(_session_soft_failures)
+    hard_failed   = bool(failed)
+    soft_failed   = bool(soft_failures)
+
+    if hard_failed or soft_failed:
+        verdict = "❌ XATOLIKLAR BOR"
+    else:
+        verdict = "✅ MUVAFFAQIYATLI"
 
     lines = [
         f"📊 <b>REGRESSION TEST — {verdict}</b>",
@@ -105,7 +114,9 @@ def _send_summary(elapsed: float) -> None:
         name, status, errors = item[0], item[1], item[2]
         attempt = item[3] if len(item) > 3 else 1
 
-        if status == "passed":
+        if status == "passed" and soft_failed:
+            lines.append(f"📋 <code>{name}</code> — ⚠️ SOFT XATOLAR")
+        elif status == "passed":
             note = f" <i>({attempt}-urinishda)</i>" if attempt > 1 else ""
             lines.append(f"📋 <code>{name}</code> — ✅ PASSED{note}")
         elif status == "failed":
@@ -119,5 +130,14 @@ def _send_summary(elapsed: float) -> None:
 
     if total == 0:
         lines.append("⚠️ Hech qanday test natijasi aniqlanmadi.")
+
+    if soft_failures:
+        count = len(soft_failures)
+        lines.append("")
+        lines.append(f"⚠️ O'TMAGAN QADAMLAR ({count} ta):")
+        for err in soft_failures[:10]:
+            lines.append(err)
+        if count > 10:
+            lines.append(f"... va yana {count - 10} ta (Allure reportda ko'ring)")
 
     send_telegram("\n".join(lines))

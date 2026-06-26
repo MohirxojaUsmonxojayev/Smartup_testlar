@@ -20,6 +20,11 @@ class SoftAssert:
         if not condition:
             self.failures.append(message)
             try:
+                from utils.telegram_reporter import _session_soft_failures
+                _session_soft_failures.append(message)
+            except Exception:
+                pass
+            try:
                 allure.attach(
                     message,
                     name="soft-fail",
