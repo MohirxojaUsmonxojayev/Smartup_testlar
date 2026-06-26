@@ -46,6 +46,8 @@ class SoftAssert:
                         name=f"url: {message[:50]}",
                         attachment_type=allure.attachment_type.TEXT,
                     )
+                    from utils.telegram_reporter import _session_soft_screenshots
+                    _session_soft_screenshots.append((message, screenshot))
                 except Exception:
                     pass
 

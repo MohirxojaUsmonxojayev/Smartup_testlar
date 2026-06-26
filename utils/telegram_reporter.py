@@ -12,12 +12,13 @@ import re
 import time
 from datetime import datetime
 
-from utils.telegram_sender import send_telegram
+from utils.telegram_sender import send_telegram, send_photo
 
 _final_results: dict = {}
 _call_counts: dict = {}
 _start_time: float = 0.0
 _session_soft_failures: list = []
+_session_soft_screenshots: list = []  # [(xato_matni, screenshot_bytes), ...]
 
 
 class TelegramReporter:
@@ -25,6 +26,7 @@ class TelegramReporter:
     def pytest_sessionstart(self, session) -> None:
         global _start_time
         _session_soft_failures.clear()
+        _session_soft_screenshots.clear()
         _start_time = time.time()
         server = os.getenv("COMPANY_URL", "app3.greenwhite.uz/xtrade")
         send_telegram(
@@ -141,3 +143,18 @@ def _send_summary(elapsed: float) -> None:
             lines.append(f"... va yana {count - 10} ta (Allure reportda ko'ring)")
 
     send_telegram("\n".join(lines))
+
+    screenshots = list(_session_soft_screenshots)
+    if screenshots:
+        for i, (err_msg, img_bytes) in enumerate(screenshots[:10], 1):
+            caption = f"📸 XATO #{i}\n{err_msg}"
+            try:
+                sent = send_photo(img_bytes, caption)
+                if not sent:
+                    send_telegram(f"📸 XATO #{i}\n{err_msg}")
+            except Exception:
+                send_telegram(f"📸 XATO #{i}\n{err_msg}")
+            time.sleep(0.5)
+        remaining = len(screenshots) - 10
+        if remaining > 0:
+            send_telegram(f"... va yana {remaining} ta xato screenshoti — Allure reportda ko'ring")

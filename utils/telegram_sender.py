@@ -24,6 +24,24 @@ def _load_env() -> None:
 _load_env()
 
 
+def send_photo(photo_bytes: bytes, caption: str = "") -> bool:
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        return False
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    try:
+        r = requests.post(
+            url,
+            data={"chat_id": chat_id, "caption": caption[:1024], "parse_mode": "HTML"},
+            files={"photo": ("screenshot.png", photo_bytes, "image/png")},
+            timeout=30,
+        )
+        return r.ok
+    except Exception:
+        return False
+
+
 def send_telegram(text: str) -> bool:
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
