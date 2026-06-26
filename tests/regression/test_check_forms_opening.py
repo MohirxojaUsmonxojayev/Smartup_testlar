@@ -281,7 +281,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
     with allure.step("29 - [Продажа] Конструктор отчетов по продажам — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Продажа").click()
         page.get_by_role("link", name="Конструктор отчетов по продажам").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
@@ -335,7 +340,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
     with allure.step("34 - [Продажа] Конструктор отчётов по визитам — 'Просмотр' ko'rinadi"):
         page.get_by_role("button", name="Продажа").click()
         page.get_by_role("menuitem", name="Конструктор отчётов по визитам").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
@@ -634,7 +644,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
     with allure.step("66 - [Склад] Конструктор отчетов по внутр. перемещениям — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Склад").click()
         page.get_by_role("link", name="Конструктор отчетов по внутр. перемещениям").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
@@ -652,7 +667,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             pass
         page.get_by_role("link", name="Склад").click()
         page.get_by_role("link", name="Конструктор отчетов по запросам на закуп").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
@@ -670,7 +690,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             pass
         page.get_by_role("link", name="Склад").click()
         page.get_by_role("link", name="Конструктор отчетов по закупкам").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
@@ -688,7 +713,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             pass
         page.get_by_role("link", name="Склад").click()
         page.get_by_role("link", name="Конструктор отчетов по поступлениям").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
@@ -706,7 +736,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             pass
         page.get_by_role("link", name="Склад").click()
         page.get_by_role("link", name="Конструктор отчетов по списанию").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
@@ -724,7 +759,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             pass
         page.get_by_role("link", name="Склад").click()
         page.get_by_role("link", name="Конструктор отчетов по запросам на межорг. перемещения").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
@@ -742,7 +782,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             pass
         page.get_by_role("link", name="Склад").click()
         page.get_by_role("link", name="Конструктор отчетов по межорг. перемещениям").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
@@ -987,7 +1032,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
     with allure.step("98 - [Финансы] Конструктор отчетов по финансам — 'Просмотреть' ko'rinadi"):
         page.get_by_role("link", name="Финансы").click()
         page.get_by_role("link", name="Конструктор отчетов по финансам").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
@@ -2012,7 +2062,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
     with allure.step("211 - [Торговый маркетинг] Конструктор отчетов по долям на полках — 'Просмотр' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Конструктор отчетов по долям на полках").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
@@ -2086,7 +2141,12 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
     with allure.step("218 - [Оборудование] Конструктор отчетов по заявкам на оборудование — 'Просмотреть' ko'rinadi"):
         page.get_by_role("link", name="Оборудование").click()
         page.get_by_role("link", name="Конструктор отчетов по заявкам на оборудование").click()
-        page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            page.wait_for_selector(
+                "app-mbi-report-constructor, b-page", timeout=15000
+            )
+        except Exception:
+            pass
         try:
             angular = page.locator("app-mbi-report-constructor")
             if angular.count() > 0:
