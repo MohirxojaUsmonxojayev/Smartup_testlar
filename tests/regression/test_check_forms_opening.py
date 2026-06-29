@@ -1,4 +1,4 @@
-import allure
+﻿import allure
 from playwright.sync_api import Page, expect
 
 from tests.regression.test_auth import run_user_login
@@ -1115,14 +1115,14 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Финансы] Анализ счета — 'Параметры' topilmadi | {type(e).__name__}")
 
-    with allure.step("106 - [Финансы] Прибыль и убыток (P&L) — 'Параметры' ko'rinadi"):
+    with allure.step("106 - [Финансы] Прибыль и убыток (PnL) — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Финансы").click()
-        page.get_by_role("link", name="Прибыль и убыток (P&L)").click()
+        page.get_by_role("link", name="Прибыль и убыток (PnL)").click()
         try:
             expect(page.locator("b-page")).to_contain_text("Параметры")
         except Exception as e:
             soft.check(False,
-                f"❌ [Финансы] Прибыль и убыток (P&L) — 'Параметры' topilmadi | {type(e).__name__}")
+                f"❌ [Финансы] Прибыль и убыток (n&L) — 'Параметры' topilmadi | {type(e).__name__}")
 
     with allure.step("107 - [Финансы] Отчет о прибылях и убытках (БЕТА) — 'Закрыть' ko'rinadi"):
         page.get_by_role("link", name="Финансы").click()
@@ -1490,7 +1490,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Комментарии — 'Прикрепление' topilmadi | {type(e).__name__}")
 
-    with allure.step("148 - [Справочники] Опросники — 'Прикрепление' ko'rinadi"):
+    with allure.step("147 - [Справочники] Опросники — 'Прикрепление' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Опросники", exact=True).click()
         try:
@@ -1499,7 +1499,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Опросники — 'Прикрепление' topilmadi | {type(e).__name__}")
 
-    with allure.step("149 - [Справочники] Регионы — 'Создать' ko'rinadi"):
+    with allure.step("148 - [Справочники] Регионы — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Регионы").click()
         try:
@@ -1508,7 +1508,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Регионы — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("150 - [Справочники] Вопросы двойного визита — 'Создать' ko'rinadi"):
+    with allure.step("149 - [Справочники] Вопросы двойного визита — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Вопросы двойного визита").click()
         try:
@@ -1517,7 +1517,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Вопросы двойного визита — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("151 - [Справочники] Опросники двойных визитов — 'Создать' ko'rinadi"):
+    with allure.step("150 - [Справочники] Опросники двойных визитов — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Опросники двойных визитов").click()
         try:
@@ -1526,7 +1526,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Опросники двойных визитов — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("152 - [Справочники] Презентации — 'Создать' ko'rinadi"):
+    with allure.step("151 - [Справочники] Презентации — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Презентации").click()
         try:
@@ -1535,7 +1535,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Презентации — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("153 - [Справочники] Продавцы — jadvalda 'Название' ustuni ko'rinadi"):
+    with allure.step("152 - [Справочники] Продавцы — jadvalda 'Название' ustuni ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Продавцы").click()
         try:
@@ -1544,7 +1544,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Продавцы — jadvalda 'Название' ustuni topilmadi | {type(e).__name__}")
 
-    with allure.step("154 - [Справочники] Физические лица — 'Создать' ko'rinadi"):
+    with allure.step("153 - [Справочники] Физические лица — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Физические лица").click()
         try:
@@ -1553,7 +1553,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Физические лица — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("155 - [Справочники] Юридические лица — 'Создать' ko'rinadi"):
+    with allure.step("154 - [Справочники] Юридические лица — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Юридические лица").click()
         try:
@@ -1562,7 +1562,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Юридические лица — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("156 - [Справочники] Отделы — 'Создать' ko'rinadi"):
+    with allure.step("155 - [Справочники] Отделы — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Отделы").click()
         try:
@@ -1571,7 +1571,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Отделы — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("157 - [Справочники] Должности — 'Создать' ko'rinadi"):
+    with allure.step("156 - [Справочники] Должности — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Должности").click()
         try:
@@ -1580,7 +1580,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Должности — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("158 - [Справочники] Рабочие зоны — 'Создать' ko'rinadi"):
+    with allure.step("157 - [Справочники] Рабочие зоны — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Рабочие зоны").click()
         try:
@@ -1589,7 +1589,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Рабочие зоны — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("159 - [Справочники] Штат — 'Создать' ko'rinadi"):
+    with allure.step("158 - [Справочники] Штат — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Штат").click()
         try:
@@ -1598,7 +1598,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Штат — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("160 - [Справочники] Клиенты — 'Создать' ko'rinadi"):
+    with allure.step("159 - [Справочники] Клиенты — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Клиенты").click()
         try:
@@ -1607,7 +1607,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Клиенты — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("161 - [Справочники] Уведомления — 'Создать' ko'rinadi"):
+    with allure.step("160 - [Справочники] Уведомления — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Уведомления").click()
         try:
@@ -1616,7 +1616,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Уведомления — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("162 - [Справочники] Акции — 'Создать' tugmasi ko'rinadi"):
+    with allure.step("161 - [Справочники] Акции — 'Создать' tugmasi ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Акции").click()
         try:
@@ -1625,7 +1625,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Акции — 'Создать' tugmasi topilmadi | {type(e).__name__}")
 
-    with allure.step("163 - [Справочники] Нагрузки — 'Создать' tugmasi ko'rinadi"):
+    with allure.step("162 - [Справочники] Нагрузки — 'Создать' tugmasi ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Нагрузки").click()
         try:
@@ -1634,7 +1634,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Нагрузки — 'Создать' tugmasi topilmadi | {type(e).__name__}")
 
-    with allure.step("164 - [Справочники] Рекомендации — 'Создать' ko'rinadi"):
+    with allure.step("163 - [Справочники] Рекомендации — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Рекомендации").click()
         try:
@@ -1643,7 +1643,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Рекомендации — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("165 - [Справочники] Правила ограничений — 'Создать' ko'rinadi"):
+    with allure.step("164 - [Справочники] Правила ограничений — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Правила ограничений").click()
         try:
@@ -1652,7 +1652,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Правила ограничений — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("166 - [Справочники] Продуктовая корзина — 'Создать' ko'rinadi"):
+    with allure.step("165 - [Справочники] Продуктовая корзина — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Продуктовая корзина").click()
         try:
@@ -1661,7 +1661,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Продуктовая корзина — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("167 - [Справочники] Сеты ТМЦ — 'Создать' ko'rinadi"):
+    with allure.step("166 - [Справочники] Сеты ТМЦ — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Сеты ТМЦ").click()
         try:
@@ -1670,7 +1670,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Сеты ТМЦ — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("168 - [Справочники] Лимитирование ТМЦ — 'Создать' ko'rinadi"):
+    with allure.step("167 - [Справочники] Лимитирование ТМЦ — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Лимитирование ТМЦ").click()
         try:
@@ -1679,7 +1679,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Лимитирование ТМЦ — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("169 - [Справочники] Вопросы категоризации — 'Создать' ko'rinadi"):
+    with allure.step("168 - [Справочники] Вопросы категоризации — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Вопросы категоризации").click()
         try:
@@ -1688,7 +1688,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Вопросы категоризации — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("170 - [Справочники] Категоризация физических лиц — jadvalda 'Название' ko'rinadi"):
+    with allure.step("169 - [Справочники] Категоризация физических лиц — jadvalda 'Название' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Категоризация физических лиц").click()
         try:
@@ -1697,7 +1697,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Категоризация физических лиц — jadvalda 'Название' topilmadi | {type(e).__name__}")
 
-    with allure.step("171 - [Справочники] Категоризация юридических лиц — jadvalda 'Название' ko'rinadi"):
+    with allure.step("170 - [Справочники] Категоризация юридических лиц — jadvalda 'Название' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Категоризация юридических лиц").click()
         try:
@@ -1706,7 +1706,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Категоризация юридических лиц — jadvalda 'Название' topilmadi | {type(e).__name__}")
 
-    with allure.step("172 - [Справочники] Результат категоризации — jadvalda 'Пользователь' ko'rinadi"):
+    with allure.step("171 - [Справочники] Результат категоризации — jadvalda 'Пользователь' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Результат категоризации").click()
         try:
@@ -1715,7 +1715,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Результат категоризации — jadvalda 'Пользователь' topilmadi | {type(e).__name__}")
 
-    with allure.step("173 - [Справочники] Отчет по результату категоризации — 'Просмотреть' ko'rinadi"):
+    with allure.step("172 - [Справочники] Отчет по результату категоризации — 'Просмотреть' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Отчет по результату категоризации").click()
         try:
@@ -1724,7 +1724,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Отчет по результату категоризации — 'Просмотреть' topilmadi | {type(e).__name__}")
 
-    with allure.step("174 - [Справочники] Публикация в бот — 'Добавить' ko'rinadi"):
+    with allure.step("173 - [Справочники] Публикация в бот — 'Добавить' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Публикация в бот").click()
         try:
@@ -1733,7 +1733,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Справочники] Публикация в бот — 'Добавить' topilmadi | {type(e).__name__}")
 
-    with allure.step("175 - [Справочники] Минимальные обязательные ассортименты — 'Создать' ko'rinadi"):
+    with allure.step("174 - [Справочники] Минимальные обязательные ассортименты — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Справочники").click()
         page.get_by_role("link", name="Минимальные обязательные ассортименты").click()
         try:
@@ -1744,7 +1744,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
 
     # ── Торговый маркетинг bo'limi ─────────────────────────────────────────
 
-    with allure.step("176 - [Торговый маркетинг] Настройки мерчандайзинга — 'Создать' ko'rinadi"):
+    with allure.step("175 - [Торговый маркетинг] Настройки мерчандайзинга — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Настройки мерчандайзинга").click()
         try:
@@ -1753,7 +1753,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Настройки мерчандайзинга — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("177 - [Торговый маркетинг] Мерчандайзинг — jadvalda 'Пользователь' ko'rinadi"):
+    with allure.step("176 - [Торговый маркетинг] Мерчандайзинг — jadvalda 'Пользователь' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Мерчандайзинг", exact=True).click()
         try:
@@ -1762,7 +1762,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Мерчандайзинг — jadvalda 'Пользователь' topilmadi | {type(e).__name__}")
 
-    with allure.step("178 - [Торговый маркетинг] КПЭ по штатам — 'Создать' ko'rinadi"):
+    with allure.step("177 - [Торговый маркетинг] КПЭ по штатам — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="КПЭ по штатам").click()
         try:
@@ -1771,7 +1771,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] КПЭ по штатам — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("179 - [Торговый маркетинг] КПЭ по рабочим зонам — 'Создать' ko'rinadi"):
+    with allure.step("178 - [Торговый маркетинг] КПЭ по рабочим зонам — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="КПЭ по рабочим зонам").click()
         try:
@@ -1780,7 +1780,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] КПЭ по рабочим зонам — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("180 - [Торговый маркетинг] КПЭ по характеристикам ТМЦ — 'Создать' ko'rinadi"):
+    with allure.step("179 - [Торговый маркетинг] КПЭ по характеристикам ТМЦ — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.locator("#kt_header_menu").get_by_role("link", name="КПЭ по характеристикам ТМЦ").click()
         try:
@@ -1789,7 +1789,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] КПЭ по характеристикам ТМЦ — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("181 - [Торговый маркетинг] КПЭ по ТМЦ — 'Создать' ko'rinadi"):
+    with allure.step("180 - [Торговый маркетинг] КПЭ по ТМЦ — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.locator("#kt_header_menu").get_by_role("link", name="КПЭ по ТМЦ").click()
         try:
@@ -1798,7 +1798,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] КПЭ по ТМЦ — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("182 - [Торговый маркетинг] КПЭ по клиентам — 'Создать' ko'rinadi"):
+    with allure.step("181 - [Торговый маркетинг] КПЭ по клиентам — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.locator("#kt_header_menu").get_by_role("link", name="КПЭ по клиентам").click()
         try:
@@ -1807,7 +1807,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] КПЭ по клиентам — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("183 - [Торговый маркетинг] КПЭ клиентов по ТМЦ — 'Создать' ko'rinadi"):
+    with allure.step("182 - [Торговый маркетинг] КПЭ клиентов по ТМЦ — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.locator("#kt_header_menu").get_by_role("link", name="КПЭ клиентов по ТМЦ").click()
         try:
@@ -1816,7 +1816,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] КПЭ клиентов по ТМЦ — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("184 - [Торговый маркетинг] КПЭ клиентов по характеристикам ТМЦ — 'Создать' ko'rinadi"):
+    with allure.step("183 - [Торговый маркетинг] КПЭ клиентов по характеристикам ТМЦ — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.locator("#kt_header_menu").get_by_role("link", name="КПЭ клиентов по характеристикам ТМЦ").click()
         try:
@@ -1825,7 +1825,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] КПЭ клиентов по характеристикам ТМЦ — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("185 - [Торговый маркетинг] КПЭ на категорию клиентов по характеристикам ТМЦ — 'Создать' ko'rinadi"):
+    with allure.step("184 - [Торговый маркетинг] КПЭ на категорию клиентов по характеристикам ТМЦ — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.locator("#kt_header_menu").get_by_role("link", name="КПЭ на категорию клиентов по характеристикам ТМЦ").click()
         try:
@@ -1834,7 +1834,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] КПЭ на категорию клиентов по характеристикам ТМЦ — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("186 - [Торговый маркетинг] Шаблон КПЭ — 'Сохранить' ko'rinadi"):
+    with allure.step("185 - [Торговый маркетинг] Шаблон КПЭ — 'Сохранить' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Шаблон КПЭ").click()
         try:
@@ -1843,7 +1843,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Шаблон КПЭ — 'Сохранить' topilmadi | {type(e).__name__}")
 
-    with allure.step("187 - [Торговый маркетинг] Настройки бонуса — 'Создать' ko'rinadi"):
+    with allure.step("186 - [Торговый маркетинг] Настройки бонуса — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Настройки бонуса").click()
         try:
@@ -1852,7 +1852,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Настройки бонуса — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("188 - [Торговый маркетинг] Дашборд по КПЭ — 'Сформировать' ko'rinadi"):
+    with allure.step("187 - [Торговый маркетинг] Дашборд по КПЭ — 'Сформировать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Дашборд по КПЭ").click()
         try:
@@ -1861,7 +1861,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Дашборд по КПЭ — 'Сформировать' topilmadi | {type(e).__name__}")
 
-    with allure.step("189 - [Торговый маркетинг] Настройка характеристики — 'Создать' ko'rinadi"):
+    with allure.step("188 - [Торговый маркетинг] Настройка характеристики — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Настройка характеристики").click()
         try:
@@ -1870,7 +1870,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Настройка характеристики — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("190 - [Торговый маркетинг] Минимальные обязательные ассортименты — 'Создать' ko'rinadi"):
+    with allure.step("189 - [Торговый маркетинг] Минимальные обязательные ассортименты — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Минимальные обязательные ассортименты").click()
         try:
@@ -1879,7 +1879,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Минимальные обязательные ассортименты — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("191 - [Торговый маркетинг] Ассортименты — 'Создать' ko'rinadi"):
+    with allure.step("190 - [Торговый маркетинг] Ассортименты — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Ассортименты", exact=True).click()
         try:
@@ -1888,7 +1888,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Ассортименты — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("192 - [Торговый маркетинг] Планограммы — 'Прикрепление' ko'rinadi"):
+    with allure.step("191 - [Торговый маркетинг] Планограммы — 'Прикрепление' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Планограммы").click()
         try:
@@ -1897,7 +1897,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Планограммы — 'Прикрепление' topilmadi | {type(e).__name__}")
 
-    with allure.step("193 - [Торговый маркетинг] POS-материалы — 'Прикрепление' ko'rinadi"):
+    with allure.step("192 - [Торговый маркетинг] POS-материалы — 'Прикрепление' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="POS-материалы").click()
         try:
@@ -1906,7 +1906,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] POS-материалы — 'Прикрепление' topilmadi | {type(e).__name__}")
 
-    with allure.step("194 - [Торговый маркетинг] Причины несоответствия — 'Прикрепление' ko'rinadi"):
+    with allure.step("193 - [Торговый маркетинг] Причины несоответствия — 'Прикрепление' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Причины несоответствия").click()
         try:
@@ -1915,7 +1915,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Причины несоответствия — 'Прикрепление' topilmadi | {type(e).__name__}")
 
-    with allure.step("195 - [Торговый маркетинг] Конкуренты — 'Прикрепление' ko'rinadi"):
+    with allure.step("194 - [Торговый маркетинг] Конкуренты — 'Прикрепление' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Конкуренты").click()
         try:
@@ -1924,7 +1924,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Конкуренты — 'Прикрепление' topilmadi | {type(e).__name__}")
 
-    with allure.step("196 - [Торговый маркетинг] Шаблон отчета по опросам — 'Создать' ko'rinadi"):
+    with allure.step("195 - [Торговый маркетинг] Шаблон отчета по опросам — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Шаблон отчета по опросам").click()
         try:
@@ -1933,7 +1933,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Шаблон отчета по опросам — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("197 - [Торговый маркетинг] Продукты конкурентов — jadvalda 'Название' ko'rinadi"):
+    with allure.step("196 - [Торговый маркетинг] Продукты конкурентов — jadvalda 'Название' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Продукты конкурентов").click()
         try:
@@ -1942,7 +1942,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Продукты конкурентов — jadvalda 'Название' topilmadi | {type(e).__name__}")
 
-    with allure.step("198 - [Торговый маркетинг] Статусы мерчандайзинга — 'Прикрепление' ko'rinadi"):
+    with allure.step("197 - [Торговый маркетинг] Статусы мерчандайзинга — 'Прикрепление' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Статусы мерчандайзинга").click()
         try:
@@ -1951,7 +1951,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Статусы мерчандайзинга — 'Прикрепление' topilmadi | {type(e).__name__}")
 
-    with allure.step("199 - [Торговый маркетинг] Отчет по доле на полке — 'Параметры' ko'rinadi"):
+    with allure.step("198 - [Торговый маркетинг] Отчет по доле на полке — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Отчет по доле на полке").click()
         try:
@@ -1960,7 +1960,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Отчет по доле на полке — 'Параметры' topilmadi | {type(e).__name__}")
 
-    with allure.step("200 - [Торговый маркетинг] Отчет по ассортиментам — 'Параметры' ko'rinadi"):
+    with allure.step("199 - [Торговый маркетинг] Отчет по ассортиментам — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Отчет по ассортиментам").click()
         try:
@@ -1969,7 +1969,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Отчет по ассортиментам — 'Параметры' topilmadi | {type(e).__name__}")
 
-    with allure.step("201 - [Торговый маркетинг] Отчет по планограмме — 'Параметры' ko'rinadi"):
+    with allure.step("200 - [Торговый маркетинг] Отчет по планограмме — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Отчет по планограмме").click()
         try:
@@ -1978,7 +1978,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Отчет по планограмме — 'Параметры' topilmadi | {type(e).__name__}")
 
-    with allure.step("202 - [Торговый маркетинг] Отчет по ценам на полке — 'Параметры' ko'rinadi"):
+    with allure.step("201 - [Торговый маркетинг] Отчет по ценам на полке — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Отчет по ценам на полке").click()
         try:
@@ -1987,7 +1987,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Отчет по ценам на полке — 'Параметры' topilmadi | {type(e).__name__}")
 
-    with allure.step("203 - [Торговый маркетинг] Отчет по POS-материалам — 'Параметры' ko'rinadi"):
+    with allure.step("202 - [Торговый маркетинг] Отчет по POS-материалам — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Отчет по POS-материалам").click()
         try:
@@ -1996,7 +1996,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Отчет по POS-материалам — 'Параметры' topilmadi | {type(e).__name__}")
 
-    with allure.step("204 - [Торговый маркетинг] Сводный отчет по мерчандайзингу — 'Параметры' ko'rinadi"):
+    with allure.step("203 - [Торговый маркетинг] Сводный отчет по мерчандайзингу — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Сводный отчет по мерчандайзингу").click()
         try:
@@ -2005,7 +2005,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Сводный отчет по мерчандайзингу — 'Параметры' topilmadi | {type(e).__name__}")
 
-    with allure.step("205 - [Торговый маркетинг] Отчет об отсутствии или несоответствии — 'Параметры' ko'rinadi"):
+    with allure.step("204 - [Торговый маркетинг] Отчет об отсутствии или несоответствии — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Отчет об отсутствии или несоответствии").click()
         try:
@@ -2014,7 +2014,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Отчет об отсутствии или несоответствии — 'Параметры' topilmadi | {type(e).__name__}")
 
-    with allure.step("206 - [Торговый маркетинг] Отчет анализа цен — 'Параметры' ko'rinadi"):
+    with allure.step("205 - [Торговый маркетинг] Отчет анализа цен — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Отчет анализа цен").click()
         try:
@@ -2023,7 +2023,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Отчет анализа цен — 'Параметры' topilmadi | {type(e).__name__}")
 
-    with allure.step("207 - [Торговый маркетинг] Отчет по мерчандайзингу — 'Начало периода' ko'rinadi"):
+    with allure.step("206 - [Торговый маркетинг] Отчет по мерчандайзингу — 'Начало периода' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Отчет по мерчандайзингу", exact=True).click()
         try:
@@ -2032,7 +2032,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Отчет по мерчандайзингу — 'Начало периода' topilmadi | {type(e).__name__}")
 
-    with allure.step("208 - [Торговый маркетинг] Экспорт фото и видео отчетов по визитам — 'Параметры' ko'rinadi"):
+    with allure.step("207 - [Торговый маркетинг] Экспорт фото и видео отчетов по визитам — 'Параметры' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Экспорт фото и видео отчетов по визитам").click()
         try:
@@ -2041,7 +2041,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Экспорт фото и видео отчетов по визитам — 'Параметры' topilmadi | {type(e).__name__}")
 
-    with allure.step("209 - [Торговый маркетинг] Отчет по ценникам конкурентов — 'Сформировать' ko'rinadi"):
+    with allure.step("208 - [Торговый маркетинг] Отчет по ценникам конкурентов — 'Сформировать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Отчет по ценникам конкурентов").click()
         try:
@@ -2050,7 +2050,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Отчет по ценникам конкурентов — 'Сформировать' topilmadi | {type(e).__name__}")
 
-    with allure.step("210 - [Торговый маркетинг] Отчет по статусам мерчандайзинга — 'Сформировать' ko'rinadi"):
+    with allure.step("209 - [Торговый маркетинг] Отчет по статусам мерчандайзинга — 'Сформировать' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Отчет по статусам мерчандайзинга").click()
         try:
@@ -2059,7 +2059,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Торговый маркетинг] Отчет по статусам мерчандайзинга — 'Сформировать' topilmadi | {type(e).__name__}")
 
-    with allure.step("211 - [Торговый маркетинг] Конструктор отчетов по долям на полках — 'Просмотр' ko'rinadi"):
+    with allure.step("210 - [Торговый маркетинг] Конструктор отчетов по долям на полках — 'Просмотр' ko'rinadi"):
         page.get_by_role("link", name="Торговый маркетинг").click()
         page.get_by_role("link", name="Конструктор отчетов по долям на полках").click()
         try:
@@ -2080,7 +2080,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
 
     # ── Оборудование bo'limi ───────────────────────────────────────────────
 
-    with allure.step("212 - [Оборудование] Заявки на оборудование — 'Установить' ko'rinadi"):
+    with allure.step("211 - [Оборудование] Заявки на оборудование — 'Установить' ko'rinadi"):
         try:
             page.goto(_home_url, wait_until="domcontentloaded", timeout=8000)
         except Exception:
@@ -2093,7 +2093,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Оборудование] Заявки на оборудование — 'Установить' topilmadi | {type(e).__name__}")
 
-    with allure.step("213 - [Оборудование] Заявки на перемещения — 'Создать' ko'rinadi"):
+    with allure.step("212 - [Оборудование] Заявки на перемещения — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Оборудование").click()
         page.get_by_role("link", name="Заявки на перемещения").click()
         try:
@@ -2102,7 +2102,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Оборудование] Заявки на перемещения — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("214 - [Оборудование] Межорг. перемещение оборудования: отправка — 'Создать' ko'rinadi"):
+    with allure.step("213 - [Оборудование] Межорг. перемещение оборудования: отправка — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Оборудование").click()
         page.get_by_role("link", name="Межорг. перемещение оборудования: отправка").click()
         try:
@@ -2111,7 +2111,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Оборудование] Межорг. перемещение оборудования: отправка — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("215 - [Оборудование] Межорг. перемещение оборудования: прием — jadvalda 'Вид перемещения' ko'rinadi"):
+    with allure.step("214 - [Оборудование] Межорг. перемещение оборудования: прием — jadvalda 'Вид перемещения' ko'rinadi"):
         page.get_by_role("link", name="Оборудование").click()
         page.get_by_role("link", name="Межорг. перемещение оборудования: прием").click()
         try:
@@ -2120,7 +2120,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Оборудование] Межорг. перемещение оборудования: прием — jadvalda 'Вид перемещения' topilmadi | {type(e).__name__}")
 
-    with allure.step("216 - [Оборудование] Заявки на ремонт — jadvalda 'Номер заявки' ko'rinadi"):
+    with allure.step("215 - [Оборудование] Заявки на ремонт — jadvalda 'Номер заявки' ko'rinadi"):
         page.get_by_role("link", name="Оборудование").click()
         page.get_by_role("link", name="Заявки на ремонт").click()
         try:
@@ -2129,7 +2129,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Оборудование] Заявки на ремонт — jadvalda 'Номер заявки' topilmadi | {type(e).__name__}")
 
-    with allure.step("217 - [Оборудование] Неисправности оборудования — 'Прикрепление' ko'rinadi"):
+    with allure.step("216 - [Оборудование] Неисправности оборудования — 'Прикрепление' ko'rinadi"):
         page.get_by_role("link", name="Оборудование").click()
         page.get_by_role("link", name="Неисправности оборудовния").click()
         try:
@@ -2138,7 +2138,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Оборудование] Неисправности оборудования — 'Прикрепление' topilmadi | {type(e).__name__}")
 
-    with allure.step("218 - [Оборудование] Конструктор отчетов по заявкам на оборудование — 'Просмотреть' ko'rinadi"):
+    with allure.step("217 - [Оборудование] Конструктор отчетов по заявкам на оборудование — 'Просмотреть' ko'rinadi"):
         page.get_by_role("link", name="Оборудование").click()
         page.get_by_role("link", name="Конструктор отчетов по заявкам на оборудование").click()
         try:
@@ -2157,7 +2157,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Оборудование] Конструктор отчетов по заявкам на оборудование — 'Просмотреть' topilmadi | {type(e).__name__}")
 
-    with allure.step("219 - [Оборудование] Цели для рекламного оборудования — 'Создать' ko'rinadi"):
+    with allure.step("218 - [Оборудование] Цели для рекламного оборудования — 'Создать' ko'rinadi"):
         try:
             page.goto(_home_url, wait_until="domcontentloaded", timeout=8000)
         except Exception:
@@ -2170,7 +2170,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Оборудование] Цели для рекламного оборудования — 'Создать' topilmadi | {type(e).__name__}")
 
-    with allure.step("220 - [Оборудование] Остатки по рекламному оборудованию — jadvalda 'Оборудование' ko'rinadi"):
+    with allure.step("219 - [Оборудование] Остатки по рекламному оборудованию — jadvalda 'Оборудование' ko'rinadi"):
         page.get_by_role("link", name="Оборудование").click()
         page.get_by_role("link", name="Остатки по рекламному оборудованию").click()
         try:
@@ -2179,7 +2179,7 @@ def run_check_forms_opening(page: Page, soft: SoftAssert) -> None:
             soft.check(False,
                 f"❌ [Оборудование] Остатки по рекламному оборудованию — jadvalda 'Оборудование' topilmadi | {type(e).__name__}")
 
-    with allure.step("221 - [Оборудование] Характеристики оборудования — 'Создать' ko'rinadi"):
+    with allure.step("220 - [Оборудование] Характеристики оборудования — 'Создать' ko'rinadi"):
         page.get_by_role("link", name="Оборудование", exact=True).click()
         page.get_by_role("link", name="Характеристики оборудования").click()
         try:

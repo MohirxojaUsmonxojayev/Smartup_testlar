@@ -1,3 +1,32 @@
+## Token tejash qoidalari [MAJBURIY]
+
+### Har qanday vazifadan OLDIN:
+1. Vazifani o'qib, **kerakli fayllarni** aniqla — barchasini emas
+2. Agar 3+ faylga tegadigan bo'lsa → `/plan` rejimida reja ko'rsat, tasdiqlashimni kut
+3. Faylni to'liq o'qima — faqat kerakli qatorlarni o'qi (`Read(file.py, 10, 80)`)
+
+### Sessiya davomida:
+- Kontekst 40%+ to'lganda `/compact` taklif qil
+- Bir vazifa tugagach, keyingisi boshlanishidan oldin so'ra:
+  "Yangi mavzu — `/clear` bilan yangi sessiya ochaymi?"
+- Bir faylni ikki marta o'qima — keshdan foydalanish
+
+### Model tanlash (o'zing qaror qil):
+- Kichik tuzatish / savol → Haiku
+- Oddiy kod / refaktoring → Sonnet
+- Arxitektura / murakkab tahlil → Opus
+Foydalanuvchiga qaysi model ishlatilayotganini ayt.
+
+### Nima QILMA:
+- Butun papkani skanerlama — faqat so'ralgan fayllar
+- Log, migration, __pycache__, .lock fayllarini o'qima
+- Bir xato uchun 3+ marta urinma — 2 ta urinishdan keyin to'xta va tushuntir
+- Keraksiz tushuntirma yozma — faqat so'ralgan natija
+
+### Sifatni saqlash:
+- Vazifaning MOHIYATINI hech qachon yo'qotma
+- Agar token tejash vazifaga zarar bersa → tejamkorlikni qo'y, vazifani bajar
+- Har doim tugallangan, ishlaydigan kod ber
 # Claude uchun Ko'rsatmalar — Playwright Loyihasi
 
 ## Bilim Bazasi — `skills/` (Yagona Ishonchli Manba)
