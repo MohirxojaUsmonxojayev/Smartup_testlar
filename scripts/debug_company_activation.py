@@ -1,6 +1,5 @@
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -15,7 +14,7 @@ from _debug_env import add_company_args, configure_company_env
 ARCHIVE_DIR = ROOT / "skills/smartup-guide/references/forms/screenshots/company"
 
 
-def visible_texts(locator, limit: int = 50) -> list[str]:
+def visible_texts(locator, limit=50):
     result = []
     for index in range(min(locator.count(), limit)):
         item = locator.nth(index)
@@ -27,7 +26,7 @@ def visible_texts(locator, limit: int = 50) -> list[str]:
     return result
 
 
-def click_visible_text_button(page, text: str) -> bool:
+def click_visible_text_button(page, text):
     buttons = page.get_by_role("button")
     for index in range(buttons.count()):
         button = buttons.nth(index)
@@ -40,7 +39,7 @@ def click_visible_text_button(page, text: str) -> bool:
     return False
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser()
     add_company_args(parser)
     parser.add_argument("--headless", action="store_true")

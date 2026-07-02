@@ -8,7 +8,6 @@ import threading
 import time
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 import requests
 
@@ -24,7 +23,6 @@ SERVERS = {
     "smartup": "https://smartup.online",
     "app3": "https://app3.greenwhite.uz/xtrade",
 }
-SCOPES = {"smoke", "regression"}
 
 
 class ConfigError(RuntimeError):
@@ -33,13 +31,12 @@ class ConfigError(RuntimeError):
 
 @dataclass(frozen=True)
 class RunRequest:
-    scope: str
     server_key: str
     server_url: str
     target: str = DEFAULT_TARGET
 
     @property
-    def company_source(self) -> str:
+    def company_source(self):
         if self.server_key == "app3":
             return "APP3 secrets"
         return "SMARTUP secrets"
@@ -62,29 +59,29 @@ class ActiveRun:
 
 
 class ActiveRunStore:
-    def __init__(self) -> None:
+    def __init__(self):
         self._lock = threading.Lock()
-        self._active: ActiveRun | None = None
+        self._active = None
 
-    def get(self) -> ActiveRun | None:
+    def get(self):
         with self._lock:
             return self._active
 
-    def set(self, active: ActiveRun) -> bool:
+    def set(self, active):
         with self._lock:
             if self._active is not None:
                 return False
             self._active = active
             return True
 
-    def clear(self, run_id: int | None) -> None:
+    def clear(self, run_id):
         with self._lock:
             if self._active is None:
                 return
             if run_id is None or self._active.workflow_run.run_id == run_id:
                 self._active = None
 
-    def add_status_message(self, run_id: int | None, message_id: int | None) -> None:
+    def add_status_message(self, run_id, message_id):
         if message_id is None:
             return
         with self._lock:
@@ -108,25 +105,25 @@ class PendingRun:
 
 
 class PendingRunStore:
-    """Server+scope tanlangach parol kutilayotgan run so'rovlarini chat bo'yicha saqlaydi."""
+    """Server tanlangach parol kutilayotgan run so'rovlarini chat bo'yicha saqlaydi."""
 
-    def __init__(self) -> None:
+    def __init__(self):
         self._lock = threading.Lock()
-        self._pending: dict[str, PendingRun] = {}
+        self._pending = {}
 
-    def set(self, chat_id: str, pending: PendingRun) -> None:
+    def set(self, chat_id, pending):
         with self._lock:
             self._pending[chat_id] = pending
 
-    def get(self, chat_id: str) -> PendingRun | None:
+    def get(self, chat_id):
         with self._lock:
             return self._pending.get(chat_id)
 
-    def has(self, chat_id: str) -> bool:
+    def has(self, chat_id):
         with self._lock:
             return chat_id in self._pending
 
-    def clear(self, chat_id: str) -> None:
+    def clear(self, chat_id):
         with self._lock:
             self._pending.pop(chat_id, None)
 
@@ -146,7 +143,7 @@ class BotConfig:
     auto_run_request: RunRequest
 
 
-def env_required(name: str, *fallbacks: str) -> str:
+def env_required(name, *fallbacks):
     for key in (name, *fallbacks):
         value = os.getenv(key, "").strip()
         if value:
@@ -155,18 +152,18 @@ def env_required(name: str, *fallbacks: str) -> str:
     raise ConfigError(f"Required environment variable is missing: {names}")
 
 
-def env_value(name: str, default: str) -> str:
+def env_value(name, default):
     return os.getenv(name, default).strip() or default
 
 
-def env_bool(name: str, default: bool) -> bool:
+def env_bool(name, default):
     raw = os.getenv(name, "").strip().lower()
     if not raw:
         return default
     return raw in {"1", "true", "yes", "on"}
 
 
-def env_int(name: str, default: int) -> int:
+def env_int(name, default):
     raw = os.getenv(name, "").strip()
     if not raw:
         return default
@@ -177,7 +174,7 @@ def env_int(name: str, default: int) -> int:
     return value if value > 0 else default
 
 
-def resolve_server_key(value: str, default: str = "smartup") -> str:
+def resolve_server_key(value, default="smartup"):
     lowered = value.strip().lower().rstrip("/")
     if lowered in SERVERS:
         return lowered
@@ -187,14 +184,14 @@ def resolve_server_key(value: str, default: str = "smartup") -> str:
     return default
 
 
-def split_csv(value: str) -> list[str]:
+def split_csv(value):
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-def server_keys_from_env(value: str) -> set[str]:
+def server_keys_from_env(value):
     if not value:
         return set(SERVERS)
-    keys: set[str] = set()
+    keys = set()
     for item in split_csv(value):
         lowered = item.lower().rstrip("/")
         if lowered in SERVERS:
@@ -207,7 +204,7 @@ def server_keys_from_env(value: str) -> set[str]:
     return keys or set(SERVERS)
 
 
-def load_config() -> BotConfig:
+def load_config():
     allowed_server_keys = server_keys_from_env(os.getenv("ALLOWED_SERVER_URLS", ""))
 
     # Botdan hamma foydalana oladi; testni run qilish faqat to'g'ri parol bilan ochiladi.
@@ -220,11 +217,7 @@ def load_config() -> BotConfig:
         auto_run_chat_id = fallback[0] if fallback else ""
 
     auto_run_server_key = resolve_server_key(env_value("AUTO_RUN_SERVER", "smartup"))
-    auto_run_scope = env_value("AUTO_RUN_SCOPE", "smoke").lower()
-    if auto_run_scope not in SCOPES:
-        auto_run_scope = "smoke"
     auto_run_request = RunRequest(
-        scope=auto_run_scope,
         server_key=auto_run_server_key,
         server_url=SERVERS[auto_run_server_key],
         target=env_value("AUTO_RUN_TARGET", DEFAULT_TARGET),
@@ -246,11 +239,11 @@ def load_config() -> BotConfig:
 
 
 class TelegramClient:
-    def __init__(self, token: str) -> None:
+    def __init__(self, token):
         self.base_url = f"https://api.telegram.org/bot{token}"
         self.session = requests.Session()
 
-    def request(self, method: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def request(self, method, payload):
         response = self.session.post(f"{self.base_url}/{method}", data=payload, timeout=60)
         response.raise_for_status()
         data = response.json()
@@ -258,14 +251,14 @@ class TelegramClient:
             raise RuntimeError(f"Telegram API error: {data}")
         return data
 
-    def get_updates(self, offset: int | None) -> list[dict[str, Any]]:
-        payload: dict[str, Any] = {"timeout": 50, "allowed_updates": '["message","callback_query"]'}
+    def get_updates(self, offset):
+        payload = {"timeout": 50, "allowed_updates": '["message","callback_query"]'}
         if offset is not None:
             payload["offset"] = offset
         return self.request("getUpdates", payload).get("result", [])
 
-    def send_message(self, chat_id: str, text: str, reply_markup: dict[str, Any] | None = None) -> int | None:
-        payload: dict[str, Any] = {
+    def send_message(self, chat_id, text, reply_markup=None):
+        payload = {
             "chat_id": chat_id,
             "text": text,
             "disable_web_page_preview": "true",
@@ -279,12 +272,12 @@ class TelegramClient:
 
     def edit_message(
         self,
-        chat_id: str,
-        message_id: int,
-        text: str,
-        reply_markup: dict[str, Any] | None = None,
-    ) -> None:
-        payload: dict[str, Any] = {
+        chat_id,
+        message_id,
+        text,
+        reply_markup=None,
+    ):
+        payload = {
             "chat_id": chat_id,
             "message_id": str(message_id),
             "text": text,
@@ -297,10 +290,10 @@ class TelegramClient:
             payload,
         )
 
-    def delete_message(self, chat_id: str, message_id: int) -> None:
+    def delete_message(self, chat_id, message_id):
         self.request("deleteMessage", {"chat_id": chat_id, "message_id": str(message_id)})
 
-    def answer_callback(self, callback_id: str, text: str = "") -> None:
+    def answer_callback(self, callback_id, text=""):
         payload = {"callback_query_id": callback_id}
         if text:
             payload["text"] = text
@@ -308,7 +301,7 @@ class TelegramClient:
 
 
 class GitHubActionsClient:
-    def __init__(self, token: str, repository: str, workflow: str, ref: str) -> None:
+    def __init__(self, token, repository, workflow, ref):
         self.repository = repository
         self.workflow = workflow
         self.ref = ref
@@ -322,14 +315,13 @@ class GitHubActionsClient:
         )
 
     @property
-    def workflow_url(self) -> str:
+    def workflow_url(self):
         return f"https://github.com/{self.repository}/actions/workflows/{self.workflow}"
 
-    def dispatch(self, request: RunRequest, telegram_progress_message_id: int | None = None) -> WorkflowRun:
+    def dispatch(self, request, telegram_progress_message_id=None):
         started_at = datetime.now(timezone.utc)
         url = f"https://api.github.com/repos/{self.repository}/actions/workflows/{self.workflow}/dispatches"
         inputs = {
-            "scope": request.scope,
             "server_url": request.server_url,
             "target": request.target,
         }
@@ -348,7 +340,7 @@ class GitHubActionsClient:
 
         return self.find_new_run(started_at)
 
-    def find_new_run(self, started_at: datetime) -> WorkflowRun:
+    def find_new_run(self, started_at):
         deadline = time.monotonic() + 30
         earliest = started_at - timedelta(seconds=15)
         while time.monotonic() < deadline:
@@ -358,7 +350,7 @@ class GitHubActionsClient:
             time.sleep(3)
         return WorkflowRun(run_id=None, html_url=self.workflow_url)
 
-    def latest_matching_run(self, earliest: datetime) -> WorkflowRun | None:
+    def latest_matching_run(self, earliest):
         url = f"https://api.github.com/repos/{self.repository}/actions/workflows/{self.workflow}/runs"
         response = self.session.get(
             url,
@@ -377,7 +369,7 @@ class GitHubActionsClient:
                 return WorkflowRun(run_id=run_id, html_url=html_url)
         return None
 
-    def get_run_status(self, run_id: int) -> tuple[str, str | None, str]:
+    def get_run_status(self, run_id):
         url = f"https://api.github.com/repos/{self.repository}/actions/runs/{run_id}"
         response = self.session.get(url, timeout=30)
         response.raise_for_status()
@@ -385,7 +377,7 @@ class GitHubActionsClient:
         return str(data.get("status", "")), data.get("conclusion"), str(data.get("html_url", self.workflow_url))
 
 
-def parse_github_time(value: str) -> datetime | None:
+def parse_github_time(value):
     if not value:
         return None
     try:
@@ -394,10 +386,10 @@ def parse_github_time(value: str) -> datetime | None:
         return None
 
 
-def help_text() -> str:
+def help_text():
     return (
         "Test run qilish uchun /run yuboring.\n\n"
-        "Bot avval serverni so'raydi, keyin scope tanlatadi.\n"
+        "Bot avval serverni so'raydi.\n"
         "So'ngra parol so'raladi — to'g'ri parol kiritilsa test ishga tushadi.\n"
         "Company code/password GitHub Secrets'dan olinadi.\n"
         "Yakuniy test natijasini GitHub Actions workflow yuboradi.\n"
@@ -407,11 +399,11 @@ def help_text() -> str:
     )
 
 
-def start_text(config: BotConfig) -> str:
+def start_text(config):
     servers = "\n".join(f"  • {SERVERS[key]}" for key in sorted(config.allowed_server_keys))
     interval_minutes = max(1, config.auto_run_interval_seconds // 60)
     auto_run = (
-        f"Har {interval_minutes} daqiqada avtomatik {config.auto_run_request.scope} run "
+        f"Har {interval_minutes} daqiqada avtomatik run "
         "ishga tushadi (run ketayotgan bo'lsa o'tkazib yuboriladi)."
         if config.auto_run_enabled
         else "Avto-run hozir o'chirilgan."
@@ -426,17 +418,12 @@ def start_text(config: BotConfig) -> str:
         "🚀 Qanday run qilinadi:\n"
         "1. /run yuboring\n"
         "2. Bot serverni so'raydi — tugmadan tanlang\n"
-        "3. Scope tanlang: smoke yoki regression\n"
-        "4. Bot parol so'raydi — to'g'ri parolni kiriting (parol QA jamoasida)\n"
-        "5. Parol to'g'ri bo'lsa test boshlanadi, bitta xabar jonli yangilanadi\n"
-        "6. Tugagach yakuniy natija (passed/failed) shu xabarda chiqadi\n"
+        "3. Bot parol so'raydi — to'g'ri parolni kiriting (parol QA jamoasida)\n"
+        "4. Parol to'g'ri bo'lsa test boshlanadi, bitta xabar jonli yangilanadi\n"
+        "5. Tugagach yakuniy natija (passed/failed) shu xabarda chiqadi\n"
         "\n"
         "🌐 Serverlar:\n"
         f"{servers}\n"
-        "\n"
-        "🎚 Scope:\n"
-        "  • smoke — minimal asosiy yo'l, tez tekshiruv\n"
-        "  • regression — to'liq formalar, list/view checklar (chuqurroq)\n"
         "\n"
         "🧪 Nima test qilinadi (target=all):\n"
         "User setup → A group → B group → C group → Report group ketma-ket.\n"
@@ -453,7 +440,7 @@ def start_text(config: BotConfig) -> str:
     )
 
 
-def server_keyboard(config: BotConfig) -> dict[str, Any]:
+def server_keyboard(config):
     rows = []
     if "smartup" in config.allowed_server_keys:
         rows.append([{"text": "smartup.online", "callback_data": "server:smartup"}])
@@ -462,25 +449,14 @@ def server_keyboard(config: BotConfig) -> dict[str, Any]:
     return {"inline_keyboard": rows}
 
 
-def scope_keyboard(server_key: str) -> dict[str, Any]:
-    return {
-        "inline_keyboard": [
-            [
-                {"text": "smoke", "callback_data": f"scope:{server_key}:smoke"},
-                {"text": "regression", "callback_data": f"scope:{server_key}:regression"},
-            ]
-        ]
-    }
-
-
-def active_run_text(active: ActiveRun) -> str:
+def active_run_text(active):
     elapsed_seconds = max(0, int(time.monotonic() - active.started_at))
     elapsed_minutes = elapsed_seconds // 60
     elapsed_text = "1 daqiqadan kam" if elapsed_minutes == 0 else f"{elapsed_minutes} daqiqa"
     return f"Test jarayonda: {elapsed_text}. Run: {active.workflow_run.html_url}"
 
 
-def transient_status_message_ids(active: ActiveRun | None) -> tuple[int, ...]:
+def transient_status_message_ids(active):
     # Only the throwaway "test jarayonda" reminder replies. The main progress
     # message (status_message_id) becomes the final report and must be kept.
     if active is None:
@@ -488,7 +464,7 @@ def transient_status_message_ids(active: ActiveRun | None) -> tuple[int, ...]:
     return tuple(active.extra_status_message_ids)
 
 
-def safe_delete_message(telegram: TelegramClient, chat_id: str, message_id: int | None) -> None:
+def safe_delete_message(telegram, chat_id, message_id):
     if message_id is None:
         return
     try:
@@ -497,7 +473,7 @@ def safe_delete_message(telegram: TelegramClient, chat_id: str, message_id: int 
         print(f"Telegram process message delete failed: {exc}", file=sys.stderr)
 
 
-def safe_delete_transient_messages(telegram: TelegramClient, active: ActiveRun | None) -> None:
+def safe_delete_transient_messages(telegram, active):
     if active is None:
         return
     for message_id in transient_status_message_ids(active):
@@ -505,11 +481,11 @@ def safe_delete_transient_messages(telegram: TelegramClient, active: ActiveRun |
 
 
 def show_run_start(
-    telegram: TelegramClient,
-    chat_id: str,
-    config: BotConfig,
-    active_store: ActiveRunStore,
-) -> None:
+    telegram,
+    chat_id,
+    config,
+    active_store,
+):
     active = active_store.get()
     if active is not None:
         message_id = telegram.send_message(chat_id, active_run_text(active))
@@ -518,20 +494,20 @@ def show_run_start(
     telegram.send_message(chat_id, "Qaysi serverda run qilamiz?", reply_markup=server_keyboard(config))
 
 
-def password_matches(expected: str, provided: str) -> bool:
+def password_matches(expected, provided):
     return hmac.compare_digest(expected, (provided or "").strip())
 
 
 def verify_run_password(
-    telegram: TelegramClient,
-    github: GitHubActionsClient,
-    config: BotConfig,
-    active_store: ActiveRunStore,
-    pending_store: PendingRunStore,
-    chat_id: str,
-    text: str,
-    user_message_id: int | None,
-) -> None:
+    telegram,
+    github,
+    config,
+    active_store,
+    pending_store,
+    chat_id,
+    text,
+    user_message_id,
+):
     """Parol kutilayotgan chatda kelgan matnni parol sifatida tekshiradi."""
     pending = pending_store.get(chat_id)
     if pending is None:
@@ -558,15 +534,15 @@ def verify_run_password(
 
 
 def handle_message(
-    telegram: TelegramClient,
-    github: GitHubActionsClient,
-    config: BotConfig,
-    active_store: ActiveRunStore,
-    pending_store: PendingRunStore,
-    chat_id: str,
-    text: str,
-    message_id: int | None,
-) -> None:
+    telegram,
+    github,
+    config,
+    active_store,
+    pending_store,
+    chat_id,
+    text,
+    message_id,
+):
     is_command = text.startswith("/")
 
     # Parol kutilayotgan bo'lsa va bu buyruq bo'lmasa — matnni parol urinishi deb qaraymiz.
@@ -599,13 +575,13 @@ def handle_message(
 
 
 def handle_callback(
-    telegram: TelegramClient,
-    github: GitHubActionsClient,
-    config: BotConfig,
-    active_store: ActiveRunStore,
-    pending_store: PendingRunStore,
-    callback: dict[str, Any],
-) -> None:
+    telegram,
+    github,
+    config,
+    active_store,
+    pending_store,
+    callback,
+):
     callback_id = str(callback.get("id", ""))
     data = str(callback.get("data", ""))
     message = callback.get("message") or {}
@@ -629,26 +605,13 @@ def handle_callback(
         if server_key not in config.allowed_server_keys or server_key not in SERVERS:
             telegram.answer_callback(callback_id, "Server not allowed")
             return
-        telegram.answer_callback(callback_id, "Server tanlandi")
-        telegram.edit_message(chat_id, message_id, "Scope tanlang", reply_markup=scope_keyboard(server_key))
-        return
-
-    if data.startswith("scope:"):
-        parts = data.split(":")
-        if len(parts) != 3:
-            telegram.answer_callback(callback_id, "Invalid selection")
-            return
-        _, server_key, scope = parts
-        if server_key not in config.allowed_server_keys or server_key not in SERVERS or scope not in SCOPES:
-            telegram.answer_callback(callback_id, "Invalid selection")
-            return
         telegram.answer_callback(callback_id, "Parol kerak")
-        request = RunRequest(scope=scope, server_key=server_key, server_url=SERVERS[server_key])
+        request = RunRequest(server_key=server_key, server_url=SERVERS[server_key])
         pending_store.set(chat_id, PendingRun(request=request, prompt_message_id=message_id))
         telegram.edit_message(
             chat_id,
             message_id,
-            f"🔒 {SERVERS[server_key]} / {scope}\n\nTestni run qilish uchun parolni yuboring:",
+            f"🔒 {SERVERS[server_key]}\n\nTestni run qilish uchun parolni yuboring:",
         )
         return
 
@@ -656,13 +619,13 @@ def handle_callback(
 
 
 def start_run(
-    telegram: TelegramClient,
-    github: GitHubActionsClient,
-    chat_id: str,
-    message_id: int,
-    request: RunRequest,
-    active_store: ActiveRunStore,
-) -> None:
+    telegram,
+    github,
+    chat_id,
+    message_id,
+    request,
+    active_store,
+):
     telegram.edit_message(
         chat_id,
         message_id,
@@ -703,13 +666,13 @@ def start_run(
 
 
 def monitor_run(
-    telegram: TelegramClient,
-    github: GitHubActionsClient,
-    chat_id: str,
-    workflow_run: WorkflowRun,
-    request: RunRequest,
-    active_store: ActiveRunStore,
-) -> None:
+    telegram,
+    github,
+    chat_id,
+    workflow_run,
+    request,
+    active_store,
+):
     assert workflow_run.run_id is not None
     status_errors = 0
 
@@ -749,16 +712,16 @@ def monitor_run(
         time.sleep(STATUS_POLL_INTERVAL_SECONDS)
 
 
-def auto_run_label(request: RunRequest) -> str:
-    return f"{request.server_key} / {request.scope} / {request.target}"
+def auto_run_label(request):
+    return f"{request.server_key} / {request.target}"
 
 
 def trigger_auto_run(
-    telegram: TelegramClient,
-    github: GitHubActionsClient,
-    config: BotConfig,
-    active_store: ActiveRunStore,
-) -> None:
+    telegram,
+    github,
+    config,
+    active_store,
+):
     if not config.auto_run_chat_id:
         return
     if active_store.get() is not None:
@@ -777,11 +740,11 @@ def trigger_auto_run(
 
 
 def auto_run_loop(
-    telegram: TelegramClient,
-    github: GitHubActionsClient,
-    config: BotConfig,
-    active_store: ActiveRunStore,
-) -> None:
+    telegram,
+    github,
+    config,
+    active_store,
+):
     interval = config.auto_run_interval_seconds
     while True:
         # Align to the interval boundary (top of the hour for 3600s, in UTC == local for whole-hour offsets).
@@ -792,7 +755,7 @@ def auto_run_loop(
             print(f"Auto-run trigger error: {exc}", file=sys.stderr)
 
 
-def main() -> int:
+def main():
     try:
         config = load_config()
     except ConfigError as exc:
@@ -804,7 +767,7 @@ def main() -> int:
     active_store = ActiveRunStore()
     pending_store = PendingRunStore()
 
-    offset: int | None = None
+    offset = None
     print(f"Telegram CI bot started for {config.repository}/{config.workflow} on {config.ref}")
 
     if config.auto_run_enabled and config.auto_run_chat_id:

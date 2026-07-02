@@ -1,7 +1,8 @@
 import allure
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_navigate import switch_filial
+from utils.base_page import BasePage
 from tests.smoke.test_groups.test_report_grup.report_helpers import generate_and_verify_download, select_b_input_option
 
 pytestmark = [allure.epic("Report Group"), allure.feature("Integration Report"), allure.story("Optimum")]
@@ -20,7 +21,7 @@ PREFIXES = [
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_report_optimum_check(page: Page, code, scope: str = "smoke", login: bool = True) -> None:
+def run_report_optimum_check(page, code, login=True):
     """Report-04: Optimum report — sozlamalar bilan optimum.zip yuklab olish.
 
     Login (login=True bo'lsa): admin login va test filialiga (filial-pw{code}) o'tish.
@@ -50,7 +51,7 @@ def run_report_optimum_check(page: Page, code, scope: str = "smoke", login: bool
         page.locator('button[ng-click="q.show_setting = true"]').click()
         select_b_input_option(page, "product_groups", "Группа")
         for key, value in PREFIXES:
-            page.locator(f'input[ng-model="d.prefix_{key}"]').fill(value)
+            BasePage(page).input(ng_model=f"d.prefix_{key}", value=value)
         save_btn = page.locator('button[ng-click="save()"]')
         save_btn.click()
         expect(save_btn).to_be_hidden()

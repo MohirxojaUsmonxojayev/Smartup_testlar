@@ -10,7 +10,6 @@ import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
-from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,7 +23,7 @@ DEFAULT_MODEL = "gemini-2.5-flash"
 FAILED_STATUSES = {"failed", "broken"}
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args():
     parser = argparse.ArgumentParser(description="Pytest/Allure natijasidan system summary va ixtiyoriy AI xulosa yaratadi.")
     parser.add_argument("--exit-code", type=int, required=True, help="pytest exit code")
     parser.add_argument("--command", default="", help="Maskalangan pytest command")
@@ -39,7 +38,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _read_json(path: Path) -> dict[str, Any] | None:
+def _read_json(path):
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -47,7 +46,7 @@ def _read_json(path: Path) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def _mask_sensitive(text: str) -> str:
+def _mask_sensitive(text):
     if not text:
         return text
     replacements = [
@@ -63,13 +62,13 @@ def _mask_sensitive(text: str) -> str:
     return masked
 
 
-def _truncate(text: str, limit: int) -> str:
+def _truncate(text, limit):
     if len(text) <= limit:
         return text
     return text[:limit] + "\n...[truncated]..."
 
 
-def _first_non_empty_line(text: str) -> str:
+def _first_non_empty_line(text):
     for line in text.splitlines():
         clean = line.strip()
         if clean:
@@ -77,7 +76,7 @@ def _first_non_empty_line(text: str) -> str:
     return ""
 
 
-def _timeout_text(message: str) -> str:
+def _timeout_text(message):
     match = re.search(r"Timeout\s+(\d+)ms", message)
     if not match:
         return "berilgan vaqt"
@@ -88,7 +87,7 @@ def _timeout_text(message: str) -> str:
     return f"{milliseconds} ms"
 
 
-def _waited_target(message: str) -> str:
+def _waited_target(message):
     for pattern in (r"- waiting for (.+)", r"waiting for (.+)"):
         match = re.search(pattern, message)
         if match:
@@ -99,11 +98,11 @@ def _waited_target(message: str) -> str:
     return ""
 
 
-def _is_technical_target(target: str) -> bool:
+def _is_technical_target(target):
     return target.startswith(("locator(", "get_by_", "page.", "expect("))
 
 
-def _error_type(message: str) -> str:
+def _error_type(message):
     if "Smartup transition failed" in message:
         return "SmartupTransitionError"
     if "TimeoutError" in message:
@@ -117,7 +116,7 @@ def _error_type(message: str) -> str:
     return "unknown"
 
 
-def _location(item: dict[str, Any]) -> str:
+def _location(item):
     source = str(item.get("source") or "").strip()
     if source:
         return source
@@ -125,7 +124,7 @@ def _location(item: dict[str, Any]) -> str:
     return full_name or str(item.get("name") or "unknown")
 
 
-def _runner_test(item: dict[str, Any]) -> str:
+def _runner_test(item):
     full_name = str(item.get("fullName") or "")
     match = re.search(r"(test_[A-Za-z0-9_]+)$", full_name)
     if match:
@@ -141,7 +140,7 @@ def _runner_test(item: dict[str, Any]) -> str:
     return ""
 
 
-def _group_name(item: dict[str, Any], runner_test: str) -> str:
+def _group_name(item, runner_test):
     full_name = str(item.get("fullName") or "").lower()
     name = str(item.get("name") or "").lower()
     source = str(item.get("source") or item.get("location") or "").lower()
@@ -156,8 +155,8 @@ def _group_name(item: dict[str, Any], runner_test: str) -> str:
     return ""
 
 
-def _trace_locations(trace: str) -> list[dict[str, str]]:
-    locations: list[dict[str, str]] = []
+def _trace_locations(trace):
+    locations = []
     pattern = re.compile(
         r"(?P<path>(?:[A-Za-z]:)?[/\\]?.*?tests[/\\]smoke[/\\][^:\n]+?\.py):"
         r"(?P<line>\d+)(?::\s+in\s+(?P<func>[A-Za-z_]\w*))?"
@@ -181,7 +180,7 @@ def _trace_locations(trace: str) -> list[dict[str, str]]:
     return locations
 
 
-def _inner_source_from_trace(trace: str) -> dict[str, str]:
+def _inner_source_from_trace(trace):
     locations = _trace_locations(trace)
     if not locations:
         return {}
@@ -189,11 +188,11 @@ def _inner_source_from_trace(trace: str) -> dict[str, str]:
     return (non_runner or locations)[-1]
 
 
-def _failed_step_entries(steps: Any, parent: tuple[str, ...] = ()) -> list[dict[str, Any]]:
+def _failed_step_entries(steps, parent=()):
     if not isinstance(steps, list):
         return []
 
-    entries: list[dict[str, Any]] = []
+    entries = []
     for step in steps:
         if not isinstance(step, dict):
             continue
@@ -217,11 +216,11 @@ def _failed_step_entries(steps: Any, parent: tuple[str, ...] = ()) -> list[dict[
     return entries
 
 
-def _step_path_text(path: list[str]) -> str:
+def _step_path_text(path):
     return " -> ".join(item for item in path if item)
 
 
-def _failed_step_info(item: dict[str, Any]) -> dict[str, Any]:
+def _failed_step_info(item):
     failed_steps = item.get("failed_steps")
     if isinstance(failed_steps, list) and failed_steps:
         first = failed_steps[0] if isinstance(failed_steps[0], dict) else {}
@@ -235,7 +234,7 @@ def _failed_step_info(item: dict[str, Any]) -> dict[str, Any]:
     return {"inner_test": "", "failed_step": "", "failed_step_short": ""}
 
 
-def _structured_failure_details(text: str) -> dict[str, str]:
+def _structured_failure_details(text):
     if "Smartup transition failed" not in text:
         return {}
 
@@ -247,7 +246,7 @@ def _structured_failure_details(text: str) -> dict[str, str]:
         "ui_error": "UI error",
         "location_hint": "Location hint",
     }
-    details: dict[str, str] = {"kind": "Smartup transition failed"}
+    details = {"kind": "Smartup transition failed"}
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if line.startswith("E "):
@@ -262,7 +261,7 @@ def _structured_failure_details(text: str) -> dict[str, str]:
     return details
 
 
-def _human_reason(message: str) -> str:
+def _human_reason(message):
     structured = _structured_failure_details(message)
     if structured:
         action = structured.get("action") or "save/transition action"
@@ -308,7 +307,7 @@ def _human_reason(message: str) -> str:
     return "Xato sababi logda aniq ko'rinmadi. Allure trace va screenshotni tekshirish kerak."
 
 
-def _human_next_action(message: str) -> str:
+def _human_next_action(message):
     structured = _structured_failure_details(message)
     if structured:
         if structured.get("ui_error"):
@@ -323,7 +322,7 @@ def _human_next_action(message: str) -> str:
     return "Failure log va trace artifactni ochib, shu qadamdagi UI holatini tekshir."
 
 
-def _human_impact(item: dict[str, Any], skipped_count: int) -> str:
+def _human_impact(item, skipped_count):
     name = f"{item.get('name', '')} {item.get('fullName', '')}".lower()
     if "setup" in name and skipped_count:
         return f"Setup tugamagani uchun keyingi {skipped_count} ta test skip bo'lgan."
@@ -332,7 +331,7 @@ def _human_impact(item: dict[str, Any], skipped_count: int) -> str:
     return "Shu test shu qadamda to'xtagan."
 
 
-def _humanize_failure(item: dict[str, Any], skipped_count: int) -> dict[str, Any]:
+def _humanize_failure(item, skipped_count):
     message = str(item.get("message") or "")
     trace = str(item.get("trace") or "")
     structured = _structured_failure_details(f"{message}\n{trace}")
@@ -363,12 +362,12 @@ def _humanize_failure(item: dict[str, Any], skipped_count: int) -> dict[str, Any
     }
 
 
-def collect_allure_results(results_dir: Path, started_at: float) -> list[dict[str, Any]]:
+def collect_allure_results(results_dir, started_at):
     if not results_dir.exists():
         return []
 
     threshold = max(started_at - 5, 0)
-    rows: list[dict[str, Any]] = []
+    rows = []
     for path in sorted(results_dir.glob("*-result.json"), key=lambda item: item.stat().st_mtime):
         if threshold and path.stat().st_mtime < threshold:
             continue
@@ -394,12 +393,12 @@ def collect_allure_results(results_dir: Path, started_at: float) -> list[dict[st
     return rows
 
 
-def collect_failure_logs(logs_dir: Path, started_at: float) -> list[dict[str, str]]:
+def collect_failure_logs(logs_dir, started_at):
     if not logs_dir.exists():
         return []
 
     threshold = max(started_at - 5, 0)
-    logs: list[dict[str, str]] = []
+    logs = []
     for path in sorted(logs_dir.glob("*.log"), key=lambda item: item.stat().st_mtime, reverse=True):
         if threshold and path.stat().st_mtime < threshold:
             continue
@@ -415,8 +414,8 @@ def collect_failure_logs(logs_dir: Path, started_at: float) -> list[dict[str, st
     return logs
 
 
-def build_deterministic_summary(exit_code: int, results: list[dict[str, Any]]) -> dict[str, Any]:
-    counts: dict[str, int] = {}
+def build_deterministic_summary(exit_code, results):
+    counts = {}
     for item in results:
         status = str(item.get("status") or "unknown")
         counts[status] = counts.get(status, 0) + 1
@@ -434,7 +433,7 @@ def build_deterministic_summary(exit_code: int, results: list[dict[str, Any]]) -
     }
 
 
-def build_local_summary(deterministic: dict[str, Any]) -> dict[str, Any]:
+def build_local_summary(deterministic):
     result = str(deterministic.get("result") or "UNKNOWN")
     failed_tests = deterministic.get("failed_tests")
     skipped_count = int(deterministic.get("skipped_count") or 0)
@@ -469,7 +468,7 @@ def build_local_summary(deterministic: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def enrich_ai_summary(summary: dict[str, Any], deterministic: dict[str, Any]) -> dict[str, Any]:
+def enrich_ai_summary(summary, deterministic):
     """AI faylida faqat AI yozgan qisqa xulosa qoladi."""
     return {
         "result": deterministic.get("result", summary.get("result", "UNKNOWN")),
@@ -479,7 +478,7 @@ def enrich_ai_summary(summary: dict[str, Any], deterministic: dict[str, Any]) ->
     }
 
 
-def build_prompt(command: str, deterministic: dict[str, Any], results: list[dict[str, Any]], logs: list[dict[str, str]]) -> str:
+def build_prompt(command, deterministic, results, logs):
     payload = {
         "command": command,
         "deterministic_summary": deterministic,
@@ -506,7 +505,7 @@ def build_prompt(command: str, deterministic: dict[str, Any], results: list[dict
     )
 
 
-def call_gemini(prompt: str, model: str, api_key: str) -> str:
+def call_gemini(prompt, model, api_key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     body = {
         "systemInstruction": {
@@ -552,7 +551,7 @@ def call_gemini(prompt: str, model: str, api_key: str) -> str:
     return text
 
 
-def parse_ai_json(text: str) -> dict[str, Any]:
+def parse_ai_json(text):
     clean = text.strip()
     if clean.startswith("```"):
         clean = re.sub(r"^```(?:json)?\s*", "", clean)
@@ -570,11 +569,11 @@ def parse_ai_json(text: str) -> dict[str, Any]:
 
 
 def render_markdown(
-    summary: dict[str, Any],
-    title: str,
-    model: str = "",
-    note: str = "",
-) -> str:
+    summary,
+    title,
+    model="",
+    note="",
+):
     lines = [
         f"# {title}",
         "",
@@ -620,13 +619,13 @@ def render_markdown(
 
 
 def write_outputs(
-    summary: dict[str, Any],
-    output_md: Path,
-    output_json: Path,
-    title: str,
-    model: str = "",
-    note: str = "",
-) -> None:
+    summary,
+    output_md,
+    output_json,
+    title,
+    model="",
+    note="",
+):
     output_md.parent.mkdir(parents=True, exist_ok=True)
     output_json.parent.mkdir(parents=True, exist_ok=True)
     output_json.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -634,17 +633,17 @@ def write_outputs(
 
 
 def write_allure_summary(
-    summary: dict[str, Any],
-    output_md: Path,
-    output_json: Path,
-    results_dir: Path,
+    summary,
+    output_md,
+    output_json,
+    results_dir,
     *,
-    title: str,
-    full_name: str,
-    epic: str,
-    feature: str,
-    story: str,
-) -> None:
+    title,
+    full_name,
+    epic,
+    feature,
+    story,
+):
     results_dir.mkdir(parents=True, exist_ok=True)
     result_uuid = str(uuid.uuid4())
     slug = full_name.replace(".", "-")
@@ -686,7 +685,7 @@ def write_allure_summary(
     )
 
 
-def main() -> int:
+def main():
     args = parse_args()
     command = _mask_sensitive(args.command)
     results = collect_allure_results(args.results_dir, args.started_at)

@@ -4,7 +4,9 @@
 
 Barcha skilllar va Smartup domain bilimlari uchun **yagona source of truth** — repo root'idagi `skills/`. `.agents/skills/` (Codex) va `.claude/skills/` (Claude Code) — shu papkaga `../../skills/<name>` symlink qiluvchi entry-point'lar; ikkalasi ham aslida bir xil `skills/` faylini o'qiydi va yozadi, shuning uchun data bo'linmaydi.
 
-- **O'qish/Yozish:** Smartup bilimlari uchun `skills/smartup-guide/SKILL.md` (index) dan boshla; yangi bilim topilsa shu papkadagi mos `references/...` yoki `references/forms/<slug>.md` ga yoz. Forma screenshotlari `skills/smartup-guide/references/forms/screenshots/<slug>/` ichida.
+- **O'qish:** Smartup sahifa, forma, contract, order, locator, modal, grid yoki UI xatti-harakati ustida ishlashdan oldin avval `skills/smartup-guide/SKILL.md` ni (index) o'qi, so'ng kerakli `references/...` yoki forma uchun `references/forms/<slug>.md` dossierini o'qi.
+- **Yozish:** Yangi biznes qoida, UI xatti-harakati, locator yoki xato sababi topilsa — uni `skills/smartup-guide/` ichidagi mos reference yoki form dossier fayliga yoz (boshqa joyga emas). Forma screenshotlari `skills/smartup-guide/references/forms/screenshots/<slug>/` ichida arxivlanadi.
+- `smartup-guide` Skill tool ro'yxatida bo'lmasligi mumkin — shunda ham yuqoridagi fayllarni to'g'ridan-to'g'ri Read bilan o'qi.
 - **Yangi skill qo'shish:** papkani `skills/<name>/` ichida yarat, so'ng ikkala entry-point'da symlink qo'sh — `.agents/skills/<name> -> ../../skills/<name>` va `.claude/skills/<name> -> ../../skills/<name>`.
 
 ## Avtomatik O'rganish
@@ -25,11 +27,28 @@ Maqsad: har suhbatda bir xil xatoni takrorlamaslik.
 - User setup runner: `tests/smoke/test_setup/test_setup_runner.py` — setup testlarini ketma-ket ishlatadi
 - All runner: `tests/smoke/test_all_runner.py` — barcha runner fayllarini ketma-ket jamlab ishlatadi
 - Full script: `run_tests.sh` — `test_all_runner.py` ni Allure bilan ishlatadi
-- `code` fixture: session uchun unikal 4 xonali son, runner da yangi, yakka testda `data_store.json` dan o'qiladi
-- `.env` ishlatilmaydi; runnerda `--url` majburiy
+- `code` fixture: session uchun unikal 6 xonali son, runner da yangi, yakka testda `data_store.json` dan o'qiladi
+- Agar repo rootda `.env` mavjud bo'lsa, direct `pytest`/PyCharm run konfiguratsiyasi undan olinadi; `.env` yo'q bo'lsa terminal/CI flaglari ishlaydi
 - Mavjud company: `--url <server_url> --company-code <code> --company-password <password>`
 - Yangi company: `--url <server_url> --create-company`; yangi company admin paroli kod ichidagi default qiymat
 - User password test ichida hardcode, lekin qoida fayllarida literal qiymat yozilmaydi
+
+[//]: # (## Suhbat Oxirida Majburiy — Skills Yangilash)
+
+[//]: # ()
+[//]: # (**Har suhbat oxirida quyidagilarni bajar &#40;so'ralmasa ham&#41;:**)
+
+[//]: # ()
+[//]: # (1. Bu suhbatda yangi UI sahifa, forma, locator, tasdiqlangan flow yoki xato sababi topildimi?)
+
+[//]: # (2. Agar ha — `skills/smartup-guide/` ichidagi mos form dossier yoki reference fayliga yoz.)
+
+[//]: # (3. Yangi forma bo'lsa — screenshot ham `skills/smartup-guide/references/forms/screenshots/<slug>/` ga arxivla.)
+
+[//]: # (4. Test muvaffaqiyatli ishlasa — test docstring + skills sinxron bo'lsin.)
+
+[//]: # ()
+[//]: # (Yozmasdan suhbatni yopma.)
 
 ## Ruxsatlar
 

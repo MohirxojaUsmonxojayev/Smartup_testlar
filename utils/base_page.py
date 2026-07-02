@@ -1,17 +1,23 @@
+import logging
 import re
 from datetime import datetime, timedelta
 
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 
+logger = logging.getLogger(__name__)
+
+_UNSET = object()
+
+
 class BasePage:
-    def __init__(self, page: Page):
+    def __init__(self, page):
         self.page = page
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    def current_heading_text(self) -> str:
+    def current_heading_text(self):
         try:
             headings = [item.strip() for item in self.page.get_by_role("heading").all_inner_texts()]
         except Exception:
@@ -20,7 +26,7 @@ class BasePage:
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    def visible_error_text(self, timeout=1_000) -> str:
+    def visible_error_text(self, timeout=1_000):
         selectors = (
             "#biruniAlertExtended",
             "#biruniAlert",
@@ -48,13 +54,13 @@ class BasePage:
     def _transition_failure_message(
         self,
         *,
-        action: str,
-        expected: str,
-        before_state: str,
-        actual_state: str,
-        ui_error: str = "",
-        location_hint: str = "",
-    ) -> str:
+        action,
+        expected,
+        before_state,
+        actual_state,
+        ui_error="",
+        location_hint="",
+    ):
         lines = [
             "Smartup transition failed",
             f"Before page: {before_state or 'unknown'}",
@@ -72,17 +78,17 @@ class BasePage:
 
     def save_and_expect_heading(
         self,
-        expected_heading: str,
+        expected_heading,
         *,
-        action: str = "Сохранить",
-        before_state: str | None = None,
-        expected_state: str | None = None,
-        confirm_text: str | None = None,
-        button_name: str = "Сохранить",
-        exact_button: bool = True,
+        action="Сохранить",
+        before_state=None,
+        expected_state=None,
+        confirm_text=None,
+        button_name="Сохранить",
+        exact_button=True,
         timeout=120_000,
-        location_hint: str = "",
-    ) -> None:
+        location_hint="",
+    ):
         before = before_state or self.current_heading_text()
         button = self.page.get_by_role("button", name=button_name, exact=exact_button).first
         expect(button).to_be_visible()
@@ -125,116 +131,146 @@ class BasePage:
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    def _expect_checkbox_state(self, checkbox, checked=True, timeout=10_000):
-        if checked:
-            expect(checkbox).to_be_checked(timeout=timeout)
+    def checkbox(
+        self,
+        locator=None,
+        checked=_UNSET,
+        *,
+        ng_model=None,
+        label=None,
+        check_all=False,
+        first_visible=False,
+        grid_name=None,
+        expect_checked=_UNSET,
+        return_value=False,
+        index=0,
+        root=None,
+    ):
+        """Smartup checkbox/switch bilan ishlash uchun yagona universal funksiya.
+
+        Checkboxni topish (faqat bittasini bering):
+          - label="НДС": ko'rinadigan field label orqali (asosiy usul)
+          - ng_model="d.vat_enabled": input[ng-model=...] orqali
+          - locator: tayyor Locator yoki selector string (grid checkbox va h.k.)
+          - check_all=True: grid "hammasini belgilash" (input[bcheckall])
+          - first_visible=True: birinchi ko'rinadigan grid checkbox
+
+        Amal:
+          - checked=True/False: shu holatga keltiradi (idempotent) va tasdiqlaydi
+          - expect_checked=True/False: faqat holatni tasdiqlaydi
+          - return_value=True: joriy bool holatni qaytaradi
+
+        `root` (Page yoki modal Locator) va `index` topishni cheklaydi.
+        """
+        root = root or self.page
+
+        # --- topish: bitta strategiya ---
+        if label is not None:
+            cb = self._field_locator_by_label(label, index=index, root=root, target="switch")
+        elif ng_model is not None:
+            cb = root.locator(f'input[ng-model="{ng_model}"]').nth(index)
+        elif check_all or first_visible:
+            # Grid ko'pincha loader (block-ui-overlay) ortidan kech render bo'ladi;
+            # loader tushmasdan click qilinsa kaskad ko'rinmas input ustiga tushib qoladi.
+            self.wait_for_loader()
+            if first_visible:
+                self.page.wait_for_load_state("networkidle")
+                scope = root.locator(f'b-grid[name="{grid_name}"]') if grid_name else self.page
+                cb = scope.locator("b-grid:visible input[type='checkbox']").first
+            else:
+                scope = root.locator(f'b-grid[name="{grid_name}"]') if grid_name else root
+                cb = scope.locator("input[bcheckall]").first
+            if cb.count() == 0:
+                cb = scope.locator("input[type='checkbox']").first
+            expect(cb).to_be_attached()
+        elif locator is not None:
+            cb = root.locator(locator).first if isinstance(locator, str) else locator
         else:
-            expect(checkbox).not_to_be_checked(timeout=timeout)
+            raise ValueError(
+                "checkbox(): label, ng_model, locator, check_all yoki first_visible dan bittasini bering"
+            )
 
-    # ------------------------------------------------------------------------------------------------------------------
+        # --- bosish: input opacity:0 (ko'rinmas) bo'lishi mumkin, shuning uchun click
+        #     ko'rinadigan label/grid-cell/wrapper ustiga cascade qilinadi ---
+        if checked is not _UNSET and cb.is_checked() != checked:
+            def reached():
+                try:
+                    expect(cb).to_be_checked(timeout=1_000) if checked else expect(cb).not_to_be_checked(timeout=1_000)
+                    return True
+                except (AssertionError, PlaywrightTimeoutError):
+                    return False
 
-    def _checkbox_state_matches(self, checkbox, checked=True, timeout=1_000):
-        try:
-            self._expect_checkbox_state(checkbox, checked=checked, timeout=timeout)
-            return True
-        except (AssertionError, PlaywrightTimeoutError):
-            return False
+            label_el = cb.locator("xpath=ancestor::label[1]")
+            cell_el = cb.locator(
+                "xpath=ancestor::*[contains(@class,'tbl-checkbox-cell') or contains(@class,'tbl-header-cell')][1]"
+            )
+            wrap_el = cb.locator(
+                "xpath=ancestor::*[contains(@class,'switch') or contains(@class,'checkbox') or contains(@class,'smt-checkbox') or contains(@class,'custom-control')][1]"
+            )
 
-    # ------------------------------------------------------------------------------------------------------------------
+            done = False
+            if label_el.count() > 0 and label_el.first.is_visible():
+                label_el.first.click()
+                done = True
+            elif label_el.count() > 0:
+                # label bor, lekin ko'rinmas (masalan grid header'da balandligi 0) —
+                # checkbox koordinatasi bo'yicha to'g'ridan-to'g'ri mouse click
+                label_box = label_el.first.bounding_box()
+                cb_box = cb.bounding_box()
+                if label_box is not None and cb_box is not None and label_box["width"] > 0:
+                    self.page.mouse.click(
+                        label_box["x"] + min(10, label_box["width"] / 2),
+                        cb_box["y"] + cb_box["height"] / 2,
+                    )
+                    done = reached()
 
-    def _click_grid_checkbox_cell(self, grid_cell, checkbox, checked=True):
-        cell = grid_cell.first
-        cell.scroll_into_view_if_needed()
-        box = cell.bounding_box()
-        if box is None or box["width"] <= 0 or box["height"] <= 0:
-            return False
+            if not done and cell_el.count() > 0 and cell_el.first.is_visible():
+                cell = cell_el.first
+                cell.scroll_into_view_if_needed()
+                box = cell.bounding_box()
+                if box is not None and box["width"] > 0 and box["height"] > 0:
+                    y = box["height"] / 2
+                    for x in (min(24, box["width"] / 2), min(12, box["width"] / 2), box["width"] / 2):
+                        cell.click(position={"x": x, "y": y})
+                        if reached():
+                            break
+                done = True
 
-        y = box["height"] / 2
-        click_x_positions = (
-            min(24, box["width"] / 2),
-            min(12, box["width"] / 2),
-            box["width"] / 2,
-        )
-        for x in click_x_positions:
-            cell.click(position={"x": x, "y": y})
-            if self._checkbox_state_matches(checkbox, checked=checked):
-                return True
-        return False
+            if not done:
+                if wrap_el.count() > 0 and wrap_el.first.is_visible():
+                    wrap_el.first.click()
+                else:
+                    expect(cb).to_be_visible()
+                    cb.click()
 
-    def click_first_visible_checkbox(self):
-        self.page.wait_for_load_state("networkidle")
-        checkbox = self.page.locator("b-grid:visible input[type='checkbox']").first
-        if checkbox.count() == 0:
-            checkbox = self.page.locator("input[type='checkbox']").first
-        expect(checkbox).to_be_attached()
-        self.set_checkbox(checkbox, checked=True)
-
-    # ------------------------------------------------------------------------------------------------------------------
-
-    def set_checkbox(self, checkbox, checked=True):
-        """Checkboxni ko'rinadigan control orqali real click bilan kerakli holatga keltiradi."""
-        if checkbox.is_checked() == checked:
-            return
-
-        label = checkbox.locator("xpath=ancestor::label[1]")
-        if label.count() > 0 and label.first.is_visible():
-            label.first.click()
-            self._expect_checkbox_state(checkbox, checked=checked)
-            return
-        if label.count() > 0:
-            label_box = label.first.bounding_box()
-            checkbox_box = checkbox.bounding_box()
-            if label_box is not None and checkbox_box is not None and label_box["width"] > 0:
-                self.page.mouse.click(
-                    label_box["x"] + min(10, label_box["width"] / 2),
-                    checkbox_box["y"] + checkbox_box["height"] / 2,
-                )
-                if self._checkbox_state_matches(checkbox, checked=checked):
-                    return
-
-        grid_cell = checkbox.locator(
-            "xpath=ancestor::*[contains(@class,'tbl-checkbox-cell') or contains(@class,'tbl-header-cell')][1]"
-        )
-        if grid_cell.count() > 0 and grid_cell.first.is_visible():
-            if self._click_grid_checkbox_cell(grid_cell, checkbox, checked=checked):
-                return
-            self._expect_checkbox_state(checkbox, checked=checked)
-            return
-
-        wrapper = checkbox.locator(
-            "xpath=ancestor::*[contains(@class,'checkbox') or contains(@class,'smt-checkbox') or contains(@class,'custom-control')][1]"
-        )
-        if wrapper.count() > 0 and wrapper.first.is_visible():
-            wrapper.first.click()
-        else:
-            expect(checkbox).to_be_visible()
-            checkbox.click()
-
-        self._expect_checkbox_state(checkbox, checked=checked)
-
-    # ------------------------------------------------------------------------------------------------------------------
-
-    def set_checkall(self, checked=True):
-        self.set_checkbox(self.page.locator("input[bcheckall]").first, checked=checked)
+        want = checked if checked is not _UNSET else expect_checked
+        if want is not _UNSET:
+            expect(cb).to_be_checked() if want else expect(cb).not_to_be_checked()
+        if return_value:
+            return cb.is_checked()
+        return cb
 
     # ------------------------------------------------------------------------------------------------------------------
 
     def wait_for_loader(self, timeout=300_000):
         """
         Loader (overlay) paydo bo'lishini va keyin yo'qolishini kutadi.
+        Sahifa settled bo'lsa True qaytaradi; loader timeout ichida
+        yo'qolmasa xato ko'taradi.
         """
         overlay = self.page.locator(".block-ui-overlay")
         try:
             overlay.wait_for(state="visible", timeout=2_000)
         except Exception:
             # Agar loader 2 soniyada chiqmasa, demak jarayon tugagan yoki juda tez o'tgan
-            return
+            return True
 
         try:
             overlay.wait_for(state="hidden", timeout=timeout)
-        except Exception as e:
-            print(f"Xato: Loader {timeout} ms ichida yo'qolmadi: {e}")
+        except Exception as exc:
+            logger.warning("Loader %s ms ichida yo'qolmadi: %s", timeout, exc)
             raise
+        return True
 
     # ------------------------------------------------------------------------------------------------------------------
 
@@ -250,10 +286,14 @@ class BasePage:
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    def grid_row(self, text, grid_selector="b-grid"):
+    def grid_row(self, text, *contains, grid_selector="b-grid"):
+        """`text` bo'yicha grid qatorini topadi, ko'rinishini va (berilgan bo'lsa)
+        `contains` dagi har bir matnni (nom, status va h.k.) o'z ichiga olishini tekshiradi."""
         grid = self.page.locator(grid_selector)
         row = grid.locator(".tbl-row").filter(has_text=text).first
         expect(row).to_be_visible()
+        for value in contains:
+            expect(row).to_contain_text(value)
         return row
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -262,6 +302,54 @@ class BasePage:
         row = self.grid_row(text, grid_selector=grid_selector)
         row.click()
         return row
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def grid_controller(
+        self,
+        *,
+        search=None,
+        expand=False,
+        reload=False,
+        open_filter=False,
+        open_setting=False,
+        controller_selector="b-grid-controller",
+    ):
+        """List formadagi `b-grid-controller` boshqaruvlari. Tanlovga qarab bittasi bajariladi:
+
+          - search="matn": qidiruv maydoniga yozib Enter bosadi (loader kutiladi)
+          - expand=True: "X / Y" (page size, fa-arrow-down) tugmasini bosib ko'proq qator yuklaydi
+          - reload=True: ro'yxatni yangilaydi (fa-redo)
+          - open_filter=True: filtr oynasini ochadi (fa-filter)
+          - open_setting=True: setting/ustunlar menyusini ochadi (fa-bars)
+        """
+        gc = self.page.locator(controller_selector).first
+
+        if search is not None:
+            field = gc.locator('input[ng-model="o.searchValue"]').first
+            expect(field).to_be_visible()
+            field.fill(search)
+            field.press("Enter")
+            self.wait_for_loader()
+            return
+        if expand:
+            gc.locator("button:has(i.fa-arrow-down)").first.click()
+            self.wait_for_loader()
+            return
+        if reload:
+            gc.locator('button[ng-click="reload()"]').first.click()
+            self.wait_for_loader()
+            return
+        if open_filter:
+            gc.locator('button[ng-click="openFilter()"]').first.click()
+            return
+        if open_setting:
+            gc.locator("button.dropdown-toggle:has(span.fa-bars)").first.click()
+            return
+
+        raise ValueError(
+            "grid_controller(): search, expand, reload, open_filter yoki open_setting dan bittasini bering"
+        )
 
     # ------------------------------------------------------------------------------------------------------------------
 
@@ -296,118 +384,306 @@ class BasePage:
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    def _field_container_by_label(self, label, needs_search=False):
-        label_locator = self.page.get_by_text(re.compile(rf"^{re.escape(label)}\*?$"))
+    def multiselect(self, label, *option_texts, name=None, index=0, close=True, exact=True, timeout=30_000, root=None):
+        """Multi-select b-input ("N Выбранных") bilan ishlash.
 
-        for index in range(label_locator.count()):
-            label_item = label_locator.nth(index)
-            for ancestor in (
-                "ancestor::*[contains(@class,'col-')][1]",
-                "ancestor::div[contains(@class,'form-group')][1]",
-            ):
+        label: field label (masalan "Роли", "Рабочие зоны") — b-input shu orqali topiladi.
+        option_texts: tanlanadigan bir yoki bir nechta variant matni.
+        name: berilsa, label e'tiborsiz va `b-input[name=...]` orqali topiladi
+              (masalan name="roles"/"rooms" — UI matniga bog'liq emas, barqarorroq).
+
+        Single-select `select_b_input`/`b_input_by_label` dan farqi (Штат formasida
+        MCP bilan tasdiqlangan, 2026-06-30):
+          - tanlangach search maydoni bo'shaydi (variant matnini ko'rsatmaydi),
+            shuning uchun search value tasdiqlanmaydi;
+          - dropdown (`.hint`) b-input ICHIDA render bo'ladi (body'ga portal emas);
+          - tanlangach dropdown ochiq qoladi — ko'p variant tanlash mumkin;
+          - tasdiqlash `.multiple` ichidagi chip (tanlangan element) bo'yicha qilinadi.
+
+        close=True: oxirida Escape bilan dropdown yopiladi (keyingi b-input uchun zarur).
+        """
+        root = root or self.page
+        if name is not None:
+            b_input = root.locator(f'b-input[name="{name}"]').nth(index)
+        else:
+            # `_field_locator_by_label(target="b-input")` ko'rinmas labellarni o'tkazib
+            # yuboradi (masalan "Рабочие зоны" yashirin span'i), shuning uchun to'g'ri
+            # b-input ga tushadi; qaytadigan locator b-input elementining o'zi.
+            b_input = self._field_locator_by_label(label, index=index, root=root, target="b-input")
+
+        expect(b_input).to_be_visible()
+        search = b_input.locator('input[placeholder="Поиск..."]').first
+        multiple = b_input.locator(".multiple").first
+
+        for option_text in option_texts:
+            search.click()
+            option = b_input.locator(".hint").get_by_text(option_text, exact=exact).first
+            expect(option).to_be_visible(timeout=timeout)
+            option.click()
+            expect(multiple).to_contain_text(option_text)
+
+        if close:
+            search.press("Escape")
+        return b_input
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def _label_pattern(self, label):
+        return re.compile(rf"^\s*{re.escape(label)}\s*(?:\*)?\s*$", re.IGNORECASE)
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def _field_target(self, container, target):
+        if target == "b-input":
+            return container.locator("b-input:has(input[placeholder])").first
+        if target == "switch":
+            return container.locator("input[type='checkbox'], [role='switch']").first
+        if target == "input":
+            return container.locator(
+                "xpath=.//*[self::input or self::textarea]"
+                "[not(ancestor::b-input) and not(@type='checkbox') and not(@type='radio')]"
+                "[not(starts-with(@id,'focusser-'))]"
+            ).first
+        return container.locator("input, textarea, b-input, [role='switch']").first
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def _field_container_by_label(self, label, needs_search=False, index=0, root=None, target=None):
+        root = root or self.page
+        target = target or ("b-input" if needs_search else "input")
+        label_locator = root.locator(
+            "label, t, span, .control-label, .col-form-label, .form-label"
+        ).filter(has_text=self._label_pattern(label))
+        if label_locator.count() == 0:
+            label_locator = root.get_by_text(self._label_pattern(label))
+
+        match_index = 0
+        ancestor_paths = (
+            "ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' col ') or contains(@class,'col-')][1]",
+            "ancestor::*[contains(@class,'input-group')][1]",
+            "ancestor::*[contains(@class,'form-group')][1]",
+            "ancestor::*[contains(@class,'form-row')][1]",
+            "ancestor::*[contains(@class,'row')][1]",
+            "..",
+        )
+
+        for label_index in range(label_locator.count()):
+            label_item = label_locator.nth(label_index)
+            try:
+                expect(label_item).to_be_visible(timeout=1_000)
+            except (AssertionError, PlaywrightTimeoutError):
+                continue
+
+            for ancestor in ancestor_paths:
                 container = label_item.locator(f"xpath={ancestor}")
                 if container.count() == 0:
                     continue
+                field_target = self._field_target(container.first, target)
+                if field_target.count() == 0:
+                    continue
+                if match_index == index:
+                    return container.first
+                match_index += 1
+                break
 
-                if needs_search and container.get_by_placeholder("Поиск").count() > 0:
-                    return container
-
-                if not needs_search and container.get_by_role("textbox").count() > 0:
-                    return container
-
-        raise AssertionError(f"Field container not found by label: {label}")
-
-    # ------------------------------------------------------------------------------------------------------------------
-
-    def fill_textbox_by_label(self, label, value, expected_value=None):
-        textbox = self._field_container_by_label(label).get_by_role("textbox").first
-        textbox.fill(value)
-        expect(textbox).to_have_value(expected_value or value)
+        raise AssertionError(f"Field container not found by label: {label} (target={target})")
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    def select_b_input_by_label(self, label, option_text, clear=False, exact=True):
-        container = self._field_container_by_label(label, needs_search=True)
-        search = container.get_by_placeholder("Поиск").first
-        search.click()
-        if clear:
-            edit = container.locator(".edit")
-            if edit.count() > 0 and edit.first.is_visible():
-                edit.first.click()
-            search.click()
-        search.fill(option_text)
-        option = container.locator("div.hint").get_by_text(option_text, exact=exact)
-        expect(option).to_be_visible()
-        option.click()
-        expect(search).to_have_value(re.compile(re.escape(option_text)))
+    def _field_locator_by_label(self, label, *, index=0, root=None, target="input"):
+        root = root or self.page
+        label_locator = root.locator(
+            "label, t, span, .control-label, .col-form-label, .form-label"
+        ).filter(has_text=self._label_pattern(label))
+        if label_locator.count() == 0:
+            label_locator = root.get_by_text(self._label_pattern(label))
 
-    # ------------------------------------------------------------------------------------------------------------------
+        target_xpath = {
+            "input": (
+                "following::*[(self::input or self::textarea)"
+                " and not(ancestor::b-input)"
+                " and not(@type='checkbox') and not(@type='radio') and not(@type='hidden')"
+                " and not(starts-with(@id,'focusser-'))][1]"
+            ),
+            "b-input": "following::b-input[.//input][1]",
+            "switch": "following::input[@type='checkbox'][1]",
+        }[target]
 
-    def expect_b_input_value_by_label(self, label, expected_value):
-        container = self._field_container_by_label(label, needs_search=True)
-        search = container.get_by_placeholder("Поиск").first
-        expect(search).to_have_value(re.compile(re.escape(expected_value)))
+        match_index = 0
+        for label_index in range(label_locator.count()):
+            label_item = label_locator.nth(label_index)
+            try:
+                expect(label_item).to_be_visible(timeout=1_000)
+            except (AssertionError, PlaywrightTimeoutError):
+                continue
 
-    # ------------------------------------------------------------------------------------------------------------------
-
-    def _label_field_container(self, label, index=0):
-        """Label matni orqali form-group/col/form-row konteynerini topadi."""
-        label_locator = self.page.get_by_text(label, exact=True).nth(index)
-        expect(label_locator).to_be_visible()
-        field = label_locator.locator(
-            "xpath=ancestor::*[contains(@class,'form-group') or contains(@class,'col') or contains(@class,'form-row')][1]"
-        )
-        if field.count() == 0:
-            field = label_locator.locator("xpath=..")
-        return field
-
-    # ------------------------------------------------------------------------------------------------------------------
-
-    def input_by_label_text(self, label, index=0):
-        field = self._label_field_container(label, index)
-        input_el = field.locator("input:not([type='checkbox']):not([type='radio'])").first
-        expect(input_el).to_be_visible()
-        return input_el
-
-    # ------------------------------------------------------------------------------------------------------------------
-
-    def fill_input_by_label_text(self, label, value, index=0):
-        input_el = self.input_by_label_text(label, index)
-        input_el.click()
-        input_el.press("ControlOrMeta+A")
-        input_el.press("Backspace")
-        input_el.fill(value)
-        input_el.press("Tab")
-
-    # ------------------------------------------------------------------------------------------------------------------
-
-    def input_value_by_label_text(self, label, index=0) -> str:
-        return self.input_by_label_text(label, index).input_value()
-
-    # ------------------------------------------------------------------------------------------------------------------
-
-    def switch_checkbox_by_label_text(self, label, index=0):
-        return self._label_field_container(label, index).locator("input[type='checkbox']").first
-
-    # ------------------------------------------------------------------------------------------------------------------
-
-    def set_switch_by_label_text(self, label, enabled=True):
-        field = self._label_field_container(label)
-        checkbox = field.locator("input[type='checkbox']").first
-        if checkbox.is_checked() != enabled:
-            switch = field.locator("[role='switch'], .switch span").first
-            if switch.count() > 0:
-                expect(switch).to_be_visible()
-                switch.click()
+            if target == "switch":
+                # Label matni <label> ning O'ZI bo'lishi mumkin (checkbox — uning ichida,
+                # masalan Smartup counterparty toggle'lari <label><input><t>Клиент</t></label>).
+                # `ancestor::label` self'ni hisobga olmaydi → label element uchun count 0 bo'lib
+                # `following::` keyingi qatordagi checkbox'ga tushib ketardi (Клиент→Сотрудник bug).
+                # `ancestor-or-self` label wrapper ichidagi to'g'ri checkbox'ni topadi.
+                field = label_item.locator("xpath=(ancestor-or-self::label[1]//input[@type='checkbox'])[1]")
+                if field.count() == 0:
+                    field = label_item.locator(f"xpath={target_xpath}")
             else:
-                expect(checkbox).to_be_visible()
-                checkbox.click()
-        self._expect_checkbox_state(checkbox, checked=enabled)
+                field = label_item.locator(f"xpath={target_xpath}")
+
+            if field.count() == 0:
+                container = self._field_container_by_label(label, index=match_index, root=root, target=target)
+                field = self._field_target(container, target)
+            if field.count() == 0:
+                continue
+
+            if target != "switch":
+                try:
+                    expect(field.first).to_be_visible(timeout=500)
+                except (AssertionError, PlaywrightTimeoutError):
+                    continue
+
+            if match_index == index:
+                return field.first
+            match_index += 1
+
+        raise AssertionError(f"Field not found by label: {label} (target={target})")
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    def switch_checked_by_label_text(self, label) -> bool:
-        return self.switch_checkbox_by_label_text(label).is_checked()
+    def b_input_by_label(
+        self,
+        label,
+        value=_UNSET,
+        *,
+        expect_value=_UNSET,
+        return_value=False,
+        search_text=None,
+        clear=False,
+        exact=True,
+        server_search=False,
+        delay=50,
+        index=0,
+        root=None,
+        timeout=30_000,
+    ):
+        b_input = self._field_locator_by_label(label, index=index, root=root, target="b-input")
+        search = b_input.locator("input[placeholder]").first
+        expect(search).to_be_visible()
+
+        if value is not _UNSET:
+            option_text = str(value)
+            search.click()
+
+            if clear:
+                edit = b_input.locator(".edit")
+                if edit.count() > 0 and edit.first.is_visible():
+                    edit.first.click()
+                search.click()
+
+            query = search_text or option_text
+            if server_search:
+                search.press("ControlOrMeta+A")
+                search.press("Backspace")
+                search.press_sequentially(query, delay=delay)
+            else:
+                search.fill(query)
+
+            option = b_input.locator(".hint-item").filter(has_text=option_text).first
+            if option.count() == 0:
+                option = b_input.locator("div.hint").get_by_text(option_text, exact=exact).first
+            if option.count() == 0:
+                option = b_input.get_by_text(option_text, exact=exact).last
+            expect(option).to_be_visible(timeout=timeout)
+            option.click()
+
+        expected = expect_value
+        if expected is _UNSET and value is not _UNSET:
+            expected = str(value)
+        if expected is not _UNSET:
+            if isinstance(expected, str):
+                expected = re.compile(re.escape(expected))
+            expect(search).to_have_value(expected)
+
+        if return_value:
+            return search.input_value()
+        return search
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def _label_field_container(self, label, index=0, root=None, target="input"):
+        """Label matni orqali form-group/col/form-row konteynerini topadi."""
+        return self._field_container_by_label(label, index=index, root=root, target=target)
+
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def input(
+        self,
+        locator=None,
+        value=_UNSET,
+        *,
+        label=None,
+        ng_model=None,
+        placeholder=None,
+        expect_value=_UNSET,
+        return_value=False,
+        index=0,
+        root=None,
+        clear=True,
+        press_tab=False,
+    ):
+        """Oddiy text input/textarea bilan ishlash uchun yagona universal funksiya
+        (`checkbox()` kabi pattern).
+
+        Inputni topish (faqat bittasini bering):
+          - label="Код": ko'rinadigan field label orqali (label -> following input)
+          - ng_model="d.first_name": `input[ng-model=...]` orqali (label ishonchsiz
+            bo'lganda, masalan label DOMda inputdan keyin kelsa)
+          - placeholder="Поиск": placeholder orqali
+          - locator: tayyor Locator yoki selector string
+
+        Amal:
+          - value=...: maydonni tozalab (clear=True) shu qiymat bilan to'ldiradi
+          - expect_value=...: qiymatni tasdiqlaydi (value berilsa, default expect_value=value)
+          - return_value=True: joriy qiymatni (str) qaytaradi
+          - press_tab=True: to'ldirgach Tab bosadi
+
+        `index` bir nechta mos input orasidan N-chisini, `root` (Page yoki modal Locator)
+        topishni cheklaydi.
+        """
+        root = root or self.page
+
+        if label is not None:
+            input_el = self._field_locator_by_label(label, index=index, root=root, target="input")
+        elif ng_model is not None:
+            input_el = root.locator(
+                f'input[ng-model="{ng_model}"]:visible, textarea[ng-model="{ng_model}"]:visible'
+            ).nth(index)
+        elif placeholder is not None:
+            input_el = root.get_by_placeholder(placeholder).nth(index)
+        elif locator is not None:
+            input_el = root.locator(locator).nth(index) if isinstance(locator, str) else locator
+        else:
+            raise ValueError("input(): label, ng_model, placeholder yoki locator dan bittasini bering")
+
+        expect(input_el).to_be_visible()
+
+        if value is not _UNSET:
+            input_el.click()
+            if clear:
+                input_el.press("ControlOrMeta+A")
+                input_el.press("Backspace")
+            input_el.fill(str(value))
+            if press_tab:
+                input_el.press("Tab")
+
+        expected = expect_value
+        if expected is _UNSET and value is not _UNSET:
+            expected = str(value)
+        if expected is not _UNSET:
+            expect(input_el).to_have_value(expected)
+
+        if return_value:
+            return input_el.input_value()
+        return input_el
 
     # ------------------------------------------------------------------------------------------------------------------
 

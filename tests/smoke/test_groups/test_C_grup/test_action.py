@@ -1,9 +1,9 @@
 import re
 
 import allure
-from playwright.sync_api import Page, expect
-from tests.smoke.flows.flow_authorization import authorization_user
-from tests.smoke.flows.flow_navigate import navigate_to
+from playwright.sync_api import expect
+from tests.smoke.flows.flow_authorization import authorization
+from tests.smoke.flows.flow_navigate import navigate_to, expect_page
 from tests.smoke.flows.flow_order.flow_order_add import (
     auto_filled_order_dates,
     flow_order_final_page,
@@ -17,7 +17,7 @@ pytestmark = [allure.epic("C Group"), allure.feature("Marketing"), allure.story(
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_c_group_create_action(page: Page, code, scope: str = "smoke", login: bool = True) -> None:
+def run_c_group_create_action(page, code, login=True):
     """C-01: 10 dona olinganda 10% chegirma beruvchi aksiya yaratish.
 
     Qadamlar:
@@ -31,11 +31,11 @@ def run_c_group_create_action(page: Page, code, scope: str = "smoke", login: boo
     action_name = f"Скидка 10% на 10 товаров pw{code}"
 
     if login:
-        authorization_user(page, code)
+        authorization(page, who="user", code=code)
 
     with allure.step("1 - Aksiyalar ro'yxatiga o'tish"):
         navigate_to(page, tab="Справочники", name="Акции")
-        expect(page.get_by_role("heading", name="Акции")).to_be_visible()
+        expect_page(page, heading="Акции")
 
     with allure.step("2 - Yangi aksiya formasi: asosiy maydonlar"):
         page.get_by_role("button", name="Создать").click()
@@ -81,15 +81,10 @@ def run_c_group_create_action(page: Page, code, scope: str = "smoke", login: boo
         page.locator('input[ng-model="product.value"]').fill("10")
 
     with allure.step("5 - Saqlash va ro'yxatda tekshirish"):
-        BasePage(page).save_and_expect_heading(
-            "Акции",
-            action="Акция (создание) -> Завершить",
-            before_state="Акция (создание)",
-            expected_state="Акции list ochilishi",
-            button_name="Завершить",
-            confirm_text="Сохранить?",
-            location_hint="tests/smoke/test_groups/test_C_grup/test_action.py::run_c_group_create_action",
-        )
+        page.get_by_role("button", name="Завершить", exact=True).first.click()
+        BasePage(page).confirm_biruni("Сохранить?")
+        BasePage(page).wait_for_loader()
+        expect_page(page, heading="Акции")
         page.get_by_role("searchbox", name="Поиск").fill(action_name)
         page.get_by_role("searchbox", name="Поиск").press("Enter")
         row = page.locator("b-grid .tbl-row").filter(has_text=action_name).first
@@ -99,7 +94,7 @@ def run_c_group_create_action(page: Page, code, scope: str = "smoke", login: boo
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_c_group_order_action_discount(page: Page, code, scope: str = "smoke", login: bool = True) -> None:
+def run_c_group_order_action_discount(page, code, login=True):
     """C-02: C-01 da yaratilgan aksiya orderda product tanlanganda ishlashini tekshirish.
 
     Old shart: setup'da room-pw{code} ga "Акция" narx turi prikrep qilingan va C-01 aksiyasi
@@ -120,7 +115,7 @@ def run_c_group_order_action_discount(page: Page, code, scope: str = "smoke", lo
 
     if login:
         with allure.step("1 - User tizimga kiradi"):
-            authorization_user(page, code)
+            authorization(page, who="user", code=code)
             expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - Order yaratish: main page (room/robot/client) va product x 10"):

@@ -51,6 +51,8 @@ pytest tests/smoke/test_setup/test_<nomi>.py -v
 pytest tests/smoke/test_setup/test_setup_runner.py::test_<nomi> -v
 ```
 
+Repo rootda `.env` mavjud bo'lsa direct pytest/PyCharm run konfiguratsiyasi undan olinadi; `.env` yo'q bo'lsa terminal/CI flaglari ishlaydi.
+
 ### Allure hisobot ko'rish:
 ```bash
 allure serve test-results/allure-results
@@ -70,7 +72,7 @@ allure serve test-results/allure-results
 ## Muhim
 
 - Asosiy runner cross-platform: `python scripts/run_tests.py --url <server_url> --company-code <code> --company-password <password>`; Mac/Linux uchun `./run_tests.sh ...` wrapper ham bor.
-- `.env` ishlatilmaydi; `--url` majburiy.
+- `.env` mavjud bo'lsa direct `pytest`/PyCharm runlar undan foydalanadi; `.env` yo'q muhitlarda terminal/CI flaglari majburiy.
 - Mavjud company bilan run qilish uchun `--company-code` va `--company-password` majburiy.
 - Yangi company yaratish uchun `--create-company`, `--head-email` va `--head-password` majburiy.
 - `--create-company` bilan `--company-code` va `--company-password` berilmaydi; company code test ichida `autotest<code>` ko'rinishida yaratiladi.
@@ -99,8 +101,8 @@ allure serve test-results/allure-results
 - `TELEGRAM_CHAT_ID` endi faqat soatlik avto-run xabari boradigan chatni belgilaydi (ixtiyoriy); avto-run parolsiz ishlaydi.
 
 ### Telegram bot — Windows server deploy
-- Bot Windows serverda `scripts/run_telegram_ci_bot.ps1` orqali yoki to'g'ridan-to'g'ri `.venv\Scripts\python.exe scripts\telegram_ci_bot.py` bilan ishga tushadi; ikkinchisi har ikkala shellda (CMD/PowerShell) ishlaydi va kod default'lari (repo/workflow/ref/serverlar) yetarli.
-- `.ps1` faylni CMD ishga tushira olmaydi (faqat ochadi); `.ps1` faqat PowerShell'da, yoki CMD'dan `powershell -ExecutionPolicy Bypass -File ...` bilan.
+- Bot Windows serverda CMD uchun rootdagi `run_telegram_ci_bot.bat` yoki `scripts\run_telegram_ci_bot.cmd`, PowerShell uchun `scripts/run_telegram_ci_bot.ps1`, yoki to'g'ridan-to'g'ri `.venv\Scripts\python.exe scripts\telegram_ci_bot.py` bilan ishga tushadi; to'g'ridan-to'g'ri python varianti har ikkala shellda (CMD/PowerShell) ishlaydi va kod default'lari (repo/workflow/ref/serverlar) yetarli.
+- `.ps1` faylni CMD ishga tushira olmaydi (faqat ochadi); CMD uchun rootdagi `run_telegram_ci_bot.bat` yoki `scripts\run_telegram_ci_bot.cmd` ishlatiladi.
 - Windows PowerShell 5.1 `.ps1` faylni system ANSI codepage bilan o'qiydi; faylda non-ASCII belgi (masalan uzun tire `—`) bo'lsa "missing terminating quote / missing }" parser xatosini beradi. `.ps1` fayllar faqat ASCII bo'lsin.
 - Maxfiy env'lar (`TELEGRAM_BOT_TOKEN`, `GITHUB_TOKEN`/`GITHUB_PAT`, `TELEGRAM_RUN_PASSWORD`) `User` darajada saqlanadi; bot accept qiladigan GitHub token `GITHUB_TOKEN` yoki `GITHUB_PAT` nomida bo'lishi mumkin.
 - Doimiy ishlashi uchun Task Scheduler: action `D:\Playwright\.venv\Scripts\python.exe`, args `scripts\telegram_ci_bot.py`, "Рабочая папка" `D:\Playwright`; "Останавливать дольше" belgisini olib tashlash kerak (bot doim ishlaydi).

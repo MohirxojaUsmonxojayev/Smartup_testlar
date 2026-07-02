@@ -16,27 +16,77 @@ Quyidagi qoidalarga qat'iy rioya qil:
 - All runner: `tests/smoke/test_all_runner.py`
 - Fixtures: `tests/smoke/conftest.py`
 
-## 2. Test fayl shabloni
+## 2. Test fayl shabloni (`run_` + `test_` ikki funksiya)
+
+Har bir test fayl IKKI funksiyadan iborat (test_legal_person / test_filial / test_room / test_robot real namunalari):
+
+- **`run_<nomi>(page, code, ...)`** — qayta ishlatiladigan biznes logika; setup/group runner zanjiri shuni chaqiradi. `page` ni **allaqachon login qilingan** deb qabul qiladi (auth ichida chaqirilmaydi). Raqamlangan docstring testcase + `with allure.step("N - ...")` bloklari.
+- **`test_<nomi>(page, code, ...)`** — `@allure.title(...)` bilan pytest entry; alohida/debug run uchun. `authorization(...)` (+ forma faqat filialda ko'rinsa `switch_filial(...)`) qilib, so'ng `run_<nomi>(...)` ni chaqiradi. Kerakli fixturalarni (`save_data`/`load_data`) qabul qilib `run_` ga uzatadi.
 
 ```python
 import allure
-from playwright.sync_api import Page
+from playwright.sync_api import expect            # Python assert emas, faqat kerak bo'lsa import
+from tests.smoke.flows.flow_authorization import authorization
+from tests.smoke.flows.flow_navigate import navigate_to, expect_page, switch_filial
+from utils.base_page import BasePage
 
-pytestmark = [allure.epic("Smoke"), allure.feature("<Feature nomi>"), allure.story("<Story nomi>")]
+pytestmark = [allure.epic("Smoke"), allure.feature("<Feature>"), allure.story("<Story>")]
 
-@allure.title("<Test nomi>")
-def test_<nomi>(session_page: Page, code: str, save_data, load_data, logger):
-    with allure.step("1 - <Qadam nomi>"):
-        # amal
-        pass
-    with allure.step("2 - <Qadam nomi>"):
-        # assert
-        pass
+# ----------------------------------------------------------------------------------------------------------------------
+
+def run_<nomi>(page, code, save_data=None):
+    """Testcase: <maqsad>.
+
+    1. <Tab> -> <Menyu> ro'yxatini ochish.
+    2. "Создать" -> majburiy maydonlarni to'ldirish.
+    3. Saqlab, ro'yxatda nom/kod/status ko'rinishini tekshirish.
+    """
+    entity_name = f"<entity>-pw{code}"
+    entity_code = f"cod_<entity>_pw{code}"
+
+    with allure.step("1 - <Entity> ro'yxatiga o'tish"):
+        navigate_to(page, tab="<Tab>", name="<Menyu>")
+        expect_page(page, heading="<Ro'yxat heading>")
+
+    with allure.step("2 - Yangi <entity> formasini to'ldirish"):
+        page.get_by_role("button", name="Создать").click()
+        expect_page(page, heading="<Create heading>")
+        BasePage(page).input(label="Код", value=entity_code)
+        BasePage(page).input(label="Название", value=entity_name)
+        BasePage(page).checkbox(label="Статус", expect_checked=True)
+
+    with allure.step("3 - Saqlash va ro'yxatda tekshirish"):
+        page.get_by_role("button", name="Сохранить", exact=True).first.click()
+        expect_page(page, heading="<Ro'yxat heading>")
+        BasePage(page).grid_row(entity_name, entity_code, "Активный")
+
+    # Downstream testlarga kerak bo'lsa (oxirgi step):
+    #     save_data("<key>", entity_code)
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+@allure.title("<Inson o'qiydigan test nomi>")
+def test_<nomi>(page, code, save_data):
+    authorization(page, who='admin')
+    # switch_filial(page, name=f"filial-pw{code}")   # forma faqat o'sha filialda ko'rinsa
+    run_<nomi>(page, code, save_data=save_data)
 ```
+
+### `run_` / `test_` konvensiyasi qoidalari
+- **Maksimal base funksiya**: `navigate_to`, `expect_page`, `switch_filial` (flow) va `BasePage(page).input_by_label/b_input_by_label/multiselect/checkbox/grid_controller/grid_row/click_grid_row/confirm_biruni/wait_for_loader`. Raw `page.get_by_role/locator` faqat mos base funksiya yo'q joyda (masalan "Создать"/"Сохранить" tugmasi).
+- **allure.step raqamlari docstring qadamlari bilan mantiqan mos** kelsin; step nomi qisqa va professional.
+- **Test data** — `run_` boshida lokal `f"...{code}"` o'zgaruvchilar; downstream testga kerak bo'lsa oxirgi stepda `save_data(...)`.
+- **`run_` auth qilmaydi** (page login qilingan deb keladi). Istisno: rolni almashtirish kerak bo'lsa `run_` ichida boshqa rol bilan kiriladi (masalan `run_room_attachment` `authorization(who="user"...)` qiladi).
+- **Takroriy `switch_filial` qo'yma**: setup zanjiri bitta `session_page` ni bo'lishadi, shuning uchun filial konteksti `run_` lar orasida saqlanadi. Zanjirda filialga BIR MARTA o'tiladi (birinchi kerak bo'lgan `run_` — masalan `run_room` filial-pw{code} ga o'tadi), keyingi `run_` lar (robot, natural_person, ...) o'sha filialni meros qilib oladi va QAYTA `switch_filial` qilmaydi (ortiqcha kod). Standalone/debug run uchun `switch_filial` ni `test_` wrapper'ga qo'y (run_ ichiga emas) — shunda zanjirda takrorlanmaydi, alohida run'da esa default filialdan to'g'ri filialga o'tadi.
+- **Verifikatsiya zanjiri**: save → `expect_page(list heading)` → (ro'yxatda topish uchun kerak bo'lsa) `grid_controller(search=...)` → `grid_row(code, name, "Активный")`.
+- **Lokal helper** (`_select_grid_checkall` kabi) faqat shu faylda ishlatilsa faylda `_` prefiksi bilan qoladi; bir nechta testda kerak bo'lsa `flows/` yoki `BasePage` ga chiqariladi (1 qatorlik wrapper yozilmaydi).
+- Fayl boshida module-level `pytestmark = [allure.epic, allure.feature, allure.story]` va funksiyalar orasida `# ---...---` separator.
 
 ## 3. Qoidalar
 
-- **Fixtures**: `session_page`, `code`, `save_data`, `load_data`, `logger` — conftest.py dan keladi, import qilma
+- **Fixtures** — conftest.py dan keladi, import qilma:
+  - `page` — yakka test uchun fresh page; `session_page` — setup chain; `group_user_page` — group chain (login qilingan)
+  - `code` — 6 xonali unikal son; `test_scope` — "smoke"/"regression"; `save_data` / `load_data` / `require_data` — data_store; `logger`
 - **Allure**: har bir test `@allure.title()` va `with allure.step()` bilan bo'lishi SHART
 - **Locator**: `page.locator()` ishlatilsin, `page.find_element()` EMAS
 - **Assert**: `expect(locator).to_be_visible()` ishlatilsin, Python `assert` EMAS
@@ -59,7 +109,7 @@ def test_XX_<nomi>(session_page: Page, code):
 ## 5. Loyiha Xususiyatlari
 
 ### Runner config va dinamik qiymatlar
-- `.env` ishlatilmaydi; test run konfiguratsiyasi `scripts/run_tests.py` yoki pytest optionlari orqali keladi.
+- Repo rootda `.env` mavjud bo'lsa direct `pytest`/PyCharm run konfiguratsiyasi undan olinadi; `.env` yo'q bo'lsa terminal/CI flaglari ishlaydi.
 - Har bir run uchun `--url` va company mode majburiy: mavjud company uchun `--company-code/--company-password`, yangi company uchun `--create-company --head-email/--head-password`.
 - Dinamik email va shunga o'xshash qiymatlar test/flow ichida active company code bilan quriladi:
   ```python
@@ -67,20 +117,26 @@ def test_XX_<nomi>(session_page: Page, code):
   ```
 
 ### code fixture
-- `pytest.mark.user_setup` runner orqali ishlaganda: yangi `random.randint(1000, 9999)` yaratadi
+- `pytest.mark.user_setup` runner orqali ishlaganda: yangi `random.randint(100000, 999999)` yaratadi (6 xonali)
 - Yakka test ishlaganda: `test-results/data/data_store.json` dan `"code"` kalitini o'qiydi
 - Agar `data_store.json` bo'lmasa: `pytest.exit()` bilan aniq xato beradi
 
-### authorization_user
-- `authorization_user(page, code)` — `code` parametrni qabul qiladi
-- Email ichida quriladi: `f"user-pw{code}@<active_company_code>"`
+### authorization (rolga qarab login)
+- Yagona funksiya: `authorization(page, who="admin"|"user"|"head", *, email=None, password=None, code=None, generated_code="new")`. **Eski `authorization_user` OLIB TASHLANGAN — ishlatma.**
+- `who="user"` → `user-pw{code}@{company}` + `USER_PASSWORD`/`USER_PASS`. Avvalgi `authorization_user(page, code)` o'rniga `authorization(page, who="user", code=code)` yoz.
+- `who="admin"` → `ADMIN_EMAIL`/`admin@{company}` + `ADMIN_PASSWORD`/`COMPANY_PASSWORD`. Avvalgi `authorization(page)` shu (default `who="admin"`).
+- `who="head"` → `HEAD_ADMIN_EMAIL`/`HEAD_ADMIN_PASSWORD` (company yaratish uchun).
+- `generated_code="new"` → yangi random code; `"old"` → `data_store.json` dagi `code` (yakka/debug run uchun). `code` berilsa — `generated_code` e'tiborsiz, o'sha ishlatiladi.
+- `email`/`password` to'g'ridan-to'g'ri berilsa — `who` e'tiborsiz, o'shalar ishlatiladi.
+- Credentiallar `.env` dan olinadi (precedence: `.env` yutadi — `conftest._option_or_env`).
 
 ### Selenium migratsiya source fayli
 - Foydalanuvchi Selenium test kodini rootdagi `for_migratsiya.py` fayliga qo'yadi; migratsiya so'ralganda shu fayldan o'qib Playwright + pytest smoke testga o'tkaz, UI da run qilib xatolarini tuzat.
 - Migratsiya qilingan Playwright kodni ham `for_migratsiya.py` faylining davomiga yoz; runnerga yoki test flowga avtomatik qo'shma, foydalanuvchi tekshirib o'zi ko'chiradi.
 - Migratsiyada foydalanuvchi `run_tests.sh` oldin run qilinganini aytsa, user setup tayyor deb hisobla; user bilan login qil va `code` qiymatini `test-results/data/data_store.json` dan ol.
-- Agar foydalanuvchi Playwright codegen pytest kodini bersa, Seleniumdan taxminiy migratsiya qilma; codegen kodini asos qilib olib loyiha fixture, Allure step, `code`, `authorization_user`, helper flow va locator patternlariga moslab ber.
+- Agar foydalanuvchi Playwright codegen pytest kodini bersa, Seleniumdan taxminiy migratsiya qilma; codegen kodini asos qilib olib loyiha fixture, Allure step, `code`, `authorization(who="user", code=code)`, helper flow va locator patternlariga moslab ber.
 - Codegen kodini moslashda har bir ochilgan sahifa, forma yoki view uchun `expect(...)` bilan ochilganini tasdiqla; mavjud login/navbar flowlari bo'lsa, codegen qatorlari o'rniga o'shalarni ishlat.
+- Codegen `page.goto("https://...")` kabi hardcode to'liq URL yozadi; bularni hech qachon kodda qoldirma. Conftest `--url` ni `os.environ["COMPANY_URL"]` ga yozadi va `tests/smoke/flows/flow_authorization.company_url()` shuni o'qiydi. Har bir hardcode URL ni `f"{company_url()}/login.html"`, `f"{company_url()}/a2/biruni/md/company_list"` kabi global URL ga bog'la (path qismi qoladi, domen `company_url()` dan keladi). `company_url` ni `flow_authorization` dan import qil.
 - Umumiy test ma'lumotlarini ajratish uchun random ishlatma, `code` fixture qiymatini ishlat; bu test boshida generatsiya bo'ladi va butun sessiya davomida saqlanadi.
 - `code` fixture umumiy entity nomlari va testlarni ajratish uchun ishlatiladi; agar formaning o'z `code`/`number` maydoni keyingi testlarda kerak bo'lsa, alohida `contract_code_{random_son}` kabi qiymat generatsiya qil, listda aynan shu qiymat bilan hozir yaratilgan recordni top, test muvaffaqiyatli tugaganda `save_data` orqali `data_store.json` ga saqla.
 - Contract add formasida generated `contract_code_{random_son}` qiymati `Код` inputiga yoziladi; `Номер` inputi bilan almashtirib yuborma.

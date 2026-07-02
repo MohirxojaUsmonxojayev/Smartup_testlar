@@ -6,22 +6,13 @@ helper'lar shu root ichidagi maydonlar bilan ishlaydi.
 
 import re
 
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def fill_input(root, ng_model: str, value: str) -> None:
-    field = root.locator(f'input[ng-model="{ng_model}"]:visible').first
-    expect(field).to_be_visible()
-    field.fill(value)
-    expect(field).to_have_value(value)
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-def fill_textarea(root, ng_model: str, value: str) -> None:
+def fill_textarea(root, ng_model, value):
     field = root.locator(f'textarea[ng-model="{ng_model}"]:visible').first
     expect(field).to_be_visible()
     field.fill(value)
@@ -30,29 +21,13 @@ def fill_textarea(root, ng_model: str, value: str) -> None:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def set_checkbox(root, ng_model: str, checked: bool) -> None:
-    checkbox = root.locator(f'input[ng-model="{ng_model}"]').first
-    if checkbox.is_checked() != checked:
-        control = checkbox.locator(
-            "xpath=ancestor::*[contains(@class,'checkbox') or contains(@class,'switch')][1]"
-        )
-        if control.count() > 0 and control.first.is_visible():
-            control.first.click()
-        else:
-            expect(checkbox).to_be_visible()
-            checkbox.click()
-    expect(checkbox).to_be_checked() if checked else expect(checkbox).not_to_be_checked()
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-
 def select_b_input_by_search(
     root,
-    ng_model: str,
-    search_text: str,
-    option_text: str | None = None,
-    expected_value: str | None = None,
-) -> None:
+    ng_model,
+    search_text,
+    option_text=None,
+    expected_value=None,
+):
     b_input = root.locator(f'b-input:has(input[ng-model="{ng_model}"])').first
     search = b_input.get_by_placeholder("Поиск").first
     expect(search).to_be_visible()
@@ -72,7 +47,7 @@ def select_b_input_by_search(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def select_tashkent_region(page: Page) -> None:
+def select_tashkent_region(page):
     search = page.locator('b-tree-select:visible input[ng-model="_$bTree.searchValue"]').first
     expect(search).to_be_visible()
     search.click()
@@ -100,7 +75,7 @@ def select_tashkent_region(page: Page) -> None:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def assert_visible_page_text(page: Page, *values: str) -> None:
+def assert_visible_page_text(page, *values):
     content = page.locator("b-page")
     for value in values:
         if value:

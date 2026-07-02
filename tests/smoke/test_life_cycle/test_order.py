@@ -1,6 +1,6 @@
 import allure
 from tests.smoke.flows.flow_navigate import navigate_to
-from tests.smoke.flows.flow_authorization import authorization_user
+from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_order.flow_order_add import (
     auto_filled_order_dates,
     flow_order_main_page,
@@ -14,8 +14,8 @@ pytestmark = [allure.epic("Smoke"), allure.feature("Life Cycle"), allure.story("
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_order_basic(page, code, save_data, scope: str = "smoke") -> None:
-    authorization_user(page, code)
+def run_order_basic(page, code, save_data):
+    authorization(page, who="user", code=code)
 
     with allure.step("Navigate To: Order Page"):
         navigate_to(page,
@@ -126,7 +126,7 @@ def run_order_basic(page, code, save_data, scope: str = "smoke") -> None:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_order_add_column_order_id(page, code, scope: str = "smoke") -> None:
+def run_order_add_column_order_id(page, code):
 
     with allure.step("Order List: Grid Setting"):
         flow_order_list_grid_setting(page, colum_name="ИД заказа", search_name="ИД заказа")
@@ -134,10 +134,10 @@ def run_order_add_column_order_id(page, code, scope: str = "smoke") -> None:
 # ----------------------------------------------------------------------------------------------------------------------
 
 @allure.title("Order Basic")
-def test_order_basic(page, code, save_data, test_scope) -> None:
-    run_order_basic(page, code, save_data, scope=test_scope)
+def test_order_basic(page, code, save_data):
+    run_order_basic(page, code, save_data)
 
 
 @allure.title("Order Add Column -> Order Id")
-def test_order_add_column_order_id(page, code, test_scope) -> None:
-    run_order_add_column_order_id(page, code, scope=test_scope)
+def test_order_add_column_order_id(page, code):
+    run_order_add_column_order_id(page, code)

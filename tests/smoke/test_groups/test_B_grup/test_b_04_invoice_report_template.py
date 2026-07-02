@@ -5,10 +5,10 @@ from pathlib import Path
 
 import allure
 import pytest
-from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, expect
 
-from tests.smoke.flows.flow_authorization import authorization, authorization_user, logout
-from tests.smoke.flows.flow_navigate import navigate_to
+from tests.smoke.flows.flow_authorization import authorization, logout
+from tests.smoke.flows.flow_navigate import navigate_to, expect_page
 from tests.smoke.flows.flow_order.flow_order_list import flow_open_order_list, flow_order_list
 from utils.base_page import BasePage
 
@@ -28,7 +28,7 @@ EDITOR_POLL_INTERVAL = 500
 ONLYOFFICE_EDITOR_HOST = "office.smartup.online"
 
 
-def _search_grid(page: Page, text: str) -> None:
+def _search_grid(page, text):
     search = page.locator('input[ng-model="o.searchValue"]').first
     expect(search).to_be_visible()
     search.click()
@@ -39,7 +39,7 @@ def _search_grid(page: Page, text: str) -> None:
     BasePage(page).wait_for_loader(timeout=120_000)
 
 
-def _grid_row_is_visible(page: Page, text: str, timeout: int = 2_000) -> bool:
+def _grid_row_is_visible(page, text, timeout=2_000):
     try:
         expect(page.locator("b-grid .tbl-row").filter(has_text=text).first).to_be_visible(timeout=timeout)
         return True
@@ -47,7 +47,7 @@ def _grid_row_is_visible(page: Page, text: str, timeout: int = 2_000) -> bool:
         return False
 
 
-def _visible_error_texts(page: Page) -> list[str]:
+def _visible_error_texts(page):
     selectors = [
         "[role='alert']:visible",
         ".alert-danger:visible",
@@ -57,7 +57,7 @@ def _visible_error_texts(page: Page) -> list[str]:
         ".text-danger:visible",
         ".invalid-feedback:visible",
     ]
-    texts: list[str] = []
+    texts = []
     for selector in selectors:
         locator = page.locator(selector)
         try:
@@ -74,7 +74,7 @@ def _visible_error_texts(page: Page) -> list[str]:
     return texts
 
 
-def _find_onlyoffice_editor_frame(report_page: Page):
+def _find_onlyoffice_editor_frame(report_page):
     """Report popupida OnlyOffice spreadsheet editor iframe'ini qaytaradi (topilmasa None)."""
     for frame in report_page.frames:
         url = frame.url or ""
@@ -83,7 +83,7 @@ def _find_onlyoffice_editor_frame(report_page: Page):
     return None
 
 
-def _attach_editor_open_diagnostics(report_page: Page, template_name: str) -> None:
+def _attach_editor_open_diagnostics(report_page, template_name):
     frame_urls = []
     for frame in report_page.frames:
         try:
@@ -134,7 +134,7 @@ def _clickable_dropdown_option(option):
     return option
 
 
-def _open_custom_report_in_editor_and_assert(page: Page, report_option, template_name: str) -> str:
+def _open_custom_report_in_editor_and_assert(page, report_option, template_name):
     """
     Custom invoice report fayl download bo'lmaydi — option bosilganda yangi popup
     ochilib, report OnlyOffice spreadsheet editorida (office.smartup.online) ko'rsatiladi.
@@ -186,12 +186,11 @@ def _open_custom_report_in_editor_and_assert(page: Page, report_option, template
 
 
 def run_b_group_create_custom_invoice_report_template(
-    page: Page,
-    code: str,
+    page,
+    code,
     load_data,
-    scope: str = "smoke",
-    login: bool = True,
-) -> None:
+    login=True,
+):
     """
     Testcase:
     1. Mavjud admin bilan tizimga kirish.
@@ -217,7 +216,7 @@ def run_b_group_create_custom_invoice_report_template(
 
     with allure.step("2 - Шаблоны накладных sahifasida custom template tayyorlanadi"):
         navigate_to(page, tab="Главное", name="Шаблоны накладных")
-        expect(page).to_have_url(re.compile(r".*/template_list"))
+        expect_page(page, url="template_list")
         expect(page.locator("body")).to_contain_text("Шаблоны накладных")
 
         _search_grid(page, template_name)
@@ -260,7 +259,7 @@ def run_b_group_create_custom_invoice_report_template(
 
     with allure.step("3 - Template Админ rolega qayta attach qilinadi"):
         navigate_to(page, tab="Главное", name="Шаблоны накладных")
-        expect(page).to_have_url(re.compile(r".*/template_list"))
+        expect_page(page, url="template_list")
         _search_grid(page, template_name)
 
         template_row = page.locator("b-grid .tbl-row").filter(has_text=template_name).first
@@ -316,14 +315,14 @@ def run_b_group_create_custom_invoice_report_template(
         expect(role_row).to_contain_text("Активный")
 
         page.locator("button").filter(has_text=re.compile(r"^\s*Закрыть\s*$", re.IGNORECASE)).first.click()
-        expect(page).to_have_url(re.compile(r".*/template_list"))
+        expect_page(page, url="template_list")
         expect(page.locator("body")).to_contain_text("Шаблоны накладных")
 
     with allure.step("4 - User order listda Счет-фактуры custom template OnlyOffice'da ochilishini tekshiradi"):
         created_order_client = load_data("b_group_consignment_order_client") or f"natural_client-pw{code}"
 
         logout(page)
-        authorization_user(page, code)
+        authorization(page, who="user", code=code)
 
         flow_open_order_list(page)
         expect(page.locator("#kt_content")).to_contain_text(created_order_client, timeout=120_000)
@@ -354,14 +353,12 @@ def run_b_group_create_custom_invoice_report_template(
 
 @allure.title("B-04 - Custom invoice report template yaratish va orderda tekshirish")
 def test_b_04_invoice_report_template(
-    group_session_page: Page,
-    code: str,
+    group_session_page,
+    code,
     load_data,
-    test_scope,
-) -> None:
+):
     run_b_group_create_custom_invoice_report_template(
         group_session_page,
         code,
         load_data,
-        scope=test_scope,
     )

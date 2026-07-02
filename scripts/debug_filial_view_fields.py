@@ -17,7 +17,7 @@ from utils.base_page import BasePage
 ARCHIVE_DIR = ROOT / "skills/smartup-guide/references/forms/screenshots/filial"
 
 
-def visible_texts(page, selector: str) -> list[str]:
+def visible_texts(page, selector):
     return page.locator(selector).evaluate_all(
         """(items) => items
             .filter((el) => {
@@ -30,7 +30,7 @@ def visible_texts(page, selector: str) -> list[str]:
     )
 
 
-def collect_view_state(page) -> dict:
+def collect_view_state(page):
     return {
         "url": page.url,
         "heading_texts": visible_texts(page, "h1, h2, h3, h4, h5, .card-title, .page-title"),
@@ -41,7 +41,7 @@ def collect_view_state(page) -> dict:
     }
 
 
-def collect_switches(page) -> list[dict]:
+def collect_switches(page):
     return page.evaluate(
         """() => {
             const visible = (el) => {
@@ -78,7 +78,7 @@ def collect_switches(page) -> list[dict]:
     )
 
 
-def click_tab_by_text(page, text: str) -> bool:
+def click_tab_by_text(page, text):
     tab = page.locator("a:visible, button:visible, [role='tab']:visible").filter(has_text=text).first
     if tab.count() == 0:
         return False
@@ -88,7 +88,7 @@ def click_tab_by_text(page, text: str) -> bool:
     return True
 
 
-def screenshot_name_for_tab(tab_name: str) -> str:
+def screenshot_name_for_tab(tab_name):
     mapping = {
         "Основная информация": "filial__view-main__desktop-1920x1080.png",
         "Продукты": "filial__view-products__desktop-1920x1080.png",

@@ -55,10 +55,6 @@ if (-not $env:AUTO_RUN_SERVER) {
     $env:AUTO_RUN_SERVER = "smartup"
 }
 
-if (-not $env:AUTO_RUN_SCOPE) {
-    $env:AUTO_RUN_SCOPE = "smoke"
-}
-
 if (-not $env:AUTO_RUN_TARGET) {
     $env:AUTO_RUN_TARGET = "all"
 }

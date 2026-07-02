@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
-from typing import Iterator
 
 import allure
 
@@ -10,19 +9,19 @@ import allure
 EVENT_PREFIX = "SMARTUP_PROGRESS "
 
 
-def _emit_progress_event(payload: dict[str, str]) -> None:
+def _emit_progress_event(payload):
     print(EVENT_PREFIX + json.dumps(payload, ensure_ascii=False, sort_keys=True), flush=True)
 
 
 @contextmanager
 def progress_step(
     *,
-    group: str,
-    runner: str,
-    test_id: str,
-    title: str,
-    display: str | None = None,
-) -> Iterator[None]:
+    group,
+    runner,
+    test_id,
+    title,
+    display=None,
+):
     shown_name = display or title or test_id
     base_payload = {
         "group": group,

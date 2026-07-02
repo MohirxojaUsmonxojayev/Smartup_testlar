@@ -1,6 +1,5 @@
 import allure
 import pytest
-from playwright.sync_api import Page
 
 from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_navigate import switch_filial
@@ -44,7 +43,7 @@ CISLINK_SKIP_REASON = (
 )
 
 
-def run_report_group_chain(group_page: Page, code: str, save_data, load_data, scope: str = "smoke") -> None:
+def run_report_group_chain(group_page, code, save_data, load_data):
     """Report group chainni pytest test funksiyalarini chaqirmasdan bajaradi."""
     allure.dynamic.description(REPORT_GROUP_TEST_SCENARIO)
     with progress_step(
@@ -64,63 +63,63 @@ def run_report_group_chain(group_page: Page, code: str, save_data, load_data, sc
         test_id="test_report_02_integration_three",
         title="Report-02 - Integration №3 report (3 sheet)",
     ):
-        run_report_integration_three_check(group_page, code, scope=scope, login=False)
+        run_report_integration_three_check(group_page, code, login=False)
     with progress_step(
         group="Report group",
         runner=REPORT_GROUP_RUNNER_TEST,
         test_id="test_report_03_saleswork",
         title="Report-03 - SalesWork report (sales_work.zip)",
     ):
-        run_report_saleswork_check(group_page, code, scope=scope, login=False)
+        run_report_saleswork_check(group_page, code, login=False)
     with progress_step(
         group="Report group",
         runner=REPORT_GROUP_RUNNER_TEST,
         test_id="test_report_04_optimum",
         title="Report-04 - Optimum report (optimum.zip)",
     ):
-        run_report_optimum_check(group_page, code, scope=scope, login=False)
+        run_report_optimum_check(group_page, code, login=False)
     with progress_step(
         group="Report group",
         runner=REPORT_GROUP_RUNNER_TEST,
         test_id="test_report_05_spot",
         title="Report-05 - Spot 2d report (Spot2D.zip)",
     ):
-        run_report_spot_check(group_page, code, scope=scope, login=False)
+        run_report_spot_check(group_page, code, login=False)
     with progress_step(
         group="Report group",
         runner=REPORT_GROUP_RUNNER_TEST,
         test_id="test_report_06_integration_two",
         title="Report-06 - Integration Two report (4 xml)",
     ):
-        run_report_integration_two_check(group_page, code, load_data, scope=scope, login=False)
+        run_report_integration_two_check(group_page, code, load_data, login=False)
 
 
 @pytest.mark.skip(reason=CISLINK_SKIP_REASON)
 @allure.title("Report-01 - CisLink integration report")
-def test_report_01_cislink(group_session_page: Page, code: str, test_scope) -> None:
-    run_report_cislink_check(group_session_page, code, scope=test_scope, login=True)
+def test_report_01_cislink(group_session_page, code):
+    run_report_cislink_check(group_session_page, code, login=True)
 
 
 @allure.title("Report-02 - Integration №3 report")
-def test_report_02_integration_three(group_session_page: Page, code: str, test_scope) -> None:
-    run_report_integration_three_check(group_session_page, code, scope=test_scope, login=True)
+def test_report_02_integration_three(group_session_page, code):
+    run_report_integration_three_check(group_session_page, code, login=True)
 
 
 @allure.title("Report-03 - SalesWork report")
-def test_report_03_saleswork(group_session_page: Page, code: str, test_scope) -> None:
-    run_report_saleswork_check(group_session_page, code, scope=test_scope, login=True)
+def test_report_03_saleswork(group_session_page, code):
+    run_report_saleswork_check(group_session_page, code, login=True)
 
 
 @allure.title("Report-04 - Optimum report")
-def test_report_04_optimum(group_session_page: Page, code: str, test_scope) -> None:
-    run_report_optimum_check(group_session_page, code, scope=test_scope, login=True)
+def test_report_04_optimum(group_session_page, code):
+    run_report_optimum_check(group_session_page, code, login=True)
 
 
 @allure.title("Report-05 - Spot 2d report")
-def test_report_05_spot(group_session_page: Page, code: str, test_scope) -> None:
-    run_report_spot_check(group_session_page, code, scope=test_scope, login=True)
+def test_report_05_spot(group_session_page, code):
+    run_report_spot_check(group_session_page, code, login=True)
 
 
 @allure.title("Report-06 - Integration Two report")
-def test_report_06_integration_two(group_session_page: Page, code: str, load_data, test_scope) -> None:
-    run_report_integration_two_check(group_session_page, code, load_data, scope=test_scope, login=True)
+def test_report_06_integration_two(group_session_page, code, load_data):
+    run_report_integration_two_check(group_session_page, code, load_data, login=True)

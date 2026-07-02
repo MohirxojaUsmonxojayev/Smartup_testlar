@@ -1,6 +1,5 @@
 import json
 import os
-from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 
@@ -9,7 +8,7 @@ DATA_STORE_PATH = ROOT / "test-results/data/data_store.json"
 CREATED_COMPANY_PASSWORD = "greenwhite"
 
 
-def _load_data_store() -> dict:
+def _load_data_store():
     if not DATA_STORE_PATH.exists():
         return {}
     try:
@@ -19,7 +18,7 @@ def _load_data_store() -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def add_company_args(parser: ArgumentParser) -> None:
+def add_company_args(parser):
     parser.add_argument("--url", required=True)
     parser.add_argument("--company-code")
     parser.add_argument("--company-password")
@@ -28,7 +27,7 @@ def add_company_args(parser: ArgumentParser) -> None:
     parser.add_argument("--head-password")
 
 
-def configure_company_env(args: Namespace) -> None:
+def configure_company_env(args):
     company_url = args.url.strip().rstrip("/")
     if not company_url:
         raise SystemExit("--url bo'sh bo'lishi mumkin emas")

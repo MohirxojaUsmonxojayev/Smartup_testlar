@@ -18,7 +18,7 @@ from utils.base_page import BasePage
 ARCHIVE_DIR = ROOT / "skills/smartup-guide/references/forms/screenshots/legal-person"
 
 
-def sanitize(value: str) -> str:
+def sanitize(value):
     return (
         value.lower()
         .replace(" ", "-")
@@ -29,7 +29,7 @@ def sanitize(value: str) -> str:
     )
 
 
-def save_state(page, name: str, states: dict) -> None:
+def save_state(page, name, states):
     screenshot = ARCHIVE_DIR / f"legal-person__{name}__desktop-1920x1080.png"
     page.screenshot(path=str(screenshot), full_page=True)
     states[name] = {
@@ -39,7 +39,7 @@ def save_state(page, name: str, states: dict) -> None:
     }
 
 
-def click_tab(page, name: str) -> None:
+def click_tab(page, name):
     page.locator("a:visible").filter(has_text=name).first.click()
     BasePage(page).wait_for_loader()
     page.wait_for_timeout(500)
@@ -56,7 +56,7 @@ def main():
     code = data["legal_person_code"]
 
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
-    states: dict = {}
+    states = {}
 
     with sync_playwright() as p:
         browser = p.chromium.launch(

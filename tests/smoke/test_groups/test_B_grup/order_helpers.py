@@ -3,10 +3,10 @@ import re
 from datetime import datetime, timedelta
 
 import allure
-from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, expect
 
-from tests.smoke.flows.flow_authorization import authorization_user
-from tests.smoke.flows.flow_navigate import navigate_to
+from tests.smoke.flows.flow_authorization import authorization
+from tests.smoke.flows.flow_navigate import navigate_to, expect_page
 from tests.smoke.flows.flow_order.flow_order_add import (
     flow_order_final_page,
     flow_order_main_page,
@@ -36,7 +36,6 @@ B_GROUP_ORDER_INVOICE_REPORT_OPTIONS = [
 ]
 B_GROUP_ORDER_INVOICE_DOWNLOAD_OPTIONS = ["Экспортировать заказ"]
 B_GROUP_ORDER_INVOICE_OPEN_ONLY_OPTIONS = {"Чек-лист (80 мм)"}
-B_GROUP_ORDER_INVOICE_SMOKE_REPORT_OPTIONS = B_GROUP_ORDER_INVOICE_REPORT_OPTIONS
 B_GROUP_ORDER_INVOICE_REPORT_DATA_CHECKS = {
     "Загрузочный лист": ("product", "total"),
     "Лист заказов № 3": ("product", "total"),
@@ -58,17 +57,17 @@ B_GROUP_ORDER_INVOICE_REPORT_DATA_CHECKS = {
 B_GROUP_ORDER_INVOICE_REPORT_CONTROL_RE = re.compile(r"(печать|распечатать|excel)", re.IGNORECASE)
 
 
-def _normalize_report_text(value: str) -> str:
+def _normalize_report_text(value):
     return re.sub(r"\s+", " ", value.replace("\xa0", " ")).strip()
 
 
-def _contains_amount(value: str, amount: str) -> bool:
+def _contains_amount(value, amount):
     expected_digits = re.sub(r"\D", "", amount)
     actual_digits = re.sub(r"\D", "", value)
     return bool(expected_digits and expected_digits in actual_digits)
 
 
-def _invoice_dropdown_option_names(page: Page) -> list[str]:
+def _invoice_dropdown_option_names(page):
     return page.locator(".dropdown-menu:visible a.dropdown-item").evaluate_all(
         """elements => elements
             .map(element => (element.innerText || element.textContent || "").replace(/\\s+/g, " ").trim())
@@ -77,7 +76,7 @@ def _invoice_dropdown_option_names(page: Page) -> list[str]:
     )
 
 
-def _open_order_invoice_dropdown(page: Page, client: str) -> None:
+def _open_order_invoice_dropdown(page, client):
     flow_open_order_list(page)
     expect(page.locator("#kt_content")).to_contain_text(client, timeout=120_000)
     flow_order_list(page, find_row=client)
@@ -87,7 +86,7 @@ def _open_order_invoice_dropdown(page: Page, client: str) -> None:
     expect(page.locator(".dropdown-menu:visible a.dropdown-item").first).to_be_visible()
 
 
-def _assert_invoice_dropdown_options(page: Page) -> None:
+def _assert_invoice_dropdown_options(page):
     expected_options = B_GROUP_ORDER_INVOICE_REPORT_OPTIONS + B_GROUP_ORDER_INVOICE_DOWNLOAD_OPTIONS
     actual_options = _invoice_dropdown_option_names(page)
     missing = [option for option in expected_options if option not in actual_options]
@@ -100,13 +99,7 @@ def _assert_invoice_dropdown_options(page: Page) -> None:
         raise AssertionError(f"Накладные dropdown optionlari topilmadi: {', '.join(missing)}")
 
 
-def _report_options_for_scope(scope: str) -> list[str]:
-    if scope == "regression":
-        return B_GROUP_ORDER_INVOICE_REPORT_OPTIONS
-    return B_GROUP_ORDER_INVOICE_SMOKE_REPORT_OPTIONS
-
-
-def _assert_report_loaded(report_page: Page, option_name: str) -> str:
+def _assert_report_loaded(report_page, option_name):
     expect(report_page.locator("body")).to_contain_text(B_GROUP_ORDER_INVOICE_REPORT_CONTROL_RE, timeout=60_000)
     report_text = report_page.locator("body").inner_text(timeout=60_000)
     normalized_text = _normalize_report_text(report_text)
@@ -121,7 +114,7 @@ def _assert_report_loaded(report_page: Page, option_name: str) -> str:
     return normalized_text
 
 
-def _assert_report_contains_expected_data(option_name: str, report_text: str, expected_data: dict[str, str]) -> None:
+def _assert_report_contains_expected_data(option_name, report_text, expected_data):
     missing = []
     for check_name in B_GROUP_ORDER_INVOICE_REPORT_DATA_CHECKS.get(option_name, ()):
         expected_value = expected_data.get(check_name, "")
@@ -142,7 +135,7 @@ def _assert_report_contains_expected_data(option_name: str, report_text: str, ex
         raise AssertionError(f"{option_name} reportida kutilgan order data topilmadi: {', '.join(missing)}")
 
 
-def _invoice_report_option_locator(page: Page, option_name: str):
+def _invoice_report_option_locator(page, option_name):
     exact_option_re = re.compile(rf"^\s*{re.escape(option_name)}\s*$")
     span_option = page.locator(".dropdown-menu:visible span").filter(has_text=exact_option_re).first
     if span_option.count() > 0:
@@ -150,7 +143,7 @@ def _invoice_report_option_locator(page: Page, option_name: str):
     return page.locator(".dropdown-menu:visible a.dropdown-item").filter(has_text=exact_option_re).first
 
 
-def _install_report_print_guard(page: Page) -> None:
+def _install_report_print_guard(page):
     page.context.add_init_script(
         """
         (() => {
@@ -167,7 +160,7 @@ def _install_report_print_guard(page: Page) -> None:
     )
 
 
-def _open_invoice_report_and_assert(page: Page, client: str, option_name: str, expected_data: dict[str, str]) -> str:
+def _open_invoice_report_and_assert(page, client, option_name, expected_data):
     _open_order_invoice_dropdown(page, client)
     option = _invoice_report_option_locator(page, option_name)
     expect(option).to_be_visible()
@@ -208,7 +201,7 @@ def _open_invoice_report_and_assert(page: Page, client: str, option_name: str, e
             report_page.close()
 
 
-def _download_invoice_export_and_assert(page: Page, client: str, option_name: str) -> str:
+def _download_invoice_export_and_assert(page, client, option_name):
     _open_order_invoice_dropdown(page, client)
     option = _invoice_report_option_locator(page, option_name)
     expect(option).to_be_visible()
@@ -226,7 +219,7 @@ def _download_invoice_export_and_assert(page: Page, client: str, option_name: st
     return suggested_filename
 
 
-def _save_visible_confirm_if_open(page: Page) -> None:
+def _save_visible_confirm_if_open(page):
     confirm = page.get_by_role("dialog").filter(has=page.get_by_role("button", name="да"))
     try:
         expect(confirm).to_be_visible(timeout=3_000)
@@ -237,20 +230,8 @@ def _save_visible_confirm_if_open(page: Page) -> None:
     confirm.wait_for(state="hidden")
 
 
-def _input_by_label_text(page: Page, label: str, index: int = 0):
-    return BasePage(page).input_by_label_text(label, index)
-
-
-def _fill_input_by_label_text(page: Page, label: str, value: str, index: int = 0) -> None:
-    BasePage(page).fill_input_by_label_text(label, value, index)
-
-
-def _input_value_by_label_text(page: Page, label: str, index: int = 0) -> str:
-    return BasePage(page).input_value_by_label_text(label, index)
-
-
-def _input_validation_state_by_label_text(page: Page, label: str, index: int = 0) -> dict[str, str]:
-    input_el = _input_by_label_text(page, label, index)
+def _input_validation_state_by_label(page, label, index=0):
+    input_el = BasePage(page).input(label=label, index=index)
     return {
         "value": input_el.input_value(),
         "className": input_el.get_attribute("class") or "",
@@ -258,8 +239,8 @@ def _input_validation_state_by_label_text(page: Page, label: str, index: int = 0
     }
 
 
-def _input_has_non_neutral_border_by_label_text(page: Page, label: str, neutral_colors: set[str]) -> bool:
-    input_el = _input_by_label_text(page, label)
+def _input_has_non_neutral_border_by_label(page, label, neutral_colors):
+    input_el = BasePage(page).input(label=label)
     for color in neutral_colors:
         try:
             expect(input_el).to_have_css("border-color", color, timeout=200)
@@ -269,7 +250,7 @@ def _input_has_non_neutral_border_by_label_text(page: Page, label: str, neutral_
     return True
 
 
-def _page_text_is_present(page: Page, text: str, timeout: int = 3_000) -> bool:
+def _page_text_is_present(page, text, timeout=3_000):
     try:
         expect(page.locator("body")).to_contain_text(text, timeout=timeout)
         return True
@@ -277,27 +258,27 @@ def _page_text_is_present(page: Page, text: str, timeout: int = 3_000) -> bool:
         return False
 
 
-def _page_text_occurrences(page: Page, text: str) -> int:
+def _page_text_occurrences(page, text):
     return page.locator("body").inner_text().count(text)
 
 
-def _order_id_from_current_url(page: Page) -> str:
+def _order_id_from_current_url(page):
     order_id = re.search(r"[?&]deal_id=(\d+)", page.url)
     if not order_id:
         raise AssertionError(f"Order id URL ichidan topilmadi: {page.url}")
     return order_id.group(1)
 
 
-def _expect_text_visible(page: Page, text: str) -> None:
+def _expect_text_visible(page, text):
     expect(page.locator("body")).to_contain_text(text)
 
 
-def _click_visible_text(page: Page, text: str) -> None:
+def _click_visible_text(page, text):
     _expect_text_visible(page, text)
     page.get_by_text(text, exact=True).first.click()
 
 
-def _close_error_dialog(page: Page, expected_text: str | None = None) -> None:
+def _close_error_dialog(page, expected_text=None):
     dialog = page.get_by_role("dialog").filter(has_text="Ошибка")
     expect(dialog).to_be_visible()
     if expected_text:
@@ -306,20 +287,15 @@ def _close_error_dialog(page: Page, expected_text: str | None = None) -> None:
     dialog.wait_for(state="hidden")
 
 
-def _save_order_from_final_page(page: Page) -> None:
-    BasePage(page).save_and_expect_heading(
-        "Заказы",
-        action="Заказ final page -> Сохранить",
-        before_state="Заказ final page",
-        expected_state="Заказы list ochilishi",
-        confirm_text="",
-        # Order wizard save tugmasi ikonkali: exact accessible name mos kelmaydi
-        exact_button=False,
-        location_hint="tests/smoke/test_groups/test_B_grup/order_helpers.py::_save_order_from_final_page",
-    )
+def _save_order_from_final_page(page):
+    # Order wizard save tugmasi ikonkali: exact accessible name mos kelmaydi -> exact=False
+    page.get_by_role("button", name="Сохранить", exact=False).first.click()
+    BasePage(page).confirm_biruni()
+    BasePage(page).wait_for_loader()
+    expect_page(page, heading="Заказы")
 
 
-def _assert_save_blocked_without_confirm(page: Page, expected_date: str | None = None) -> None:
+def _assert_save_blocked_without_confirm(page, expected_date=None):
     page.get_by_role("button", name="Сохранить").click()
     confirm = page.get_by_role("dialog").filter(has=page.get_by_role("button", name="да"))
     try:
@@ -351,7 +327,7 @@ def _assert_save_blocked_without_confirm(page: Page, expected_date: str | None =
                 return
             if expected_date:
                 expect(page).to_have_url(re.compile(r".*/order\+edit"))
-                state = _input_validation_state_by_label_text(page, "Дата оплаты по консигнации")
+                state = _input_validation_state_by_label(page, "Дата оплаты по консигнации")
                 allure.attach(
                     json.dumps(state, ensure_ascii=False, indent=2),
                     name="consignment-date-validation-state",
@@ -362,7 +338,7 @@ def _assert_save_blocked_without_confirm(page: Page, expected_date: str | None =
                     "rgb(226, 230, 239)",
                     "rgb(228, 233, 242)",
                 }
-                if state["value"] == expected_date and _input_has_non_neutral_border_by_label_text(
+                if state["value"] == expected_date and _input_has_non_neutral_border_by_label(
                     page,
                     "Дата оплаты по консигнации",
                     neutral_border_colors,
@@ -375,7 +351,7 @@ def _assert_save_blocked_without_confirm(page: Page, expected_date: str | None =
     raise AssertionError("30 kundan katta konsignatsiya sanasi qabul qilindi")
 
 
-def _click_consignment_add_button(page: Page) -> None:
+def _click_consignment_add_button(page):
     label = page.get_by_text("Дата оплаты по консигнации", exact=True).first
     expect(label).to_be_visible()
     add_button = page.locator('button[ng-click="addConsignment()"]:visible').first
@@ -383,29 +359,28 @@ def _click_consignment_add_button(page: Page) -> None:
     add_button.click()
 
 
-def _open_order_settings(page: Page) -> None:
+def _open_order_settings(page):
     navigate_to(page, tab="Главное", name="Настройки системы")
-    expect(page.get_by_role("heading", name="Настройки системы")).to_be_visible()
+    expect_page(page, heading="Настройки системы")
     page.get_by_role("link", name="Заказ").click()
     expect(page.get_by_text("Разрешить выдачу консигнации", exact=True)).to_be_visible()
 
 
-def _enable_consignment_for_orders(page: Page) -> None:
+def _enable_consignment_for_orders(page):
     _open_order_settings(page)
     base = BasePage(page)
 
-    base.set_switch_by_label_text("Разрешить выдачу консигнации", True)
-    _fill_input_by_label_text(page, "Лимит консигнации (в днях)", "30")
-    expect(_input_by_label_text(page, "Лимит консигнации (в днях)")).to_have_value("30")
+    base.checkbox(label="Разрешить выдачу консигнации", checked=True)
+    base.input(label="Лимит консигнации (в днях)", value="30", expect_value="30", press_tab=True)
 
     page.get_by_role("button", name="Сохранить").first.click()
     _save_visible_confirm_if_open(page)
 
-    expect(base.switch_checkbox_by_label_text("Разрешить выдачу консигнации")).to_be_checked()
-    expect(_input_by_label_text(page, "Лимит консигнации (в днях)")).to_have_value("30")
+    base.checkbox(label="Разрешить выдачу консигнации", expect_checked=True)
+    base.input(label="Лимит консигнации (в днях)", expect_value="30")
 
 
-def _cancel_existing_client_orders_if_any(page: Page, code: str) -> None:
+def _cancel_existing_client_orders_if_any(page, code):
     flow_open_order_list(page)
 
     for _ in range(20):
@@ -419,7 +394,7 @@ def _cancel_existing_client_orders_if_any(page: Page, code: str) -> None:
         raise AssertionError(f"natural_client-pw{code} uchun active orderlar tozalanmadi")
 
 
-def _consignment_day_limit(page: Page) -> str:
+def _consignment_day_limit(page):
     """
     Order final (3-) formasidagi AngularJS scope'dan haqiqiy konsignatsiya kun limitini o'qiydi.
 
@@ -450,7 +425,7 @@ def _consignment_day_limit(page: Page) -> str:
     return limit
 
 
-def run_b_group_create_order_with_consignment_limit(page: Page, code: str, save_data, scope: str = "smoke", login: bool = True) -> None:
+def run_b_group_create_order_with_consignment_limit(page, code, save_data, login=True):
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -464,7 +439,7 @@ def run_b_group_create_order_with_consignment_limit(page: Page, code: str, save_
     """
     if login:
         with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-            authorization_user(page, code)
+            authorization(page, who="user", code=code)
             expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - Order settingsda konsignatsiya yoqiladi va limit 30 kun qilinadi"):
@@ -475,8 +450,8 @@ def run_b_group_create_order_with_consignment_limit(page: Page, code: str, save_
 
     with allure.step("4 - Yangi zakaz asosiy va TMC qadamlaridan o'tkaziladi"):
         flow_order_list(page, add=True)
-        deal_time = _input_value_by_label_text(page, "Дата заказа")
-        delivery_date = _input_value_by_label_text(page, "Дата отгрузки")
+        deal_time = BasePage(page).input(label="Дата заказа", return_value=True)
+        delivery_date = BasePage(page).input(label="Дата отгрузки", return_value=True)
         flow_order_main_page(
             page,
             check_form=True,
@@ -509,11 +484,19 @@ def run_b_group_create_order_with_consignment_limit(page: Page, code: str, save_
         ).strftime("%d.%m.%Y")
 
     with allure.step("6 - Konsignatsiya date/amount, tip oplati va status to'ldirilib saqlanadi"):
-        _fill_input_by_label_text(page, "Дата оплаты по консигнации", expected_limit_date)
-        expect(_input_by_label_text(page, "Дата оплаты по консигнации")).to_have_value(expected_limit_date)
+        BasePage(page).input(
+            label="Дата оплаты по консигнации",
+            value=expected_limit_date,
+            expect_value=expected_limit_date,
+            press_tab=True,
+        )
 
-        _fill_input_by_label_text(page, "Сумма консигнации", "35000")
-        expect(_input_by_label_text(page, "Сумма консигнации")).to_have_value("35 000")
+        BasePage(page).input(
+            label="Сумма консигнации",
+            value="35000",
+            expect_value="35 000",
+            press_tab=True,
+        )
 
         flow_order_final_page(
             page,
@@ -552,7 +535,7 @@ def run_b_group_create_order_with_consignment_limit(page: Page, code: str, save_
         expect(page).to_have_url(re.compile(r".*/order_list"))
 
 
-def run_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_data, save_data, scope: str = "smoke", login: bool = True) -> None:
+def run_b_group_edit_order_with_consignment_limit(page, code, load_data, save_data, login=True):
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -565,7 +548,7 @@ def run_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_da
     """
     if login:
         with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-            authorization_user(page, code)
+            authorization(page, who="user", code=code)
             expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - B-group create testi yaratgan active order listda topiladi"):
@@ -580,7 +563,7 @@ def run_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_da
     with allure.step("3 - Order edit qilinib quantity 5 dan 4 ga kamaytiriladi"):
         flow_order_list(page, find_row=created_order_client, edit=True)
         expect(page).to_have_url(re.compile(r".*/order\+edit"))
-        delivery_date = _input_value_by_label_text(page, "Дата отгрузки")
+        delivery_date = BasePage(page).input(label="Дата отгрузки", return_value=True)
         delivery_date_value = datetime.strptime(delivery_date, "%d.%m.%Y")
         first_split_date = (delivery_date_value + timedelta(days=15)).strftime("%d.%m.%Y")
         limit_date = (delivery_date_value + timedelta(days=30)).strftime("%d.%m.%Y")
@@ -598,29 +581,56 @@ def run_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_da
             page,
             "Общая сумма консигнаций не должна быть больше суммы заказа",
         )
-        expect(_input_by_label_text(page, "Дата оплаты по консигнации")).to_have_value("")
-        expect(_input_by_label_text(page, "Сумма консигнации")).to_have_value("")
+        BasePage(page).input(label="Дата оплаты по консигнации", expect_value="")
+        BasePage(page).input(label="Сумма консигнации", expect_value="")
         _expect_text_visible(page, "ИТОГО")
         _expect_text_visible(page, "28 000")
 
     with allure.step("5 - 30 kundan katta konsignatsiya sanasi save qilinmaydi"):
-        _fill_input_by_label_text(page, "Дата оплаты по консигнации", invalid_date)
-        _fill_input_by_label_text(page, "Сумма консигнации", "28000")
-        expect(_input_by_label_text(page, "Дата оплаты по консигнации")).to_have_value(invalid_date)
-        expect(_input_by_label_text(page, "Сумма консигнации")).to_have_value("28 000")
+        BasePage(page).input(
+            label="Дата оплаты по консигнации",
+            value=invalid_date,
+            expect_value=invalid_date,
+            press_tab=True,
+        )
+        BasePage(page).input(
+            label="Сумма консигнации",
+            value="28000",
+            expect_value="28 000",
+            press_tab=True,
+        )
         _assert_save_blocked_without_confirm(page, expected_date=invalid_date)
         expect(page).to_have_url(re.compile(r".*/order\+edit"))
 
     with allure.step("6 - Konsignatsiya + orqali 2 ta sanaga bo'linadi"):
-        _fill_input_by_label_text(page, "Дата оплаты по консигнации", first_split_date)
-        _fill_input_by_label_text(page, "Сумма консигнации", "14000")
-        expect(_input_by_label_text(page, "Сумма консигнации")).to_have_value("14 000")
+        BasePage(page).input(
+            label="Дата оплаты по консигнации",
+            value=first_split_date,
+            expect_value=first_split_date,
+            press_tab=True,
+        )
+        BasePage(page).input(
+            label="Сумма консигнации",
+            value="14000",
+            expect_value="14 000",
+            press_tab=True,
+        )
 
         _click_consignment_add_button(page)
-        _fill_input_by_label_text(page, "Дата оплаты по консигнации", limit_date, index=1)
-        _fill_input_by_label_text(page, "Сумма консигнации", "14000", index=1)
-        expect(_input_by_label_text(page, "Дата оплаты по консигнации", index=1)).to_have_value(limit_date)
-        expect(_input_by_label_text(page, "Сумма консигнации", index=1)).to_have_value("14 000")
+        BasePage(page).input(
+            label="Дата оплаты по консигнации",
+            value=limit_date,
+            expect_value=limit_date,
+            index=1,
+            press_tab=True,
+        )
+        BasePage(page).input(
+            label="Сумма консигнации",
+            value="14000",
+            expect_value="14 000",
+            index=1,
+            press_tab=True,
+        )
 
     with allure.step("7 - Order save qilinadi"):
         _save_order_from_final_page(page)
@@ -646,7 +656,7 @@ def run_b_group_edit_order_with_consignment_limit(page: Page, code: str, load_da
         expect(page).to_have_url(re.compile(r".*/order_list"))
 
 
-def run_b_group_order_invoice_reports(page: Page, code: str, load_data, scope: str = "smoke") -> None:
+def run_b_group_order_invoice_reports(page, code, load_data):
     """
     Testcase:
     1. B-group sessiyasida oldingi test yaratgan draft order listdan topiladi.
@@ -663,8 +673,8 @@ def run_b_group_order_invoice_reports(page: Page, code: str, load_data, scope: s
         "order_id": created_order_id,
         "total": "28 000",
     }
-    opened_reports: dict[str, str] = {}
-    downloaded_files: dict[str, str] = {}
+    opened_reports = {}
+    downloaded_files = {}
 
     with allure.step("1 - B-group draft order listda topiladi"):
         flow_open_order_list(page)
@@ -681,7 +691,7 @@ def run_b_group_order_invoice_reports(page: Page, code: str, load_data, scope: s
         _assert_invoice_dropdown_options(page)
 
     with allure.step("3 - Накладные report optionlari ochilishi va order datasi tekshiriladi"):
-        for option_name in _report_options_for_scope(scope):
+        for option_name in B_GROUP_ORDER_INVOICE_REPORT_OPTIONS:
             with allure.step(f"Накладные: {option_name} reporti ochiladi"):
                 opened_reports[option_name] = _open_invoice_report_and_assert(
                     page,

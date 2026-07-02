@@ -2,6 +2,7 @@ import re
 
 import allure
 from playwright.sync_api import expect
+from tests.smoke.flows.flow_navigate import expect_page
 from utils.base_page import BasePage
 
 from tests.smoke.flows.flow_order.flow_order_list import flow_order_list
@@ -45,7 +46,7 @@ def flow_order_main_page(
 
     if contract and not check_form:
         with allure.step(f"Main Page: contract -> '{contract}' tanlash"):
-            BasePage(page).select_b_input_by_label("Договор", contract, exact=False)
+            BasePage(page).b_input_by_label("Договор", value=contract, exact=False)
             if contract_balance_text:
                 expect(page.locator("#kt_content")).to_contain_text(contract_balance_text)
 
@@ -115,7 +116,7 @@ def flow_order_final_page(page, check_form=False, payment_type=None, natural_cli
 
     if payment_type and not check_form:
         with allure.step(f"Final Page: Payment Type -> '{payment_type}' tanlash"):
-            BasePage(page).select_b_input_by_label("Тип оплаты", payment_type, clear=True)
+            BasePage(page).b_input_by_label("Тип оплаты", value=payment_type, clear=True)
 
     if check_form:
         with allure.step(f"Final Page: "
@@ -125,7 +126,7 @@ def flow_order_final_page(page, check_form=False, payment_type=None, natural_cli
                          f"Check room -> '{room}'"
                          f"Check robot -> '{robot}'"
                          ):
-            BasePage(page).expect_b_input_value_by_label("Тип оплаты", payment_type)
+            BasePage(page).b_input_by_label("Тип оплаты", expect_value=payment_type)
             expect(page.locator("#anor279-ui_select-status:visible")).to_contain_text(status)
             expect(page.locator("form[name=\"step2\"]")).to_contain_text(natural_client)
             expect(page.locator("form[name=\"step2\"]")).to_contain_text(room)
@@ -133,17 +134,12 @@ def flow_order_final_page(page, check_form=False, payment_type=None, natural_cli
 
     if save:
         with allure.step("Final Page: Order save qilish"):
-            BasePage(page).save_and_expect_heading(
-                "Заказы",
-                action="Заказ final page -> Сохранить",
-                before_state="Заказ final page",
-                expected_state="Заказы list ochilishi",
-                confirm_text="Сохранить?",
-                # Order wizard tugmasida fa-save ikonka bor: ::before glyph accessible name'ga
-                # qo'shilib exact match buziladi, shuning uchun exact_button=False
-                exact_button=False,
-                location_hint="tests/smoke/flows/flow_order/flow_order_add.py::flow_order_final_page",
-            )
+            # Order wizard tugmasida fa-save ikonka bor: ::before glyph accessible name'ga
+            # qo'shilib exact match buziladi, shuning uchun exact=False
+            page.get_by_role("button", name="Сохранить", exact=False).first.click()
+            BasePage(page).confirm_biruni("Сохранить?")
+            BasePage(page).wait_for_loader()
+            expect_page(page, heading="Заказы")
 
 # ----------------------------------------------------------------------------------------------------------------------
 

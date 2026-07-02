@@ -1,23 +1,23 @@
 import re
 
 import allure
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 
-from tests.smoke.flows.flow_navigate import navigate_to
+from tests.smoke.flows.flow_navigate import navigate_to, expect_page
 from utils.base_page import BasePage
 
 
-def flow_open_contract_list(page: Page) -> None:
+def flow_open_contract_list(page):
     navigate_to(page, tab="Финансы", name="Договоры")
     BasePage(page).wait_for_loader()
-    expect(page).to_have_url(re.compile(r".*/anor/mkf/contract_list"))
-    expect(page.get_by_role("heading")).to_contain_text("Договоры")
+    expect_page(page, url="anor/mkf/contract_list")
+    expect_page(page, heading="Договоры")
     expect(page.get_by_role("button", name="Создать", exact=True)).to_be_visible()
 
 
-def flow_contract_list(page: Page, add=False, find_code=None, view=False) -> None:
-    expect(page).to_have_url(re.compile(r".*/anor/mkf/contract_list"))
-    expect(page.get_by_role("heading")).to_contain_text("Договоры")
+def flow_contract_list(page, add=False, find_code=None, view=False):
+    expect_page(page, url="anor/mkf/contract_list")
+    expect_page(page, heading="Договоры")
 
     if add:
         with allure.step("Contract List: 'Создать' button click"):

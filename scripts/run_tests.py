@@ -32,11 +32,11 @@ TARGETS = {
 }
 
 
-def normalized_url(value: str | None) -> str:
+def normalized_url(value):
     return (value or "").strip().rstrip("/")
 
 
-def clean_allure_results() -> None:
+def clean_allure_results():
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     for item in RESULTS_DIR.iterdir():
         if item.name == "history":
@@ -49,8 +49,8 @@ def clean_allure_results() -> None:
         item.unlink(missing_ok=True)
 
 
-def command_text(command: list[str]) -> str:
-    masked: list[str] = []
+def command_text(command):
+    masked = []
     hide_next = False
     for item in command:
         if hide_next:
@@ -63,14 +63,14 @@ def command_text(command: list[str]) -> str:
     return " ".join(masked)
 
 
-def run(command: list[str], env: dict[str, str], dry_run: bool = False) -> int:
+def run(command, env, dry_run=False):
     print(command_text(command))
     if dry_run:
         return 0
     return subprocess.call(command, cwd=ROOT, env=env)
 
 
-def generate_report(env: dict[str, str], open_report: bool, dry_run: bool) -> None:
+def generate_report(env, open_report, dry_run):
     allure = shutil.which("allure")
     if not allure:
         return
@@ -82,7 +82,7 @@ def generate_report(env: dict[str, str], open_report: bool, dry_run: bool) -> No
         run([allure, "open", str(REPORT_DIR)], env, dry_run=dry_run)
 
 
-def show_trace(env: dict[str, str], dry_run: bool) -> None:
+def show_trace(env, dry_run):
     playwright = shutil.which("playwright")
     if not playwright or not TRACE_DIR.exists():
         return
@@ -93,13 +93,13 @@ def show_trace(env: dict[str, str], dry_run: bool) -> None:
 
 
 def generate_test_summary(
-    env: dict[str, str],
-    test_exit: int,
-    pytest_command: list[str],
-    started_at: float,
-    ai_summary: bool,
-    dry_run: bool,
-) -> None:
+    env,
+    test_exit,
+    pytest_command,
+    started_at,
+    ai_summary,
+    dry_run,
+):
     command = [
         sys.executable,
         str(ROOT / "scripts" / "analyze_test_result.py"),
@@ -115,7 +115,7 @@ def generate_test_summary(
     run(command, env, dry_run=dry_run)
 
 
-def parse_args() -> tuple[argparse.Namespace, list[str]]:
+def parse_args():
     parser = argparse.ArgumentParser(
         description="Smartup smoke testlarini Mac, Linux va Windows terminalida ishga tushiradi."
     )
@@ -136,8 +136,6 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
         help="Suite boshida yangi company yaratadi va keyingi testlarda shu company_code ishlatiladi.",
     )
     parser.add_argument("--headless", action="store_true", help="Chromium headless rejimda ishlaydi.")
-    parser.add_argument("--regression", action="store_true", help="SCOPE=regression bilan run qiladi.")
-    parser.add_argument("--scope", choices=("smoke", "regression"), help="Test scope. Default: smoke.")
     parser.add_argument(
         "--disable-license-policy",
         action="store_true",
@@ -154,7 +152,7 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     return parser.parse_known_args()
 
 
-def main() -> int:
+def main():
     args, pytest_extra = parse_args()
     env = os.environ.copy()
 
@@ -223,11 +221,6 @@ def main() -> int:
     else:
         env.pop("DISABLE_LICENSE_POLICY", None)
 
-    scope = args.scope or ("regression" if args.regression else env.get("SCOPE", "smoke"))
-    if scope not in {"smoke", "regression"}:
-        print(f"Unsupported scope: {scope}. Use smoke or regression.", file=sys.stderr)
-        return 2
-
     target, code_mode = TARGETS.get(args.target, (args.target, ""))
     pytest_command = [sys.executable, "-m", "pytest", target]
 
@@ -235,7 +228,6 @@ def main() -> int:
         pytest_command.append(code_mode)
     if args.headless or env.get("HEADLESS", "").lower() in {"1", "true", "yes", "on"}:
         pytest_command.append("--headless")
-    pytest_command.extend(["--scope", scope])
     pytest_command.extend(["--url", company_url_arg])
     if args.create_company:
         pytest_command.append("--create-company")

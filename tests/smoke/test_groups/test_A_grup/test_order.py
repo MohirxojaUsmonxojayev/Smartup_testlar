@@ -2,9 +2,10 @@ import re
 
 import allure
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
+from tests.smoke.flows.flow_navigate import expect_page
 
-from tests.smoke.flows.flow_authorization import authorization_user
+from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_order.flow_order_add import (
     flow_order_final_page,
     flow_order_main_page,
@@ -24,13 +25,12 @@ pytestmark = [
 
 
 def run_a_group_contract_limit_validation_and_valid_order(
-    page: Page,
-    code: str,
+    page,
+    code,
     load_data,
     save_data,
-    scope: str = "smoke",
-    login: bool = True,
-) -> None:
+    login=True,
+):
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -46,7 +46,7 @@ def run_a_group_contract_limit_validation_and_valid_order(
 
     if login:
         with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-            authorization_user(page, code)
+            authorization(page, who="user", code=code)
             expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - A-group contract name data_store.json dan olinadi"):
@@ -106,16 +106,11 @@ def run_a_group_contract_limit_validation_and_valid_order(
         expect(page.locator("#kt_content")).to_contain_text(contract_name)
 
     with allure.step("7 - 7000 summali zakaz muvaffaqiyatli saqlanadi"):
-        BasePage(page).save_and_expect_heading(
-            "Заказы",
-            action="Заказ final page -> Сохранить",
-            before_state="Заказ final page",
-            expected_state="Заказы list ochilishi",
-            confirm_text="Сохранить?",
-            # Order wizard save tugmasi ikonkali: exact accessible name mos kelmaydi
-            exact_button=False,
-            location_hint="tests/smoke/test_groups/test_A_grup/test_order.py::run_a_group_contract_limit_validation_and_valid_order",
-        )
+        # Order wizard save tugmasi ikonkali: exact accessible name mos kelmaydi -> exact=False
+        page.get_by_role("button", name="Сохранить", exact=False).first.click()
+        BasePage(page).confirm_biruni("Сохранить?")
+        BasePage(page).wait_for_loader()
+        expect_page(page, heading="Заказы")
         expect(page).to_have_url(re.compile(r".*/order_list"))
 
     with allure.step("8 - Zakaz list va view oynasida contract bilan tekshiriladi"):
@@ -139,13 +134,12 @@ def run_a_group_contract_limit_validation_and_valid_order(
 
 
 def run_a_group_order_uses_contract_payment_type(
-    page: Page,
-    code: str,
+    page,
+    code,
     load_data,
     save_data,
-    scope: str = "smoke",
-    login: bool = True,
-) -> None:
+    login=True,
+):
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -160,7 +154,7 @@ def run_a_group_order_uses_contract_payment_type(
 
     if login:
         with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-            authorization_user(page, code)
+            authorization(page, who="user", code=code)
             expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - Tip oplati contract ma'lumotlari data_store.json dan olinadi"):
@@ -193,7 +187,7 @@ def run_a_group_order_uses_contract_payment_type(
         expect(page.locator("#kt_content")).to_contain_text("ИТОГО")
         expect(page.locator("#kt_content")).to_contain_text("700 000")
         expect(page.locator("#kt_content")).to_contain_text(contract_name)
-        BasePage(page).expect_b_input_value_by_label("Тип оплаты", contract_payment_type)
+        BasePage(page).b_input_by_label("Тип оплаты", expect_value=contract_payment_type)
 
         page.get_by_role("button", name="Сохранить").click()
         BasePage(page).confirm_biruni("Сохранить?")
@@ -217,9 +211,9 @@ def run_a_group_order_uses_contract_payment_type(
         expect(page.locator("#kt_content")).to_contain_text(contract_name)
 
     with allure.step("6 - Contractdagi Типы оплат auto-fill bo'ladi va user uni o'zgartira oladi"):
-        BasePage(page).expect_b_input_value_by_label("Тип оплаты", contract_payment_type)
-        BasePage(page).select_b_input_by_label("Тип оплаты", "Наличные деньги", clear=True)
-        BasePage(page).expect_b_input_value_by_label("Тип оплаты", "Наличные деньги")
+        BasePage(page).b_input_by_label("Тип оплаты", expect_value=contract_payment_type)
+        BasePage(page).b_input_by_label("Тип оплаты", value="Наличные деньги", clear=True)
+        BasePage(page).b_input_by_label("Тип оплаты", expect_value="Наличные деньги")
 
     with allure.step("7 - O'zgartirilgan tip oplati bilan zakaz muvaffaqiyatli saqlanadi"):
         flow_order_final_page(
@@ -251,12 +245,11 @@ def run_a_group_order_uses_contract_payment_type(
 
 
 def run_a_group_edit_order_and_save_as_new(
-    page: Page,
-    code: str,
+    page,
+    code,
     load_data,
-    scope: str = "smoke",
-    login: bool = True,
-) -> None:
+    login=True,
+):
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -271,7 +264,7 @@ def run_a_group_edit_order_and_save_as_new(
 
     if login:
         with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-            authorization_user(page, code)
+            authorization(page, who="user", code=code)
             expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - A-04 yaratgan order ma'lumotlari data_store.json dan olinadi"):
@@ -378,15 +371,15 @@ def run_a_group_edit_order_and_save_as_new(
 
 
 @allure.title("A Group: Contract limit tekshiruvi va limit ichida zakaz yaratish")
-def test_a_group_contract_limit_validation_and_valid_order(page: Page, code: str, load_data, save_data, test_scope) -> None:
-    run_a_group_contract_limit_validation_and_valid_order(page, code, load_data, save_data, scope=test_scope)
+def test_a_group_contract_limit_validation_and_valid_order(page, code, load_data, save_data):
+    run_a_group_contract_limit_validation_and_valid_order(page, code, load_data, save_data)
 
 
 @allure.title("A Group: Contract tip oplati auto-fill va limit tekshiruvi")
-def test_a_group_order_uses_contract_payment_type(page: Page, code: str, load_data, save_data, test_scope) -> None:
-    run_a_group_order_uses_contract_payment_type(page, code, load_data, save_data, scope=test_scope)
+def test_a_group_order_uses_contract_payment_type(page, code, load_data, save_data):
+    run_a_group_order_uses_contract_payment_type(page, code, load_data, save_data)
 
 
 @allure.title("A Group: Order editda statusni Новый qilib saqlash")
-def test_a_group_edit_order_and_save_as_new(page: Page, code: str, load_data, test_scope) -> None:
-    run_a_group_edit_order_and_save_as_new(page, code, load_data, scope=test_scope)
+def test_a_group_edit_order_and_save_as_new(page, code, load_data):
+    run_a_group_edit_order_and_save_as_new(page, code, load_data)

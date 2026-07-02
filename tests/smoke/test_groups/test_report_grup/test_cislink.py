@@ -1,7 +1,8 @@
 import allure
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_navigate import switch_filial
+from utils.base_page import BasePage
 from tests.smoke.test_groups.test_report_grup.report_helpers import generate_and_verify_download, select_b_input_option
 
 pytestmark = [allure.epic("Report Group"), allure.feature("Integration Report"), allure.story("CisLink")]
@@ -9,7 +10,7 @@ pytestmark = [allure.epic("Report Group"), allure.feature("Integration Report"),
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_report_cislink_check(page: Page, code, scope: str = "smoke", login: bool = True) -> None:
+def run_report_cislink_check(page, code, login=True):
     """Report-01: CisLink integration report — sozlash va .zip yuklab olishni tekshirish.
 
     Login (login=True bo'lsa): admin login va test filialiga (filial-pw{code}) o'tish.
@@ -39,7 +40,7 @@ def run_report_cislink_check(page: Page, code, scope: str = "smoke", login: bool
         expect(page.locator('button[b-hotkey="save"]')).to_be_visible()
 
     with allure.step("3 - Filtrlarni to'ldirish"):
-        page.locator('input[ng-model="d.identification_code"]').fill("test")
+        BasePage(page).input(ng_model="d.identification_code", value="test")
         select_b_input_option(page, "person_groups", "Группа")
         select_b_input_option(page, "product_groups", "Группа")
         select_b_input_option(page, "price_types", price_type_name)

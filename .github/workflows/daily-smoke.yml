@@ -5,14 +5,6 @@ on:
     - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
-      scope:
-        description: Test scope
-        required: true
-        default: smoke
-        type: choice
-        options:
-          - smoke
-          - regression
       server_url:
         description: Server URL
         required: true
@@ -48,7 +40,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      TEST_SCOPE: ${{ github.event.inputs.scope || 'smoke' }}
       TEST_SERVER_URL: ${{ github.event.inputs.server_url || 'https://smartup.online/' }}
       TEST_TARGET: ${{ github.event.inputs.target || 'all' }}
       TEST_AI_SUMMARY: ${{ github.event.inputs.ai_summary || 'false' }}
@@ -76,7 +67,6 @@ jobs:
         run: |
           mkdir -p test-results
           python scripts/telegram_progress.py start \
-            --scope "$TEST_SCOPE" \
             --server "$TEST_SERVER_URL" \
             --target "$TEST_TARGET" \
             --message-id "$TEST_TELEGRAM_PROGRESS_MESSAGE_ID" \
@@ -150,7 +140,6 @@ jobs:
             --url "$TEST_SERVER_URL" \
             --company-code "$TEST_COMPANY_CODE" \
             --company-password "$TEST_COMPANY_PASSWORD" \
-            --scope "$TEST_SCOPE" \
             --headless \
             "${AI_SUMMARY_ARGS[@]}" \
             -s 2>&1 | tee test-results/ci-test-output.log

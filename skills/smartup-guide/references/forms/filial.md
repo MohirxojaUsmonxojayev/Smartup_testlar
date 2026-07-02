@@ -56,3 +56,9 @@ Tags: filial, run-result, screenshot
 - Product tab screenshot: `references/forms/screenshots/filial/filial__view-products__desktop-1920x1080.png`.
 - View discovery JSON: `references/forms/screenshots/filial/filial__view-state.json`.
 - Main card va product module checked assertlari qo'shilgandan keyin `test_01_authorization + test_02_legal_person + test_03_filial --scope=regression --new-code -q -s` passed: 3 passed in 93.76s.
+
+### 2026-06-29 checkbox API konsolidatsiyasi
+Tags: filial, switch, checkbox, refactor, locator
+- `d.vat_enabled` / `d.excise_enabled` switch DOM jonli tekshirildi: `<label class="switch"> <input type=checkbox opacity:0 ng-model=...> <span>holat matni</span></label>`. Click target = `label.switch` (raw input ko'rinmas). Batafsil: [../../ui-patterns.md](../ui-patterns.md) "checkbox/switch yagona API" qoidasi.
+- НДС switch yoqilganda `Ставка НДС (%)` (`d.vat_percent`) maydoni paydo bo'lishi jonli tasdiqlandi: `filial__add-vat-on__desktop-1200x690.png`.
+- `test_03_filial` endi `BasePage(page).checkbox(ng_model="d.vat_enabled", checked=True)` ishlatadi (eski `flow_form.set_checkbox` o'rniga).

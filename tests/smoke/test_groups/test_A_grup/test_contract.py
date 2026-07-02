@@ -3,9 +3,9 @@ import random
 import allure
 import pytest
 from faker import Faker
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 
-from tests.smoke.flows.flow_authorization import authorization_user
+from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_contract.flow_contract_add import (
     flow_contract_add_page,
     flow_contract_assert_list_row,
@@ -23,7 +23,7 @@ pytestmark = [
 ]
 
 
-def run_a_group_create_order_contract(page: Page, code: str, save_data, scope: str = "smoke", login: bool = True) -> None:
+def run_a_group_create_order_contract(page, code, save_data, login=True):
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -38,7 +38,7 @@ def run_a_group_create_order_contract(page: Page, code: str, save_data, scope: s
 
     if login:
         with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-            authorization_user(page, code)
+            authorization(page, who="user", code=code)
             expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - Finans > Dоговоры ro'yxati ochiladi"):
@@ -70,7 +70,7 @@ def run_a_group_create_order_contract(page: Page, code: str, save_data, scope: s
         save_data("a_group_contract_name", contract_name)
 
 
-def run_a_group_create_order_contract_with_payment_type(page: Page, code: str, save_data, scope: str = "smoke", login: bool = True) -> None:
+def run_a_group_create_order_contract_with_payment_type(page, code, save_data, login=True):
     """
     Testcase:
     1. User sifatida tizimga kirish.
@@ -85,7 +85,7 @@ def run_a_group_create_order_contract_with_payment_type(page: Page, code: str, s
 
     if login:
         with allure.step("1 - User tizimga muvaffaqiyatli kiradi"):
-            authorization_user(page, code)
+            authorization(page, who="user", code=code)
             expect(page.get_by_role("heading", name="Trade")).to_be_visible()
 
     with allure.step("2 - Finans > Договоры ro'yxati ochiladi"):
@@ -132,10 +132,10 @@ def run_a_group_create_order_contract_with_payment_type(page: Page, code: str, s
 
 
 @allure.title("A Group: Zakaz uchun UZS contract yaratish")
-def test_a_group_create_order_contract(page: Page, code: str, save_data, test_scope) -> None:
-    run_a_group_create_order_contract(page, code, save_data, scope=test_scope)
+def test_a_group_create_order_contract(page, code, save_data):
+    run_a_group_create_order_contract(page, code, save_data)
 
 
 @allure.title("A Group: Tip oplati sharti bilan zakaz contract yaratish")
-def test_a_group_create_order_contract_with_payment_type(page: Page, code: str, save_data, test_scope) -> None:
-    run_a_group_create_order_contract_with_payment_type(page, code, save_data, scope=test_scope)
+def test_a_group_create_order_contract_with_payment_type(page, code, save_data):
+    run_a_group_create_order_contract_with_payment_type(page, code, save_data)
