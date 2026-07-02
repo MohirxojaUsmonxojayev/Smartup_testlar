@@ -8,19 +8,25 @@ Tags: locator, b-input, grid, modal, biruni, screenshot, list
 Tags: locator, angular
 - Qoida: Angular `ng-model` locatorlardan iloji boricha qoch.
 - Qoida: Yangi testlarda raw CSS/XPath/`ng-model` locator yozma; avval `page.get_by_role(...)`, `page.get_by_text(...)` yoki label/textga tayangan helper ishlat.
+- Kontekst: hozircha Angular migratsiyaga o'tgan UI faqat `company` formasi; qolgan formalar eski Biruni/AngularJS tuzilmasida va ularda mavjud `ng-model`/`b-input` helperlari ishlatiladi.
 - Afzal locatorlar:
-  - `BasePage.fill_textbox_by_label(...)`
-  - `BasePage.select_b_input_by_label(...)`
-  - `BasePage.expect_b_input_value_by_label(...)`
+  - `BasePage.input(label="Код", value=...)` (universal: `label=`/`ng_model=`/`placeholder=`/`locator=`)
+  - `BasePage.b_input_by_label(label, value=...)`
   - label/text asosidagi local yoki umumiy helper
   - `page.get_by_role(...)`
 - Sabab: UI Angular migratsiya/yangilanishlarida semantik locatorlar barqarorroq.
 
-### Heading Tekshirish — Ko'p Heading Muammosi
-Tags: locator, heading, get_by_role
-- `expect(page.get_by_role("heading")).to_contain_text("...")` faqat sahifada bitta ko'rinadigan heading bo'lganda ishonchli (masalan oddiy list/create forma).
-- Wizard yoki ko'p bo'limli formalarda bir vaqtda bir nechta ko'rinadigan heading bo'ladi (masalan Акция create: `Акция (создание)`, `Главное`, `Условия`); bunda nomsiz `get_by_role("heading")` bir nechta elementga to'g'ri kelib `to_contain_text` fail bo'ladi.
-- Yechim: sarlavhani aniq nom bilan nishonla — `expect(page.get_by_role("heading", name="Акция (создание)")).to_be_visible()` (substring match; `exact=True` ishlatma, list heading'larda ko'pincha oldida icon/probel bo'ladi).
+### Heading / Sahifa Tekshirish — `expect_page` helper
+Tags: locator, heading, get_by_role, navigation, url
+- **DOM fakti** (2026-06-29 live tekshirilgan): sahifa sarlavhasi yagona `<h6 class="text-dark font-weight-bolder ...">` (Angular `ng-binding`). `<h1>` mavjud, lekin **bo'sh** — sarlavha uchun `h1` ISHLATMA, `get_by_role("heading")` ishlat.
+- Oddiy list/create sahifada `role=heading` aniq **1 ta**. Sahifa o'zgarsa shu elementning matni **almashadi** (yangi heading element qo'shilmaydi). `navigate_to` transition o'rtasida heading matni qisqa vaqt **bo'sh `''`** bo'ladi — shuning uchun tekshiruv doim **auto-retry qiluvchi `expect(...)`** bilan bo'lsin, bir martalik `inner_text()` emas.
+- **Ko'p heading muammosi:** wizard yoki ko'p bo'limli formalarda bir vaqtda bir nechta ko'rinadigan heading bo'ladi (masalan Акция create: `Акция (создание)`, `Главное`, `Условия`). Bunda `expect(page.get_by_role("heading")).to_contain_text(X)` — kerakli matn ulardan birida bo'lsa ham — **FAIL bo'ladi** (2026-06-29 sintetik isbotlangan: locator 2+ elementga to'g'ri kelsa, scalar `to_contain_text` to'g'ri matnda ham yiqiladi). Ya'ni to'g'ri sahifada turib ham false-negative beradi.
+- **Afzal yechim — `tests/smoke/flows/flow_navigate.py::expect_page(page, heading=None, url=None, timeout=...)`** (navigate_to'dan keyin chaqiriladi; `navigate_to` o'zi faqat navigatsiya qiladi, tekshirmaydi):
+  - `expect_page(page, heading="Цены")` — `heading` str (substring, registrga befarq) yoki `re.compile(...)` bo'lishi mumkin (masalan `re.compile(r"Комп|Comp")`). Ichida `get_by_role("heading").filter(has_text=...).first` + `to_be_visible()` ishlatiladi: ortiqcha heading bo'lsa ham mosini tanlaydi, `.first` strict-mode'dan saqlaydi, retry qiladi.
+  - `expect_page(page, url="price_type_list")` — `url` bo'lagi (substring) yoki regex. **URL slug eng ishonchli signal**: locale'ga bog'liq emas, har sahifada unikal.
+  - `expect_page(page, heading="...", url="...")` — ikkalasi birga, eng kuchli tekshiruv.
+- Barqaror URL slug'lar: `price_type_list`, `payment_type_list`, `filial_list`, `inventory_list` (ТМЦ), `action_list` (Акции), `order_list`, `anor/mkf/contract_list`, `template_list`.
+- Eski `expect(page.get_by_role("heading", name="X")).to_be_visible()` ham ishlaydi (substring; `exact=True` ISHLATMA — list heading'larda ko'pincha oldida icon/probel bo'ladi), lekin yangi/refactor kodda `expect_page` afzal: bitta markaziy nuqta, xato xabari hozirgi heading + url ni ko'rsatadi.
 
 ### View (Просмотр) label→value olish — exact match
 Tags: locator, order-view, label, xpath
@@ -36,10 +42,11 @@ Tags: form, discovery, checkbox, switch, radio
 
 ### b-input
 Tags: b-input, locator
-- Qoida: `b-input` tanlash uchun umumiy helper ishlatiladi.
-- Helperlar:
-  - `BasePage.select_b_input_by_label(label, option_text, clear=False, exact=True)`
-  - `BasePage.expect_b_input_value_by_label(label, expected_value)`
+- Qoida: `b-input` uchun public API bitta bo'lsin: `BasePage.b_input_by_label(...)`.
+- Ishlatish:
+  - `BasePage.b_input_by_label(label, value=option_text)` — tanlash
+  - `BasePage.b_input_by_label(label, expect_value=expected_value)` — value assert
+  - `BasePage.b_input_by_label(label, return_value=True)` — joriy value olish
 - Eslatma: ba'zi input value'lar sahifa textiga kirmaydi; input value assert qilish kerak.
 
 ### b-input Server-Search (report group)
@@ -85,6 +92,13 @@ Tags: list, grid, search, column
 - Testda ishlatish: qo'shilgan elementni listda topish uchun kerakli ustun/search yo'q bo'lsa, avval grid settingdan yoq.
 - Qoida: Listda qatorlar ko'p bo'lsa grid faqat birinchi sahifadagi qatorlarni render qiladi; yaratilgan entity 50 tadan keyin bo'lsa `b-grid` bo'yicha to'g'ridan-to'g'ri `to_contain_text` fail qiladi. List assertdan oldin global `Поиск`ga unique code/name yozib `Enter` bos.
 
+### Umumiy CRUD Sahifa Tuzilishi
+Tags: list, add, edit, view, grid, loader
+- Qoida: Smartup sahifalarining ko'pi bir xil CRUD patternida: list tepasida search/filter/list-exchange/setting controls, pastida `b-grid` rowlari; row tanlanganda `Создать`/`Просмотр`/`Изменить` kabi action buttonlar ishlaydi.
+- Qoida: add va edit formalar odatda bir xil forma tuzilishiga ega; qo'shilgan element listdan topilib view formadan tekshiriladi.
+- Qoida: tizimdagi blocking loader/spinner umumiy va sahifa/forma o'tishlarida kech yuklanishi mumkin; list/add/view/edit action helperlari loader yo'qolishini markaziy kutishi kerak.
+- Testda ishlatish: yangi testlarda list search, grid row select, action button click, save transition, view assert va close kabi qadamlar lokal takror yozilmasin — umumiy list/form/view helper yoki flow orqali yuritilsin.
+
 ### Screenshot Arxivi
 Tags: screenshot, debug, url
 - Screenshotlar kelajakdagi visual regression/baseline taqqoslashga tayyor formatda saqlansin.
@@ -112,9 +126,17 @@ Tags: screenshot, debug, url
 ### Umumiy Forma Helper'lari (DRY)
 Tags: locator, form, helper, setup
 - Qayerda: `tests/smoke/flows/flow_form.py` va `utils/base_page.py`.
-- Qoida: ng-model asosidagi forma amallari uchun yangi helper yozilmasin — `flow_form.py` dagi tayyorlari ishlatilsin: `fill_input`, `fill_textarea`, `set_checkbox`, `select_b_input_by_search`, `select_tashkent_region`, `assert_visible_page_text`. `root` sifatida `page` ham, modal locator (`.modal.show`) ham beriladi — alohida `_modal_*` variant kerak emas.
-- Qoida: label matni orqali input/switch bilan ishlash `BasePage` metodlari orqali: `input_by_label_text`, `fill_input_by_label_text`, `input_value_by_label_text`, `set_switch_by_label_text`, `switch_checkbox_by_label_text`, `switch_checked_by_label_text`.
-- Testda ishlatish: input qiymatini tekshirishda `input_value(...) != x` deb raise qilish o'rniga `expect(input_by_label_text(...)).to_have_value(x)` ishlatilsin — auto-retry bo'ladi.
+- Kontekst: `company` formasi Angular `smt-control` strukturada; boshqa setup/report/biznes formalar eski Biruni/AngularJS holida, shuning uchun `flow_form.py` helperlari ularga mos.
+- Joylashuv: label asosidagi universal helperlar (`input`, `b_input_by_label`, `checkbox`) `utils/base_page.py` ichida tursin; ular biznes flow emas, umumiy UI primitive. `tests/smoke/flows/flow_form.py` esa `ng-model` asosidagi low-level fallback helper sifatida qolsin.
+- Qoida: ng-model asosidagi forma amallari uchun yangi helper yozilmasin — text input/textarea uchun `base.input(ng_model="d.x", value=...)` (universal funksiya, label ishonchsiz bo'lganda), qolganlari uchun `flow_form.py` dagi tayyorlari: `fill_textarea`, `select_b_input_by_search`, `select_tashkent_region`, `assert_visible_page_text`. `root` sifatida `page` ham, modal locator (`.modal.show`) ham beriladi — alohida `_modal_*` variant kerak emas. Checkbox/switch uchun `flow_form` da alohida helper YO'Q — `base.checkbox(...)` ishlatiladi (pastdagi qoidaga qara). (Eski `flow_form.fill_input` olib tashlandi — `base.input(ng_model=...)` ga konsolidatsiya qilingan, 2026-06-30.)
+- Qoida: **oddiy text input bilan ishlashda yagona universal funksiya — `BasePage.input(...)`** (`checkbox()` kabi pattern). Topish strategiyalari (faqat bittasi): `label="Код"` (asosiy), `ng_model="d.code"` (label ishonchsiz bo'lsa, masalan label DOMda inputdan keyin kelsa), `placeholder="Поиск"`, `locator` (positional, tayyor selector). Amal: `value=...` (clear+fill), `expect_value=...` (assert; value berilsa default expect_value=value), `return_value=True` (string), `press_tab=True`, `index=`, `root=`. `first`/`nth` locatorlar test ichida qolmasin.
+- Qoida: label konteyner qidirishda avval eng yaqin `col`/`col-*` konteyneri olinadi, keyin `input-group`, `form-group`, `form-row`, `row`. Sabab: eski formalarda bir `form-group` ichida ikkita field turishi mumkin (`Код` + `Порядковый номер`, `Название` + `Код акции`, `Дата начала` + `Срок действия`); `form-group`ni birinchi olish noto'g'ri birinchi inputni tanlaydi.
+- Qoida: labeldan field topishda keng card/col ichidagi birinchi inputni olish yetarli emas; label elementidan keyingi birinchi mos field (`input`/`textarea`/`b-input`/checkbox) target qilinsin. Room add formasida `Название` keng konteyner orqali `Код` inputini qayta to'ldirib yuborgani 2026-06-26 da tasdiqlangan.
+- Qoida: `id="focusser-*"` inputlar real fill qilinadigan field emas, ular toggle/radio/focus uchun ichki elementlar. `input` bunday inputlarni chetlab o'tsin.
+- Qoida: **checkbox/switch bilan ishlashda yagona universal funksiya — `BasePage.checkbox(...)`** (`utils/base_page.py`), `input` kabi bitta public metod (ichida click cascade'i ham bor, alohida helper/method YO'Q). Topish strategiyalari (faqat bittasi): `label="НДС"` (asosiy), `ng_model="d.vat_enabled"`, `locator` (positional, grid checkbox), `check_all=True` (grid `input[bcheckall]`, ixtiyoriy `grid_name=`), `first_visible=True` (birinchi grid checkbox). Amal: `checked=True/False` (idempotent set+assert), `expect_checked=` (faqat assert), `return_value=True` (bool), `index=`, `root=` (modal locator). Eski `set_checkbox`, `set_checkall`, `click_first_visible_checkbox`, `switch_by_label` va `flow_form.set_checkbox` **olib tashlandi** — hammasi shu bitta funksiyaga konsolidatsiya qilingan (2026-06-29).
+- DOM fakti (2026-06-29 `filial+add` da jonli): Smartup form switch tuzilishi `<label class="switch"> <input type=checkbox opacity:0 ng-model=...> <span>holat matni</span></label>`. `<input>` ko'rinmas (raw click overlay tomonidan ushlanishi mumkin) — shuning uchun `checkbox()` click'ni DOIM ko'rinadigan `label`/grid-cell/wrapper ustiga cascade qiladi (funksiya ichida). Modalda `label.checkbox`. `ng-true-value`/`ng-false-value` string ('Y'/'N', 'A'/'P') bo'lsa ham `is_checked()` to'g'ri bool qaytaradi. Switch ichidagi `<span>` matni holatga qarab o'zgaradi — switch'ni **field label** orqali topish kerak, span matni orqali emas.
+- **Switch-label wrapper resolution bug + fix (MCP `filial-pw608492`/`filial-pw940898`, 2026-07-02):** counterparty toggle'lari tuzilishi `<label class="checkbox"><input type=checkbox ng-model=d.is_client><t>Клиент</t></label>` — ya'ni **`<label>` ning O'ZI** field matnini ("Клиент") tutadi. `_field_locator_by_label(target="switch")` `label, t, span` elementlarini filter qiladi va `<label>` DOM'da eng birinchi mos keladi. Eski kod `ancestor::label[1]//input[checkbox]` ishlatardi — lekin `ancestor::` **self'ni hisobga olmaydi**, shuning uchun `<label>` element uchun count 0 bo'lib `following::input[checkbox][1]` fallback'ga tushib, **keyingi** qatordagi checkbox'ni tanlardi (Клиент→Сотрудник, Активный→Поставщик, Поставщик→Клиент, Сотрудник→chat-widget `a.feedback.anonymous` — MCP'da 4-ta toggle'ning HAMMASI 1 ga siljigan). `checked=` va `expect_checked=` bir xil noto'g'ri elementга tushgani uchun assertion "yashil" bo'lardi (bug maskalanardi), faqat vizual/`Клиенты` list tekshiruvi ochib berardi. **Tuzatish:** `(ancestor-or-self::label[1]//input[@type='checkbox'])[1]` — label element o'zi bo'lsa self, `<t>`/`<span>` bo'lsa o'rovchi label topiladi; wrapping label bo'lmasa (guruh label, masalan "Статус") count 0 → `following::` fallback saqlanadi. `base_page.py:521`. Tasdiq: `test_18_natural_person_for_client_1` yangi kod bilan 5 passed (Клиенты list qadami is_client'ni isbotladi).
+- Testda ishlatish: input qiymatini tekshirishda `input_value(...) != x` deb raise qilish o'rniga `base.input(label="Код", expect_value=x)` ishlatilsin — auto-retry bo'ladi.
 
 ### Order Wizard Save Tugmasi — Exact Role Name Mos Kelmaydi
 Tags: order, locator, error

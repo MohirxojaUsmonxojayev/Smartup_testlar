@@ -14,7 +14,7 @@ from _debug_env import add_company_args, configure_company_env
 ARCHIVE_DIR = ROOT / "skills/smartup-guide/references/forms/screenshots/user"
 
 
-def collect_b_inputs(page) -> list[dict]:
+def collect_b_inputs(page):
     result = []
     b_inputs = page.locator("b-input")
     for index in range(b_inputs.count()):
@@ -42,7 +42,7 @@ def collect_b_inputs(page) -> list[dict]:
     return result
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser()
     add_company_args(parser)
     parser.add_argument("--headless", action="store_true")

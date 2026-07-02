@@ -125,6 +125,7 @@ Windows serverda bot uchun kerak:
 ```text
 TELEGRAM_BOT_TOKEN=<telegram bot token>
 TELEGRAM_CHAT_ID=<allowed chat id>
+TELEGRAM_RUN_PASSWORD=<run password>
 GITHUB_PAT=<github personal access token>
 ```
 
@@ -184,7 +185,7 @@ set ALLOWED_SERVER_URLS=https://smartup.online,https://app3.greenwhite.uz/xtrade
 Botni ishga tushirish:
 
 ```cmd
-powershell -ExecutionPolicy Bypass -File .\scripts\run_telegram_ci_bot.ps1
+run_telegram_ci_bot.bat
 ```
 
-PowerShell oynasi ochiq turishi kerak. Oyna yopilsa bot ham to'xtaydi.
+CMD oynasi ochiq turishi kerak. Oyna yopilsa bot ham to'xtaydi.

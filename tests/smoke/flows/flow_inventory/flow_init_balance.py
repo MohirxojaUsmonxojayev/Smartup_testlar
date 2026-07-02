@@ -1,30 +1,30 @@
 import re
 
 import allure
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 
-from tests.smoke.flows.flow_navigate import navigate_to
+from tests.smoke.flows.flow_navigate import navigate_to, expect_page
 from utils.base_page import BasePage
 
 
-def _select_main_warehouse(page: Page) -> None:
+def _select_main_warehouse(page):
     base_page = BasePage(page)
     base_page.select_b_input("d.warehouse_name", "Основной склад", clear=True)
     base_page.wait_for_loader()
 
 
 def flow_create_initial_balance(
-    page: Page,
-    document_number: str,
-    product_code: str,
+    page,
+    document_number,
+    product_code,
     quantity="100",
     price="5000",
-) -> None:
+):
     with allure.step("Inventory: boshlang'ich qoldiq yaratish"):
         navigate_to(page, tab="Склад", name="Ввод начальных остатков ТМЦ")
-        expect(page.get_by_role("heading")).to_contain_text("Ввод начальных остатков ТМЦ")
+        expect_page(page, heading="Ввод начальных остатков ТМЦ")
         page.get_by_role("button", name="Создать").click()
-        expect(page.get_by_role("heading")).to_contain_text("Ввод начальных остатков ТМЦ (создание)")
+        expect_page(page, heading="Ввод начальных остатков ТМЦ (создание)")
         page.get_by_role("textbox").first.fill(document_number)
         _select_main_warehouse(page)
         page.locator("b-pg-grid").get_by_role("textbox", name="Поиск").click()
@@ -33,14 +33,10 @@ def flow_create_initial_balance(
         page.locator('input[ng-model="item.price"]').first.fill(price)
 
     with allure.step("Inventory: boshlang'ich qoldiqni saqlash"):
-        BasePage(page).save_and_expect_heading(
-            "Ввод начальных остатков ТМЦ",
-            action="Ввод начальных остатков ТМЦ (создание) -> Сохранить",
-            before_state="Ввод начальных остатков ТМЦ (создание)",
-            expected_state="Ввод начальных остатков ТМЦ list ochilishi",
-            confirm_text="Сохранить?",
-            location_hint="tests/smoke/flows/flow_inventory/flow_init_balance.py::flow_create_initial_balance",
-        )
+        page.get_by_role("button", name="Сохранить", exact=True).first.click()
+        BasePage(page).confirm_biruni("Сохранить?")
+        BasePage(page).wait_for_loader()
+        expect_page(page, heading="Ввод начальных остатков ТМЦ")
         expect(page).to_have_url(re.compile(r".*/init_inventory_balance_list"))
 
     with allure.step("Inventory: boshlang'ich qoldiq hujjatini o'tkazish"):

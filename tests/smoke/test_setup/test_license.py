@@ -3,9 +3,9 @@ import re
 
 import allure
 from tests.smoke.flows.flow_authorization import authorization, logout
-from tests.smoke.flows.flow_navigate import navigate_to, switch_filial
+from tests.smoke.flows.flow_navigate import navigate_to, switch_filial, expect_page
 from utils.base_page import BasePage
-from playwright.sync_api import Page, expect, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import expect, TimeoutError as PlaywrightTimeoutError
 
 pytestmark = [allure.epic("Smoke"), allure.feature("Setup"), allure.story("License")]
 
@@ -16,15 +16,15 @@ REGULAR_LICENSE_ROW_RE = re.compile(r"Smartup ERP:\s*Базовый пользо
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def _env_flag(name: str) -> bool:
+def _env_flag(name):
     return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _license_policy_disabled() -> bool:
+def _license_policy_disabled():
     return _env_flag("DISABLE_LICENSE_POLICY")
 
 
-def _attach_license_skip_note(logger, step_name: str) -> None:
+def _attach_license_skip_note(logger, step_name):
     message = (
         f"{step_name} o'tkazib yuborildi: --disable-license-policy berilgani uchun "
         "companyda Политика лицензирования o'chirilgan."
@@ -33,14 +33,14 @@ def _attach_license_skip_note(logger, step_name: str) -> None:
     logger.info(message)
 
 
-def _logout_if_authenticated(page: Page, logger) -> None:
+def _logout_if_authenticated(page, logger):
     if page.locator(".btn.btn-icon.w-auto").is_visible():
         logout(page)
     else:
         logger.info("Faol sessiya topilmadi — logout o'tkazib yuborildi")
 
 
-def _prepare_license_purchase(page: Page, base_page: BasePage) -> None:
+def _prepare_license_purchase(page, base_page):
     if not page.get_by_role("button", name="Купить").is_visible():
         page.get_by_role("link", name="Покупка").click()
 
@@ -50,7 +50,7 @@ def _prepare_license_purchase(page: Page, base_page: BasePage) -> None:
     base_page.wait_for_loader()
 
 
-def _optional_license_row(page: Page, row_name: re.Pattern, timeout=3_000):
+def _optional_license_row(page, row_name, timeout=3_000):
     row = page.get_by_role("row", name=row_name).first
     try:
         row.wait_for(state="visible", timeout=timeout)
@@ -59,21 +59,21 @@ def _optional_license_row(page: Page, row_name: re.Pattern, timeout=3_000):
         return None
 
 
-def _license_row(page: Page, row_name: re.Pattern):
+def _license_row(page, row_name):
     row = page.get_by_role("row", name=row_name).first
     expect(row).to_be_visible()
     return row
 
 
 def _buy_license_row(
-    page: Page,
-    base_page: BasePage,
+    page,
+    base_page,
     row,
-    count: str,
+    count,
     logger,
-    success_message: str,
+    success_message,
     editable_quantity=True,
-) -> None:
+):
     if editable_quantity:
         quantity = row.get_by_role("textbox").first
         quantity.fill(count)
@@ -92,7 +92,7 @@ def _buy_license_row(
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_buy_license(page: Page, logger, scope: str = "smoke") -> None:
+def run_buy_license(page, logger):
     if _license_policy_disabled():
         _attach_license_skip_note(logger, "Litsenziya sotib olish")
         return
@@ -102,7 +102,7 @@ def run_buy_license(page: Page, logger, scope: str = "smoke") -> None:
         authorization(page)
         switch_filial(page, name="Администрирование")
         navigate_to(page, tab="Главное", name="Лицензии")
-        expect(page.get_by_role("heading", name="Лицензии")).to_be_visible()
+        expect_page(page, heading="Лицензии")
 
     with allure.step("2 - Balansni tekshirish"):
         balance_locator = page.locator('p.text-success[ng-if="q.balance > 0"]')
@@ -138,7 +138,7 @@ def run_buy_license(page: Page, logger, scope: str = "smoke") -> None:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_attach_license(page: Page, code, logger, scope: str = "smoke") -> None:
+def run_attach_license(page, code, logger):
     if _license_policy_disabled():
         _attach_license_skip_note(logger, "Litsenziyani foydalanuvchiga ulash")
         return
@@ -157,7 +157,7 @@ def run_attach_license(page: Page, code, logger, scope: str = "smoke") -> None:
             no_data = page.locator('b-grid[name="table"]').get_by_text("нет данных")
             no_data.wait_for(state="visible", timeout=30_000)
         except PlaywrightTimeoutError:
-            BasePage(page).set_checkall()
+            BasePage(page).checkbox(check_all=True, checked=True)
             page.get_by_role("button", name="Открепить").click()
             BasePage(page).confirm_biruni("Открепить пользователей в количестве")
             expect(page.locator("#kt_content")).to_contain_text("нет данных")
@@ -178,10 +178,10 @@ def run_attach_license(page: Page, code, logger, scope: str = "smoke") -> None:
 # ----------------------------------------------------------------------------------------------------------------------
 
 @allure.title("Litsenziya sotib olish")
-def test_buy_license(page: Page, logger, test_scope) -> None:
-    run_buy_license(page, logger, scope=test_scope)
+def test_buy_license(page, logger):
+    run_buy_license(page, logger)
 
 
 @allure.title("Foydalanuvchiga litsenziya ulash")
-def test_attach_license(page: Page, code, logger, test_scope) -> None:
-    run_attach_license(page, code, logger, scope=test_scope)
+def test_attach_license(page, code, logger):
+    run_attach_license(page, code, logger)

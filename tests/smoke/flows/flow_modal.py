@@ -1,8 +1,8 @@
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def fill_nps_survey(page: Page, logger):
+def fill_nps_survey(page, logger):
     """NPS Survey modal chiqsa - to'ldirib yuboradi"""
     try:
         expect(page.get_by_role("heading", name="NPS Survey")).to_be_visible(timeout=20_000)
@@ -15,7 +15,7 @@ def fill_nps_survey(page: Page, logger):
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def dialog_status(page: Page, timeout=2_000) -> bool:
+def dialog_status(page, timeout=2_000):
     """Dialog status modal chiqsa - to'ldirib yuboradi.
     Modal topilsa True, topilmasa False qaytaradi."""
     try:

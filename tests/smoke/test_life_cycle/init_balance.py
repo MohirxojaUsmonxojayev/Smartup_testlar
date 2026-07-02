@@ -1,25 +1,25 @@
 import allure
 import re
-from playwright.sync_api import Page, expect
-from tests.smoke.flows.flow_authorization import authorization_user
-from tests.smoke.flows.flow_navigate import navigate_to
+from playwright.sync_api import expect
+from tests.smoke.flows.flow_authorization import authorization
+from tests.smoke.flows.flow_navigate import navigate_to, expect_page
 from utils.base_page import BasePage
 
 pytestmark = [allure.epic("Smoke"), allure.feature("Life Cycle"), allure.story("Init Balance")]
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def _select_main_warehouse(page: Page) -> None:
+def _select_main_warehouse(page):
     base_page = BasePage(page)
     base_page.select_b_input("d.warehouse_name", "Основной склад", clear=True)
     base_page.wait_for_loader()
 
 
-def run_init_balance(page: Page, code, scope: str = "smoke") -> None:
+def run_init_balance(page, code):
     with allure.step("1 - Foydalanuvchi sifatida kirish va sahifani ochish"):
-        authorization_user(page, code)
+        authorization(page, who="user", code=code)
         navigate_to(page, tab="Склад", name="Ввод начальных остатков ТМЦ")
-        expect(page.get_by_role("heading")).to_contain_text("Ввод начальных остатков ТМЦ")
+        expect_page(page, heading="Ввод начальных остатков ТМЦ")
 
     with allure.step("2 - Yangi hujjat yaratish va ma'lumot kiritish"):
         page.get_by_role("button", name="Создать").click()
@@ -32,14 +32,10 @@ def run_init_balance(page: Page, code, scope: str = "smoke") -> None:
         page.locator('input[ng-model="item.price"]').first.fill("5000")
 
     with allure.step("3 - Saqlash va tasdiqlash"):
-        BasePage(page).save_and_expect_heading(
-            "Ввод начальных остатков ТМЦ",
-            action="Ввод начальных остатков ТМЦ (создание) -> Сохранить",
-            before_state="Ввод начальных остатков ТМЦ (создание)",
-            expected_state="Ввод начальных остатков ТМЦ list ochilishi",
-            confirm_text="Сохранить?",
-            location_hint="tests/smoke/test_life_cycle/init_balance.py::run_init_balance",
-        )
+        page.get_by_role("button", name="Сохранить", exact=True).first.click()
+        BasePage(page).confirm_biruni("Сохранить?")
+        BasePage(page).wait_for_loader()
+        expect_page(page, heading="Ввод начальных остатков ТМЦ")
         expect(page).to_have_url(re.compile(r".*/init_inventory_balance_list"))
 
     with allure.step("4 - Hujjatni o'tkazish (провести)"):
@@ -60,5 +56,5 @@ def run_init_balance(page: Page, code, scope: str = "smoke") -> None:
 # ----------------------------------------------------------------------------------------------------------------------
 
 @allure.title("Boshlang'ich qoldiqlarni kiritish va o'tkazish")
-def test_init_balance(page: Page, code, test_scope) -> None:
-    run_init_balance(page, code, scope=test_scope)
+def test_init_balance(page, code):
+    run_init_balance(page, code)

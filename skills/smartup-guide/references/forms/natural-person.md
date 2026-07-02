@@ -13,31 +13,45 @@ Tags: natural-person, setup, form, navigation
 
 ### Alohida natural person flow
 Tags: natural-person, legal-person, regression, helper
-- Natural Person alohida entity test hisoblanadi; uning qiymat yaratish, add forma to'ldirish, save, list assert helperlari `tests/smoke/test_setup/test_natural_person.py` ichida turadi.
-- Legal Person regressionda `Руководитель` uchun natural person kerak bo'lsa, `natural_person_values` va `create_natural_person_record` import qilinadi; natural person locator/fill/assert logikasi Legal Person ichida dublikat qilinmaydi.
-- Kelajakda natural person list/view bo'yicha qo'shimcha testlar shu fayldagi helperlarga tayanadi.
+- Natural Person alohida entity test hisoblanadi; uning add/save/list/view logikasi `tests/smoke/test_setup/test_natural_person.py` ichidagi `run_natural_person` va `run_natural_person_for_client_1` (test_setup_runner step 06 va 18) hamda quyidagi reusable helperlarda turadi.
+- Reusable creator: `create_natural_person(page, full_name, person_code, *, client=False)` — list ochib, formani to'ldirib, saqlaydi. Legal person regressioni director kerak bo'lganda shuni import qiladi (natural person fill/assert logikasini dublikat qilmaydi).
+- View tekshiruvi: `assert_natural_person_view(page, full_name)`; global qidiruv: `_search_list(page, text)`.
+- Eslatma (2026-06-30 refactor): eski 16-maydonli `natural_person_values` data builder va micro-helperlar (`_open_natural_person_add`, `_fill_*`, `_save_*`, dead `create_natural_person_record` va h.k.) olib tashlandi — smoke faqat `full_name` + `Код` ni ishlatadi (inline f-string). Regression kerak bo'lsa `run_*` ga `scope` parametri qo'shilib, qo'shimcha maydonlar shu yerda to'ldiriladi.
+- **Base funksiya refactorlari (2026-07-01):**
+  - ✅ BAJARILDI: `_search_list(page, text)` olib tashlandi → hamma joyda `BasePage(page).grid_controller(search=text)` (aynan bir xil `o.searchValue` element+xatti-harakat; MCP tasdiqlagan). `_search_list` faqshu faylda ishlatilgan edi.
+  - ✅ BAJARILDI: `create_natural_person` dagi qo'lda save bloki (`Сохранить` click + `confirm_biruni()` + `wait_for_loader()` + `expect_page`) → `BasePage(page).save_and_expect_heading("Физические лица", confirm_text="")` (boyroq xato xabari). ESLATMA: `save_and_expect_heading` mavjud base funksiya, lekin bundan oldin HECH QAYERDA ishlatilmagan edi; qo'lda save naqshi 10 ta setup faylida (test_user, test_company, test_robot, test_legal_person, test_price_type, test_filial, test_room, test_sector, test_product) takrorlanadi — kelajakda cross-cutting refactor imkoniyati.
+  - ⏳ IMKONIYAT (hali bajarilmagan): `run_natural_person` + `run_natural_person_for_client_1` bitta parametrli `run_natural_person(page, code, *, client=False)` ga birlashtirilishi mumkin (client uchun `Клиенты` list qadamini `if client:` bilan qo'shib). Ikkala pytest entry saqlanadi. `test_setup_runner.py` `run_*` ni to'g'ridan-to'g'ri chaqiradi (import + `test_06`/`test_18` call-site), shuning uchun birlashtirilsa runner ham yangilanadi.
 
 ## Field Bilimlari
 
 ### Natural person add fields
-Tags: natural-person, input, regression
-- Smoke branch: majburiy `d.first_name` (`Имя *`) va `d.code` to'ldiriladi; xodim uchun ko'rinadigan nom `natural_person-pw{code}`, client uchun `natural_client-pw{code}` bo'lib qolishi kerak, chunki keyingi user/contract/order flowlar shu matnni exact qidiradi.
+Tags: natural-person, input, regression, locator
+- Smoke branch: majburiy `d.first_name` (`Имя *`) va `d.code` (`Код`) to'ldiriladi; xodim uchun ko'rinadigan nom `natural_person-pw{code}`, client uchun `natural_client-pw{code}` bo'lib qolishi kerak, chunki keyingi user/contract/order flowlar shu matnni exact qidiradi.
+- **Locator tuzog'i (MCP 2026-06-30 tasdiqlangan):** `input(label="Имя")` shu formada xato tarzda `d.middle_name` ni topadi — "Имя" label DOMda first_name input'idan KEYIN keladi, shuning uchun `following::input` keyingi maydonga (middle_name) tushadi. Shu sabab `d.first_name` `input(ng_model="d.first_name", value=...)` (ng-model orqali) bilan to'ldiriladi. `input(label="Код")` esa to'g'ri `d.code` ga tushadi.
+- **"Имя" — b-input, oddiy textbox emas (MCP 2026-07-01):** `Имя *` maydoni `b-input` (placeholder "Поиск...", ism autocomplete). Shuning uchun `following::input` label bilan noaniq — ng-model ishonchli. `Фамилия`, `Отчество`, `Код` esa oddiy `textbox`.
+- **`Клиент` toggle FILIALga bog'liq (user tuzatishi 2026-07-01):** `Клиент` maydoni add formada faqat TO'G'RI filialga o'tilганda ko'rinadi. Shu sabab `test_natural_person`/`test_natural_person_for_client_1` wrapperlari `run_*` dan oldin `switch_filial(page, name=f"filial-pw{code}")` qiladi (setup zanjirida `run_room` allaqachon shu filialга o'tган). MCP tekshiruvida `red_test` ning DEFAULT filialida edim (switch_filial qilmagan) — shuning uchun `Клиент` ko'rinmadi va DOMda faqat `d.state` (`Активный`) hamda chat-widget `a.feedback.anonymous` checkboxlari bor edi. Xulosa: bu company-config emas, filial masalasi — standalone debug/MCP'da avval to'g'ri filialга `switch_filial` qilinmasa `Клиент` bo'lmaydi. Client testni standalone run qilганда `--reuse-code` bilan mavjud filial-pw{code} kerak.
+- **Counterparty toggle'lari — base checkbox() (MCP `filial-pw608492`, 2026-07-01/07-02):** to'g'ri filialда add formada 4 ta `<label>` ichidagi checkbox bor: `d.state` (`Активный`, default checked), `d.is_supplier` (`Поставщик`), `d.is_client` (`Клиент`), `d.is_employee` (`Сотрудник`). Har biri `<label>` ichida `input[type=checkbox]` + `<t>` label matnli (label matni `<label>` ning O'ZIDA). Base **`BasePage(page).checkbox(label="Клиент", checked=True)`** ishlatiladi (idempotent; oxirida `to_be_checked` tasdiqlaydi). `Активный` uchun `checkbox(label="Активный", expect_checked=True)`. Label pattern `^Клиент\s*\*?$` exact bo'lgani uchun "Клиенты" bilan chalkashmaydi.
+  - ⚠️ **BUG topildi + tuzatildi (2026-07-02):** eski `_field_locator_by_label(target="switch")` `ancestor::label//input` ishlatardi va `<label>` element uchun (self hisobga olinmagani sabab) `following::` keyingi checkbox'ga siljib, `checkbox(label="Клиент")` aslida `d.is_employee` (Сотрудник = worker) ni tanlardi. MCP'da 4-ta toggle HAMMASI 1 ga siljigani tasdiqlandi. `checked=`+`expect_checked=` bir xil xato elementга tushgani uchun test "yashil" bo'lib bug maskalanardi. Tuzatish `base_page.py:521` → `(ancestor-or-self::label[1]//input[@type='checkbox'])[1]`. To'liq tafsilot: `references/ui-patterns.md` "Switch-label wrapper resolution bug + fix".
 - Regression branch: smoke maydonlariga qo'shimcha `d.birthday`, `d.passport_series`, `d.passport_digits`, `Регион`, `d.address`, `d.post_address`, `d.main_phone`, `d.tin`, `d.telegram`, `d.email`, `d.web` to'ldiriladi.
 - `Регион` legal persondagi kabi b-tree search (`_$bTree.searchValue`); avval input click/focus qilinadi, keyin `Ташкент` qidirilib hint ichidagi exact text/label yoki `.jstree-anchor` orqali `город Ташкент`/`Ташкент` optioni tanlanadi.
-- Client case'da `Клиент` belgisi yoqiladi va save qilingandan keyin `Клиенты` listida ham ko'rinishi tekshiriladi.
+- Add forma to'liq maydon inventari (MCP 2026-07-01): Пол (radio Мужской/Женский), Фамилия, Имя*, Отчество, Код, Дата рождения, Серийный номер паспорта (AA + 7 raqam), Статус (checkbox Активный), Регион, Адрес, Почтовый адрес, Юридическое лицо, Телефон, ИНН/ПНФЛ (+Поиск btn), GPS координаты, Телеграм, Email, Ответственный, Веб-сайт; pastda tablar: Характеристики (Группа/Категория/Тип), Расчетный счет, Файлы, Примечание.
+- Add forma screenshot: `references/forms/screenshots/natural-person/add-form-red_test-2026-07-01.png`.
 
 ## List Va View Tekshiruv
 
 ### Natural person list
 Tags: natural-person, list, grid, assert
-- Default list gridda `Название`, `Пол`, `Дата рождения`, `Группа`, `Категория`, `Статус` ko'rinadi; `Код` default ko'rinmaydi.
+- Default list gridda `Дата создания`, `Название`, `Пол`, `Дата рождения`, `Группа`, `Категория`, `Статус` ko'rinadi; `Код` default ko'rinmaydi.
 - Test global searchda code bo'yicha filter qilishi mumkin, lekin row assert ko'rinadigan nom (`natural_person-pw{code}`, `natural_client-pw{code}` yoki director F.I.O.) va `Активный` statusni tekshiradi.
+- Row tanlanганда inline action toolbar chiqadi: `Просмотр` / `Изменить` / `Неактивный` / `Удалить`.
+- **Search dublikati (MCP 2026-07-01 tasdiqlangan):** listdagi qidiruv testda `_search_list` (`get_by_role("searchbox", name="Поиск")`) bilan qilinadi, lekin bu aynan `BasePage.grid_controller(search=text)` ishlatadigan element — `b-grid-controller` ichidagi `input[ng-model="o.searchValue"]` (`type=search`, placeholder "Поиск...", ko'rinadigan). Sahifadagi ikkinchi input `a.search.value` (placeholder "Поисковый запрос", `type=text`, KO'RINMAS/global) `searchbox` roliga kirmaydi, shuning uchun `get_by_role("searchbox")` faqat grid controller inputiga tushadi. Xulosa: `_search_list` = `grid_controller(search=)` dublikati, base funksiya bilan almashtirilsa bo'ladi.
 - View tugmasi: row tanlangandan keyin `Просмотр`.
 
 ### Natural person view
 Tags: natural-person, view, assert
-- View URL pattern: `/anor/mr/person/natural_person_view`.
+- View URL pattern: `/anor/mr/person/natural_person_view?person_id=<id>`.
 - View heading bilan tab heading birga chiqishi mumkin; heading assertda `get_by_role("heading").filter(has_text="Физическое лицо (просмотр)")` ishlatiladi.
+- View strukturasi (MCP 2026-07-01): yuqorida `Закрыть` tugmasi; summary blok `nom (id)` + `Активный`; chap tomonda Пол/Имя/Фамилия/Отчество/Код/Дата рождения; ichki tablar: `Основная информация`, `Детали`, `Характеристика контрагента`, `Расчетный счет`, `Файлы`. Smoke `assert_visible_page_text(page, full_name, "Активный")` — `b-page` ichida nom va statusni tekshiradi (yetarli).
 - Smoke view assert hozir yaratilgan person name va `Активный` statusini tekshiradi; regression view assert qo'shimcha `code`, `birthday`, `email`, `address`, `post_address` qiymatlarini ham tekshiradi.
 - `natural_client-pw{code}` case uchun person viewdan keyin `Клиенты` listida ham client nomi borligi tekshiriladi.
 
@@ -47,3 +61,8 @@ Tags: natural-person, view, assert
 Tags: natural-person, client, list, view, run-result
 - `test_01_authorization` + `test_03_filial` + `test_06_natural_person` + `test_18_natural_person_for_client_1 --reuse-code --headless -s` passed: 4 passed in 27.74s.
 - Run code: `5535`; natural person va natural client list/view assertlari o'tdi.
+
+### 2026-07-01 base-funksiya refactor verification
+Tags: natural-person, client, refactor, run-result
+- `_search_list` → `grid_controller(search=)` va qo'lda save → `save_and_expect_heading("Физические лица", confirm_text="")` refactoridan keyin: `test_01_authorization` + `test_02_legal_person` + `test_03_filial` + `test_04_room` + `test_06_natural_person` + `test_18_natural_person_for_client_1` = **6 passed in 71.48s** (existing company `red_test`, yangi code `608492`, headed).
+- `test_18` o'tishi `Клиент` toggle FILIALga bog'liqligini empirik tasdiqladi: `run_room` (test_04) `filial-pw{code}` ga o'tгач, `create_natural_person(client=True)` da `Клиент` ko'rindi va bosildi.

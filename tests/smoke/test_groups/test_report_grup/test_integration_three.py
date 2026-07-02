@@ -1,7 +1,7 @@
 import allure
 from datetime import datetime
 
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_navigate import switch_filial
 from utils.base_page import BasePage
@@ -11,7 +11,7 @@ pytestmark = [allure.epic("Report Group"), allure.feature("Integration Report"),
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def _one_month_ago() -> str:
+def _one_month_ago():
     """Bir oy oldingi sana, dd.mm.yyyy (datetime.now() - 1 oy)."""
     now = datetime.now()
     month = now.month - 1 or 12
@@ -22,7 +22,7 @@ def _one_month_ago() -> str:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_report_integration_three_check(page: Page, code, scope: str = "smoke", login: bool = True) -> None:
+def run_report_integration_three_check(page, code, login=True):
     """Report-02: Integration №3 (NEON) report — 3 ta sheet render bo'lishini tekshirish.
 
     Login (login=True bo'lsa): admin login va test filialiga (filial-pw{code}) o'tish.

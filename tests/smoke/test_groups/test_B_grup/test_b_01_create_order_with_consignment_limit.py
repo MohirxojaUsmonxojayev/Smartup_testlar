@@ -1,6 +1,5 @@
 import allure
 import pytest
-from playwright.sync_api import Page
 
 from tests.smoke.test_groups.test_B_grup.order_helpers import (
     run_b_group_create_order_with_consignment_limit,
@@ -16,15 +15,13 @@ pytestmark = [
 
 @allure.title("B-01 - Konsignatsiya limiti bilan zakaz yaratish")
 def test_b_01_create_order_with_consignment_limit(
-    group_user_page: Page,
-    code: str,
+    group_user_page,
+    code,
     save_data,
-    test_scope,
-) -> None:
+):
     run_b_group_create_order_with_consignment_limit(
         group_user_page,
         code,
         save_data,
-        scope=test_scope,
         login=False,
     )

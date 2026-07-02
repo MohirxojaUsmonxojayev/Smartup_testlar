@@ -1,7 +1,8 @@
 import allure
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_navigate import switch_filial
+from utils.base_page import BasePage
 from tests.smoke.test_groups.test_report_grup.report_helpers import generate_and_verify_download, select_b_input_option
 
 pytestmark = [allure.epic("Report Group"), allure.feature("Integration Report"), allure.story("Sales Work")]
@@ -9,7 +10,7 @@ pytestmark = [allure.epic("Report Group"), allure.feature("Integration Report"),
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_report_saleswork_check(page: Page, code, scope: str = "smoke", login: bool = True) -> None:
+def run_report_saleswork_check(page, code, login=True):
     """Report-03: SalesWork report — yangi shablon yaratib, sales_work.zip yuklab olishni tekshirish.
 
     Login (login=True bo'lsa): admin login va test filialiga (filial-pw{code}) o'tish.
@@ -36,7 +37,7 @@ def run_report_saleswork_check(page: Page, code, scope: str = "smoke", login: bo
         page.locator('button[ng-click="selectTemplate()"]').click()
         page.locator('button[ng-click="add()"]').click()
         expect(page.get_by_role("heading")).to_contain_text("Шаблон Saleswork")
-        page.locator('input[ng-model="d.name"]').fill(template_name)
+        BasePage(page).input(ng_model="d.name", value=template_name)
         select_b_input_option(page, "product_groups", "Группа")
         page.locator('button[ng-click="save()"]').click()
 

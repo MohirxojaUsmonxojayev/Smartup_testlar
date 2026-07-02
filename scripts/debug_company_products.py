@@ -14,7 +14,7 @@ from _debug_env import add_company_args, configure_company_env
 ARCHIVE_DIR = ROOT / "skills/smartup-guide/references/forms/screenshots/company"
 
 
-def _ancestor_text(locator, level: int) -> str:
+def _ancestor_text(locator, level):
     ancestor = locator.locator(f"xpath=ancestor::*[{level}]")
     if ancestor.count() == 0:
         return ""
@@ -25,7 +25,7 @@ def _ancestor_text(locator, level: int) -> str:
     return " ".join(text.split())
 
 
-def collect_product_switches(page, products_card) -> list[dict]:
+def collect_product_switches(page, products_card):
     switches = products_card.get_by_role("switch")
     result = []
     for index in range(switches.count()):
@@ -43,7 +43,7 @@ def collect_product_switches(page, products_card) -> list[dict]:
     return result
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser()
     add_company_args(parser)
     parser.add_argument("--code", default="9999")

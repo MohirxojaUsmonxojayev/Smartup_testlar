@@ -1,36 +1,32 @@
 import os
 import json
+import random
 from pathlib import Path
 
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 from utils.base_page import BasePage
 
 USER_PASS = "123456789"
 
 DATA_STORE_PATH = Path("test-results/data/data_store.json")
 
-# Smartup sessiya timeout/lock overlayi (#closing-session) ni avtomatik yopish uchun:
-# har bir long-lived page (id bo'yicha) uchun oxirgi login paroli va handler o'rnatilgani.
-_session_passwords: dict[int, str] = {}
-_session_handler_pages: set[int] = set()
 
-
-def _normalize_company_code(value: str) -> str:
+def _normalize_company_code(value):
     return value.strip().lstrip("@")
 
 
-def _create_company_enabled() -> bool:
+def _create_company_enabled():
     return os.getenv("CREATE_COMPANY", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def company_url() -> str:
+def company_url():
     value = os.getenv("COMPANY_URL", "").strip().rstrip("/")
     if not value:
         raise AssertionError("--url majburiy. Testni scripts/run_tests.py --url <server_url> orqali ishga tushiring.")
     return value
 
 
-def company_password() -> str:
+def company_password():
     value = os.getenv("COMPANY_PASSWORD", "").strip()
     if not value:
         raise AssertionError(
@@ -39,7 +35,7 @@ def company_password() -> str:
     return value
 
 
-def current_company_code() -> str:
+def current_company_code():
     if _create_company_enabled() and DATA_STORE_PATH.exists():
         try:
             data = json.loads(DATA_STORE_PATH.read_text(encoding="utf-8"))
@@ -55,22 +51,75 @@ def current_company_code() -> str:
         )
     return _normalize_company_code(value)
 
-
-def company_suffix() -> str:
+def company_suffix():
     return f"@{current_company_code()}"
 
-
-def admin_email() -> str:
+def admin_email():
+    value = os.getenv("ADMIN_EMAIL", "").strip()
+    if value:
+        return value
     return f"admin{company_suffix()}"
 
+def admin_password():
+    value = os.getenv("ADMIN_PASSWORD", "").strip()
+    if value:
+        return value
+    return company_password()
 
-def user_email_for(code: str) -> str:
+def user_email_for(code):
     return f"user-pw{code}{company_suffix()}"
 
+def user_password():
+    value = os.getenv("USER_PASSWORD", "").strip()
+    if value:
+        return value
+    return USER_PASS
+
+def head_email():
+    value = os.getenv("HEAD_ADMIN_EMAIL", "").strip()
+    if not value:
+        raise AssertionError(
+            "head profil uchun HEAD_ADMIN_EMAIL kerak: .env yoki --head-email orqali bering."
+        )
+    return value
+
+def head_password():
+    value = os.getenv("HEAD_ADMIN_PASSWORD", "").strip()
+    if not value:
+        raise AssertionError(
+            "head profil uchun HEAD_ADMIN_PASSWORD kerak: .env yoki --head-password orqali bering."
+        )
+    return value
+
+
+def _resolve_code(code=None, generated_code="new"):
+    """`who='user'` emailini yig'ish uchun code'ni hal qiladi.
+
+    - code berilsa: o'sha ishlatiladi (runner zanjiri session code'ni shu yo'l bilan beradi)
+    - generated_code='old': data_store.json dagi mavjud code (yakka/debug run uchun)
+    - aks holda ('new'): yangi random 6 xonali code
+    """
+    if code:
+        return str(code)
+    if generated_code == "old":
+        saved = None
+        if DATA_STORE_PATH.exists():
+            try:
+                data = json.loads(DATA_STORE_PATH.read_text(encoding="utf-8"))
+                saved = data.get("code") if isinstance(data, dict) else None
+            except json.JSONDecodeError:
+                saved = None
+        if not saved:
+            raise AssertionError(
+                "generated_code='old': data_store.json da 'code' topilmadi. "
+                "Avval to'liq runner ishga tushiring."
+            )
+        return str(saved)
+    return str(random.randint(100000, 999999))
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def logout(page: Page) -> None:
+def logout(page):
     page.locator(".btn.btn-icon.w-auto").click()
     expect(page.locator("#kt_header").get_by_text("Admin")).to_be_visible()
     page.locator('a[ng-click="a.logout()"]').click()
@@ -78,81 +127,46 @@ def logout(page: Page) -> None:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def login(page: Page, email: str | None = None, password: str | None = None) -> None:
+def login(page, email=None, password=None):
     email = email or admin_email()
     password = password or company_password()
     page.goto(f"{company_url()}/login.html")
     page.get_by_placeholder("Логин@компания").fill(email)
     page.get_by_role("textbox", name="Пароль").fill(password)
     page.get_by_role("button", name="Войти").click()
-    install_session_keepalive(page, password)
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def install_session_keepalive(page: Page, password: str) -> None:
-    """
-    Smartup sessiya timeout/lock overlayi (#closing-session) chiqsa, uni avtomatik yopadi.
-
-    Smartup belgilangan idle vaqtdan keyin "Закрытие сессии" overlayini ko'rsatadi
-    (`.cs-backdrop.open` barcha kliklarni intercept qiladi) — test o'rtasida menu/list
-    clicklari timeout bo'lib yiqiladi. add_locator_handler orqali bu overlay har qanday
-    action paytida avtomatik hal qilinadi:
-      1. "Продолжить" (`sessionStay`) ko'rinsa — parolsiz bosib sessiyani uzaytiradi (timeout-warning holati).
-      2. Aks holda re-login: parol kiritib "Войти" (`relogin`) bosadi (lock/expired holati).
-    MCP bilan smartup.online da tekshirilgan; DOM: #closing-session > .cs-backdrop.open + .cs-lock/.cs-timeout.
-    """
-    _session_passwords[id(page)] = password
-    if id(page) in _session_handler_pages:
-        return
-    _session_handler_pages.add(id(page))
-
-    overlay = page.locator("#closing-session")
-    backdrop_open = page.locator("#closing-session .cs-backdrop.open")
-
-    def _resolve_session_lock() -> None:
-        try:
-            # Timeout-warning holati (.cs-timeout): parolsiz "Продолжить" (sessionStay) sessiyani uzaytiradi.
-            stay = overlay.get_by_role("button", name="Продолжить")
-            if stay.count() > 0 and stay.first.is_visible():
-                stay.first.click()
-            else:
-                # Lock/expired holati (.cs-lock): parol + "Войти" (relogin).
-                pwd = overlay.locator("input[type=password]").first
-                if pwd.is_visible():
-                    pwd.fill(_session_passwords.get(id(page), password))
-                    # Tab — ng-model (a.session.si.rePassword) commit bo'lsin; aks holda relogin bo'sh parol
-                    # bilan ketib overlay yopilmaydi (MCP bilan tasdiqlangan).
-                    pwd.press("Tab")
-                    overlay.get_by_role("button", name="Войти", exact=True).first.click()
-            # relogin/sessionStay async — overlay yopilguncha kutamiz. Aks holda Playwright
-            # action'ni qayta tekshirib handlerni qayta chaqiradi va davom etayotgan relogin'ni uzadi.
-            backdrop_open.wait_for(state="hidden", timeout=60_000)
-        except Exception:
-            # Handler hech qachon test action'ini buzmasligi kerak; overlay yo'qolmasa
-            # Playwright o'zi keyingi tekshiruvni qiladi.
-            pass
-
-    page.add_locator_handler(
-        page.locator("#closing-session .cs-backdrop.open"),
-        _resolve_session_lock,
-        no_wait_after=True,
-    )
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-def dashboard(page: Page) -> None:
+def dashboard(page):
     expect(page.get_by_role("heading", name="Trade")).to_be_visible(timeout=120_000)
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def authorization(page: Page, email: str | None = None, password: str | None = None) -> None:
+def authorization(page, who="admin", *, email=None, password=None, code=None, generated_code="new"):
+    """Rolga qarab tizimga kiradi.
+
+    who:
+        "admin" → ADMIN_EMAIL / admin@{company} + ADMIN_PASSWORD / company parol
+        "head"  → HEAD_ADMIN_EMAIL + HEAD_ADMIN_PASSWORD (company yaratish uchun)
+        "user"  → user-pw{code}@{company} + USER_PASSWORD / USER_PASS
+
+    email/password to'g'ridan-to'g'ri berilsa — who e'tiborsiz, o'shalar ishlatiladi (eski chaqiruvlar uchun).
+    generated_code: "new" → yangi random code; "old" → data_store.json dagi code (user emailini yig'ish uchun).
+    code berilsa — generated_code e'tiborsiz, o'sha code ishlatiladi.
+    """
+    if email is None and password is None:
+        if who == "admin":
+            email, password = admin_email(), admin_password()
+        elif who == "head":
+            email, password = head_email(), head_password()
+        elif who == "user":
+            resolved_code = _resolve_code(code, generated_code)
+            email, password = user_email_for(resolved_code), user_password()
+        else:
+            raise ValueError(
+                f"authorization: noma'lum who={who!r}. 'admin', 'user' yoki 'head' bo'lishi kerak."
+            )
     login(page, email=email, password=password)
-    dashboard(page)
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-def authorization_user(page: Page, code: str) -> None:
-    login(page, email=user_email_for(code), password=USER_PASS)
     dashboard(page)
 
 # ----------------------------------------------------------------------------------------------------------------------

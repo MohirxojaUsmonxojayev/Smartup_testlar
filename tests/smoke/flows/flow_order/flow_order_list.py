@@ -1,9 +1,8 @@
 import allure
-import re
 from playwright.sync_api import expect
 
 from tests.smoke.flows import flow_modal
-from tests.smoke.flows.flow_navigate import navigate_to
+from tests.smoke.flows.flow_navigate import navigate_to, expect_page
 from utils.base_page import BasePage
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -25,15 +24,15 @@ def _ensure_order_grid_row_open(page, row_text):
 
 def flow_open_order_list(page):
     navigate_to(page, tab="Продажа", name="Заказы")
-    expect(page).to_have_url(re.compile(r".*/order_list"))
-    expect(page.get_by_role("heading")).to_contain_text("Заказы")
+    expect_page(page, url="order_list")
+    expect_page(page, heading="Заказы")
     expect(page.get_by_role("button", name="Создать", exact=True)).to_be_visible()
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 def flow_order_list(page, add=False, find_row=None, view=False, edit=False, status=None):
     page.wait_for_url("**/order_list")
-    expect(page.get_by_role("heading")).to_contain_text("Заказы")
+    expect_page(page, heading="Заказы")
 
     if add:
         with allure.step("Order List: 'Создать' button click"):
@@ -71,11 +70,11 @@ def flow_order_list(page, add=False, find_row=None, view=False, edit=False, stat
             if page.locator("#dropdown").count() > 0:
                 expect(page.locator("#dropdown").first).to_contain_text(status)
             else:
-                expect(page.get_by_role("heading")).to_contain_text("Заказы")
+                expect_page(page, heading="Заказы")
 
 def flow_order_list_grid_setting(page, colum_name, search_name):
     page.wait_for_url("**/order_list")
-    expect(page.get_by_role("heading")).to_contain_text("Заказы")
+    expect_page(page, heading="Заказы")
     page.locator(".btn.btn-default.dropdown-toggle.no-after").first.click()
     page.get_by_role("link", name="Настройка таблицы").click()
 
@@ -86,6 +85,6 @@ def flow_order_list_grid_setting(page, colum_name, search_name):
     page.get_by_role("button", name="Сохранить").click()
 
     page.wait_for_url("**/order_list")
-    expect(page.get_by_role("heading")).to_contain_text("Заказы")
+    expect_page(page, heading="Заказы")
 
 # ----------------------------------------------------------------------------------------------------------------------

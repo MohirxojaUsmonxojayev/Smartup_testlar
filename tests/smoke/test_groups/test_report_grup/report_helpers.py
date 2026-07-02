@@ -2,14 +2,14 @@
 from pathlib import Path
 
 import allure
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 
 DOWNLOAD_DIR = Path("test-results/downloads")
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def select_b_input_option(page: Page, b_input_name: str, option: str, search_text: str | None = None) -> None:
+def select_b_input_option(page, b_input_name, option, search_text=None):
     """`b-input[name=...]` ichidan Поиск orqali option tanlaydi (.hint-body/div.hint).
 
     search_text berilsa — qidiruvga shu yoziladi (server-search b-input, masalan price_types,
@@ -35,7 +35,7 @@ def select_b_input_option(page: Page, b_input_name: str, option: str, search_tex
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def generate_and_verify_download(page: Page, trigger, expected_prefix: str, save_name: str, timeout: int = 120_000) -> str:
+def generate_and_verify_download(page, trigger, expected_prefix, save_name, timeout=120_000):
     """`trigger` (Locator) bosilganda yuklanadigan faylni kutadi va tekshiradi: prefiks + bo'sh emasligi."""
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     with page.expect_download(timeout=timeout) as download_info:

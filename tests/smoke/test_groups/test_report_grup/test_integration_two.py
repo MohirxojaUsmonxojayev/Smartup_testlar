@@ -2,7 +2,7 @@ from datetime import datetime
 
 import allure
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import expect
 from tests.smoke.flows.flow_authorization import authorization
 from tests.smoke.flows.flow_navigate import switch_filial
 from tests.smoke.test_groups.test_report_grup.report_helpers import generate_and_verify_download, select_b_input_option
@@ -23,7 +23,7 @@ EXCHANGE_MODES = [
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def _close_alert_if_open(page: Page) -> None:
+def _close_alert_if_open(page):
     """Generate'dan keyin chiqishi mumkin bo'lgan biruni xato modalini yopadi va yo'qolishini kutadi."""
     for selector in ("#biruniAlertExtended", "#biruniAlert"):
         alert = page.locator(selector)
@@ -38,7 +38,7 @@ def _close_alert_if_open(page: Page) -> None:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run_report_integration_two_check(page: Page, code, load_data, scope: str = "smoke", login: bool = True) -> None:
+def run_report_integration_two_check(page, code, load_data, login=True):
     """Report-06: Integration Two (монолит) — sozlamalar va 4 ta exchange rejimi uchun .xml yuklab olish.
 
     integration_two faqat "Администрирование" filialida ochiladi, shuning uchun sahifa ochishdan oldin
@@ -69,15 +69,15 @@ def run_report_integration_two_check(page: Page, code, load_data, scope: str = "
 
     with allure.step("2 - Настройки: filtrlar va checkboxlar -> saqlash"):
         page.locator('button[ng-click="q.show_setting = true"]').click()
-        page.locator('input[ng-model="d.company_id"]').fill("8605425")
-        page.locator('input[ng-model="d.user_name"]').fill("123")
-        page.locator('input[ng-model="d.url"]').fill("https")
-        page.locator('input[ng-model="d.unit_of_quant_measurement"]').fill("шт")
-        page.locator('input[ng-model="d.unit_of_box_measurement"]').fill("шт")
+        BasePage(page).input(ng_model="d.company_id", value="8605425")
+        BasePage(page).input(ng_model="d.user_name", value="123")
+        BasePage(page).input(ng_model="d.url", value="https")
+        BasePage(page).input(ng_model="d.unit_of_quant_measurement", value="шт")
+        BasePage(page).input(ng_model="d.unit_of_box_measurement", value="шт")
         select_b_input_option(page, "price_types", price_type_name, search_text=str(code))
         select_b_input_option(page, "product_groups", "Группа")
         for ng_model in SETTING_CHECKBOXES:
-            BasePage(page).set_checkbox(page.locator(f'input[ng-model="{ng_model}"]'), checked=True)
+            BasePage(page).checkbox(ng_model=ng_model, checked=True)
         save_btn = page.locator('button[ng-click="save()"]')
         save_btn.click()
         expect(save_btn).to_be_hidden()

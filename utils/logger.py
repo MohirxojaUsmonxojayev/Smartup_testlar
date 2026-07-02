@@ -13,20 +13,20 @@ class TestLogger:
     test-results/logs/{test_name}_{timestamp}.log
     """
 
-    def __init__(self, test_name: str):
+    def __init__(self, test_name):
         self.test_name = test_name
         self.log_path = self._setup_log_file()
         self._logger = self._create_logger()
         self.has_failures = False
 
-    def _setup_log_file(self) -> str:
+    def _setup_log_file(self):
         os.makedirs(LOG_DIR, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_name = self.test_name.replace("::", "__").replace(" ", "_").replace("/", "_")
         filename = f"{safe_name}_{timestamp}.log"
         return os.path.join(LOG_DIR, filename)
 
-    def _create_logger(self) -> logging.Logger:
+    def _create_logger(self):
         logger = logging.getLogger(f"test.{self.test_name}.{id(self)}")
         logger.setLevel(logging.DEBUG)
         logger.handlers.clear()
@@ -51,16 +51,16 @@ class TestLogger:
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    def info(self, message: str) -> None:
+    def info(self, message):
         self._logger.info(message)
 
-    def step(self, message: str) -> None:
+    def step(self, message):
         self._logger.info(f"[STEP] {message}")
 
-    def warning(self, message: str) -> None:
+    def warning(self, message):
         self._logger.warning(f"[WARNING] {message}")
 
-    def fail(self, message: str, exc: BaseException = None, raise_error: bool = False) -> None:
+    def fail(self, message, exc=None, raise_error=False):
         self.has_failures = True
         self._logger.error(f"[FAIL] {message}")
         if exc is not None:
@@ -71,7 +71,7 @@ class TestLogger:
         if raise_error:
             raise AssertionError(message) from exc
 
-    def close(self) -> None:
+    def close(self):
         for handler in self._logger.handlers[:]:
             handler.close()
             self._logger.removeHandler(handler)
@@ -98,13 +98,13 @@ class TestLogger:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def get_logger(test_name: str) -> TestLogger:
+def get_logger(test_name):
     """Yangi TestLogger obyekti qaytaradi."""
     return TestLogger(test_name)
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def write_failure_log(test_name: str, when: str, longrepr: str) -> str:
+def write_failure_log(test_name, when, longrepr):
     """
     pytest hook ichidan chaqiriladi.
     Muvaffaqiyatsiz test uchun log fayl yozadi va fayl yo'lini qaytaradi.

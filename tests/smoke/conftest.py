@@ -6,38 +6,111 @@ import random
 import allure
 import pytest
 from pathlib import Path
-from typing import Any, Generator
-from playwright.sync_api import sync_playwright, Browser, Page, expect
-from tests.smoke.flows.flow_authorization import authorization_user
-from utils.logger import write_failure_log, get_logger, TestLogger
+from playwright.sync_api import sync_playwright, expect
+from tests.smoke.flows.flow_authorization import authorization
+from utils.logger import write_failure_log, get_logger
 
 TRACE_DIR = "test-results/traces"
 DATA_DIR = "test-results/data"
 ALLURE_RESULTS_DIR = "test-results/allure-results"
 ALLURE_REPORT_DIR = "test-results/allure-report"
 CREATED_COMPANY_PASSWORD = "greenwhite"
+ROOT_DIR = Path(__file__).resolve().parents[2]
 
 # Timeout konstantalari — bitta joyda, butun loyiha bo'ylab ishlatiladi
-DEFAULT_TIMEOUT    = 120_000    # click, fill, expect va boshqa locator amallari (ms)
-NAVIGATION_TIMEOUT = 120_000    # page.goto, wait_for_load_state (ms)
+DEFAULT_TIMEOUT    = 10_000    # click, fill, expect va boshqa locator amallari (ms)
+NAVIGATION_TIMEOUT = 20_000    # page.goto, wait_for_load_state (ms)
 
 _USER_SETUP_FAILED = False
-_FAILED_SMOKE_GROUPS: set[str] = set()
+_FAILED_SMOKE_GROUPS = set()
+_LOCAL_DOTENV_EXISTS = False
 
 
-def _env_flag(name: str) -> bool:
+def _load_local_dotenv():
+    """Local run profile.
+
+    Agar repo rootda .env mavjud bo'lsa, lokal runlar shu fayldagi qiymatlarni ishlatadi.
+    .env yo'q muhitlarda (CI/yangi clone) terminal flaglari va shell env ishlaydi.
+    """
+    global _LOCAL_DOTENV_EXISTS
+    env_path = ROOT_DIR / ".env"
+    if not env_path.exists():
+        return
+
+    _LOCAL_DOTENV_EXISTS = True
+    with env_path.open("r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            if line.startswith("export "):
+                line = line[len("export "):].strip()
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip("\"'")
+            if key:
+                os.environ[key] = value
+
+
+_load_local_dotenv()
+
+
+def _env_flag(name):
     return os.getenv(name, "").lower() in {"1", "true", "yes", "on"}
 
 
-def _normalized_url(value: str | None) -> str:
+def _normalized_url(value):
     return (value or "").strip().rstrip("/")
 
 
-def _company_setup_enabled(config) -> bool:
-    return config.getoption("--create-company")
+def _option_or_env(config, option_name, *env_names, normalize=None):
+    value = ""
+    if _LOCAL_DOTENV_EXISTS:
+        for env_name in env_names:
+            value = str(os.getenv(env_name, "") or "").strip()
+            if value:
+                break
+    else:
+        value = str(config.getoption(option_name) or "").strip()
+        if not value:
+            for env_name in env_names:
+                value = str(os.getenv(env_name, "") or "").strip()
+                if value:
+                    break
+    return normalize(value) if normalize else value
 
 
-def _smoke_relative_path(path: Path, root: Path) -> Path | None:
+def _cli_option(config, option_name):
+    return str(config.getoption(option_name) or "").strip()
+
+
+def _option_flag_or_env(config, option_name, *env_names):
+    if _LOCAL_DOTENV_EXISTS:
+        return any(_env_flag(env_name) for env_name in env_names)
+    return bool(config.getoption(option_name)) or any(_env_flag(env_name) for env_name in env_names)
+
+
+def _company_setup_enabled(config):
+    if _LOCAL_DOTENV_EXISTS:
+        return _env_flag("CREATE_COMPANY")
+    if config.getoption("--create-company"):
+        return True
+    if _cli_option(config, "--company-code") or _cli_option(config, "--company-password"):
+        return False
+    return _env_flag("CREATE_COMPANY")
+
+
+def _run_mode_from_cli_or_env(config):
+    if _LOCAL_DOTENV_EXISTS:
+        return "create" if _env_flag("CREATE_COMPANY") else "existing"
+    if config.getoption("--create-company"):
+        return "create"
+    if _cli_option(config, "--company-code") or _cli_option(config, "--company-password"):
+        return "existing"
+    return "create" if _env_flag("CREATE_COMPANY") else "existing"
+
+
+def _smoke_relative_path(path, root):
     try:
         rel = path.resolve().relative_to(root.resolve())
     except ValueError:
@@ -45,7 +118,7 @@ def _smoke_relative_path(path: Path, root: Path) -> Path | None:
     return rel if rel.parts[:2] == ("tests", "smoke") else None
 
 
-def _explicit_file_args(config) -> list[Path]:
+def _explicit_file_args(config):
     root = Path(str(config.rootpath))
     result = []
     for raw_arg in getattr(config.invocation_params, "args", ()) or ():
@@ -62,13 +135,13 @@ def _explicit_file_args(config) -> list[Path]:
     return result
 
 
-def _selected_runner_paths(config) -> set[Path]:
+def _selected_runner_paths(config):
     root = Path(str(config.rootpath))
     raw_args = [arg for arg in (getattr(config.invocation_params, "args", ()) or ()) if not arg.startswith("-")]
     if not raw_args:
         return {(root / "tests/smoke/test_all_runner.py").resolve()}
 
-    selected: set[Path] = set()
+    selected = set()
     for raw_arg in raw_args:
         path_text = raw_arg.split("::", 1)[0]
         path = Path(path_text)
@@ -122,12 +195,6 @@ def pytest_addoption(parser):
         help="--create-company bilan yangi companyda Политика лицензирования ni o'chiradi.",
     )
     smoke.addoption(
-        "--scope",
-        choices=("smoke", "regression"),
-        default=os.getenv("TEST_SCOPE", "smoke").lower(),
-        help="Test scope mode: smoke minimal tekshiruv, regression kengaytirilgan tekshiruv",
-    )
-    smoke.addoption(
         "--include-leaf-tests",
         action="store_true",
         default=False,
@@ -146,7 +213,7 @@ def pytest_collection_modifyitems(config, items):
             if path_name == "test_company.py" or item.name == "test_00_company":
                 item.add_marker(skip_company)
 
-    if config.getoption("--include-leaf-tests") or _explicit_file_args(config):
+    if _option_flag_or_env(config, "--include-leaf-tests", "INCLUDE_LEAF_TESTS") or _explicit_file_args(config):
         return
 
     selected_runners = _selected_runner_paths(config)
@@ -169,7 +236,7 @@ def pytest_collection_modifyitems(config, items):
         items[:] = kept
 
 
-def _smoke_group_name(item) -> str | None:
+def _smoke_group_name(item):
     marker = item.get_closest_marker("smoke_group")
     if not marker:
         return None
@@ -178,21 +245,21 @@ def _smoke_group_name(item) -> str | None:
     return str(marker.args[0])
 
 
-def _smoke_group_independent(item) -> bool:
+def _smoke_group_independent(item):
     """smoke_group('X', independent=True) bo'lsa True — group ichida test yiqilsa qolganlar skip qilinmaydi."""
     marker = item.get_closest_marker("smoke_group")
     return bool(marker and marker.kwargs.get("independent", False))
 
 
-def _is_user_setup(item) -> bool:
+def _is_user_setup(item):
     return item.get_closest_marker("user_setup") is not None
 
 
-def _is_headless(config) -> bool:
-    return config.getoption("--headless") or _env_flag("HEADLESS")
+def _is_headless(config):
+    return _option_flag_or_env(config, "--headless", "HEADLESS")
 
 
-def _browser_launch_options(config) -> dict[str, Any]:
+def _browser_launch_options(config):
     headless = _is_headless(config)
     return {
         "headless": headless,
@@ -200,8 +267,8 @@ def _browser_launch_options(config) -> dict[str, Any]:
     }
 
 
-def _browser_context_options(config) -> dict[str, Any]:
-    options: dict[str, Any] = {"accept_downloads": True}
+def _browser_context_options(config):
+    options = {"accept_downloads": True}
     if _is_headless(config):
         options["viewport"] = {"width": 1920, "height": 1080}
     else:
@@ -209,17 +276,20 @@ def _browser_context_options(config) -> dict[str, Any]:
     return options
 
 
-def _data_file(file_name="data_store") -> Path:
+def _data_file(file_name="data_store"):
     return Path(DATA_DIR) / f"{file_name}.json"
 
 
-def _load_data_file(file_name="data_store") -> dict[str, Any]:
+def _load_data_file(file_name="data_store"):
     path = _data_file(file_name)
     if not path.exists():
         return {}
+    raw = path.read_text(encoding="utf-8")
+    if not raw.strip():
+        # Bo'sh fayl (uzilgan run qoldig'i) — yo'q fayl kabi "hali ma'lumot yo'q".
+        return {}
     try:
-        with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
+        data = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise AssertionError(f"{path} buzilgan JSON: {exc}") from exc
     if not isinstance(data, dict):
@@ -227,7 +297,7 @@ def _load_data_file(file_name="data_store") -> dict[str, Any]:
     return data
 
 
-def _write_data_file(data: dict[str, Any], file_name="data_store") -> None:
+def _write_data_file(data, file_name="data_store"):
     os.makedirs(DATA_DIR, exist_ok=True)
     path = _data_file(file_name)
     tmp_path = path.with_suffix(".json.tmp")
@@ -241,12 +311,20 @@ def _write_data_file(data: dict[str, Any], file_name="data_store") -> None:
 def pytest_configure(config):
     """Allure hisoboti uchun environment, categories, executor va history tayyorlaydi."""
     expect.set_options(timeout=DEFAULT_TIMEOUT)
-    company_url = _normalized_url(config.getoption("--url"))
-    create_company = _company_setup_enabled(config)
-    company_code = str(config.getoption("--company-code") or "").strip().lstrip("@")
-    company_password = str(config.getoption("--company-password") or "").strip()
-    head_email = str(config.getoption("--head-email") or "").strip()
-    head_password = str(config.getoption("--head-password") or "").strip()
+    company_url = _option_or_env(config, "--url", "COMPANY_URL", "URL", normalize=_normalized_url)
+    run_mode = _run_mode_from_cli_or_env(config)
+    create_company = run_mode == "create"
+
+    if create_company:
+        company_code = "" if _LOCAL_DOTENV_EXISTS else _cli_option(config, "--company-code").lstrip("@")
+        company_password = "" if _LOCAL_DOTENV_EXISTS else _cli_option(config, "--company-password")
+        head_email = _option_or_env(config, "--head-email", "HEAD_ADMIN_EMAIL", "HEAD_EMAIL")
+        head_password = _option_or_env(config, "--head-password", "HEAD_ADMIN_PASSWORD", "HEAD_PASSWORD")
+    else:
+        company_code = _option_or_env(config, "--company-code", "COMPANY_CODE").lstrip("@")
+        company_password = _option_or_env(config, "--company-password", "COMPANY_PASSWORD")
+        head_email = ""
+        head_password = ""
 
     if not company_url:
         raise pytest.UsageError("--url majburiy. Masalan: --url https://app3.greenwhite.uz/xtrade")
@@ -279,7 +357,8 @@ def pytest_configure(config):
         os.environ.pop("HEAD_ADMIN_EMAIL", None)
         os.environ.pop("HEAD_ADMIN_PASSWORD", None)
 
-    if config.getoption("--disable-license-policy"):
+    disable_license_policy = _option_flag_or_env(config, "--disable-license-policy", "DISABLE_LICENSE_POLICY")
+    if disable_license_policy:
         if not create_company:
             raise pytest.UsageError("--disable-license-policy faqat --create-company bilan ishlaydi")
         os.environ["DISABLE_LICENSE_POLICY"] = "1"
@@ -303,7 +382,6 @@ def pytest_configure(config):
     with open(env_path, "w", encoding="utf-8") as f:
         f.write("Browser=Chromium\n")
         f.write(f"Browser.Headless={_is_headless(config)}\n")
-        f.write(f"Test.Scope={config.getoption('--scope')}\n")
         f.write(f"Company.URL={company_url}\n")
         f.write(f"Company.Create={create_company}\n")
         if not create_company:
@@ -367,7 +445,7 @@ def session_context(session_browser, request):
 # ----------------------------------------------------------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
-def session_page(session_context) -> Generator[Page, Any, None]:
+def session_page(session_context):
     """Barcha smoke testlar uchun yagona sahifa — holat saqlanadi."""
     page_obj = session_context.new_page()
     yield page_obj
@@ -376,7 +454,7 @@ def session_page(session_context) -> Generator[Page, Any, None]:
 # ----------------------------------------------------------------------------------------------------------------------
 
 @pytest.fixture
-def group_page(session_browser: Browser, request) -> Generator[Page, Any, None]:
+def group_page(session_browser, request):
     """Group testlar uchun fresh context/page. Grouplar bir-birining UI holatini meros qilmaydi."""
     context = session_browser.new_context(**_browser_context_options(request.config))
     context.set_default_timeout(DEFAULT_TIMEOUT)
@@ -395,7 +473,7 @@ def group_page(session_browser: Browser, request) -> Generator[Page, Any, None]:
 # ----------------------------------------------------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
-def group_session_page(session_browser: Browser, request, code) -> Generator[Page, Any, None]:
+def group_session_page(session_browser, request, code):
     """Bitta group runner moduli uchun bitta context/page."""
     context = session_browser.new_context(**_browser_context_options(request.config))
     context.set_default_timeout(DEFAULT_TIMEOUT)
@@ -413,16 +491,16 @@ def group_session_page(session_browser: Browser, request, code) -> Generator[Pag
 
 
 @pytest.fixture(scope="module")
-def group_user_page(group_session_page: Page, code: str) -> Page:
+def group_user_page(group_session_page, code):
     """Group boshida user sifatida bir marta login qiladi."""
-    authorization_user(group_session_page, code)
+    authorization(group_session_page, who="user", code=code)
     expect(group_session_page.get_by_role("heading", name="Trade")).to_be_visible()
     return group_session_page
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 @pytest.fixture
-def page(browser: Browser, request) -> Generator[Page, Any, None]:
+def page(browser, request):
     """Har bir test uchun yangi sahifa, to'liq ekran (no_viewport + --start-maximized). Trace yoziladi."""
     context = browser.new_context(**_browser_context_options(request.config))
     context.set_default_timeout(DEFAULT_TIMEOUT)
@@ -442,14 +520,7 @@ def page(browser: Browser, request) -> Generator[Page, Any, None]:
 # ----------------------------------------------------------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
-def test_scope(request) -> str:
-    """Global test scope: smoke yoki regression."""
-    return request.config.getoption("--scope")
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-@pytest.fixture(scope="session")
-def company_setup_enabled(request) -> bool:
+def company_setup_enabled(request):
     """Company setup --create-company bilan yoqilgan-yoqilmaganini qaytaradi."""
     return _company_setup_enabled(request.config)
 
@@ -461,11 +532,13 @@ def code(request):
     user_setup runner orqali ishlaganda: yangi random code yaratadi.
     Yakka test ishlaganda: data_store.json fayldan o'qiydi.
     """
-    if request.config.getoption("--new-code") and request.config.getoption("--reuse-code"):
+    new_code = _option_flag_or_env(request.config, "--new-code", "NEW_CODE")
+    reuse_code = _option_flag_or_env(request.config, "--reuse-code", "REUSE_CODE")
+    if new_code and reuse_code:
         raise pytest.UsageError("--new-code va --reuse-code birga ishlatilmaydi")
 
-    is_full_run = request.config.getoption("--new-code") or (
-        not request.config.getoption("--reuse-code")
+    is_full_run = new_code or (
+        not reuse_code
         and any(_is_user_setup(item) for item in request.session.items)
     )
 
@@ -518,7 +591,7 @@ def require_data(load_data):
 # ----------------------------------------------------------------------------------------------------------------------
 
 @pytest.fixture
-def logger(request) -> Generator[TestLogger, Any, None]:
+def logger(request):
     """Har bir test funksiyasi uchun alohida logger fixture."""
     test_logger = get_logger(request.node.nodeid)
     yield test_logger
@@ -589,7 +662,7 @@ def pytest_runtest_makereport(item, call):
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+def pytest_runtest_logreport(report):
     """
     Har bir test fazasi (setup / call / teardown) tugaganda chaqiriladi.
     Agar test muvaffaqiyatsiz bo'lsa, test-results/logs/ ichiga log yozadi.

@@ -11,7 +11,6 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +21,6 @@ EVENT_PREFIX = "SMARTUP_PROGRESS "
 MAX_MESSAGE_LENGTH = 3900
 
 TASHKENT_TZ = timezone(timedelta(hours=5))
-SCOPE_LABELS = {"smoke": "Smoke", "regression": "Regression"}
 TARGET_LABELS = {
     "all": "All",
     "setup": "Setup",
@@ -34,15 +32,15 @@ GROUP_ORDER = ["Setup", "A group", "B group"]
 STATUS_MARK = {"PASSED": "✅", "FAILED": "❌"}
 
 
-def env_value(name: str) -> str:
+def env_value(name):
     return os.getenv(name, "").strip()
 
 
-def telegram_enabled() -> bool:
+def telegram_enabled():
     return bool(env_value("TELEGRAM_BOT_TOKEN") and env_value("TELEGRAM_CHAT_ID"))
 
 
-def telegram_request(method: str, payload: dict[str, Any]) -> dict[str, Any] | None:
+def telegram_request(method, payload):
     if not telegram_enabled():
         return None
     token = env_value("TELEGRAM_BOT_TOKEN")
@@ -64,7 +62,7 @@ def telegram_request(method: str, payload: dict[str, Any]) -> dict[str, Any] | N
     return data
 
 
-def load_state() -> dict[str, Any]:
+def load_state():
     if not STATE_FILE.exists():
         return {}
     try:
@@ -74,16 +72,16 @@ def load_state() -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def save_state(state: dict[str, Any]) -> None:
+def save_state(state):
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def now_tashkent() -> datetime:
+def now_tashkent():
     return datetime.now(TASHKENT_TZ)
 
 
-def format_duration(seconds: float) -> str:
+def format_duration(seconds):
     total = max(0, int(seconds))
     minutes, secs = divmod(total, 60)
     if minutes:
@@ -91,7 +89,7 @@ def format_duration(seconds: float) -> str:
     return f"{secs}s"
 
 
-def server_host(server: str) -> str:
+def server_host(server):
     value = (server or "").strip()
     for prefix in ("https://", "http://"):
         if value.startswith(prefix):
@@ -100,17 +98,13 @@ def server_host(server: str) -> str:
     return value.rstrip("/") or "unknown"
 
 
-def scope_label(scope: str) -> str:
-    return SCOPE_LABELS.get((scope or "smoke").strip().lower(), "Smoke")
-
-
-def target_label(target: str) -> str:
+def target_label(target):
     key = (target or "all").strip().lower()
     return TARGET_LABELS.get(key, key.title() if key else "All")
 
 
-def title_line(state: dict[str, Any]) -> str:
-    name = f"{scope_label(str(state.get('scope') or 'smoke'))} CI"
+def title_line(state):
+    name = "Smoke CI"
     result = str(state.get("result") or "").upper()
     if result == "PASSED":
         return f"✅ {name} — PASSED"
@@ -119,14 +113,14 @@ def title_line(state: dict[str, Any]) -> str:
     return f"🟡 {name} — RUNNING"
 
 
-def first_failed_result(state: dict[str, Any]) -> dict[str, Any]:
+def first_failed_result(state):
     for item in state.get("results", []):
         if isinstance(item, dict) and item.get("status") == "FAILED":
             return item
     return {}
 
 
-def truncate_message(text: str) -> str:
+def truncate_message(text):
     if len(text) <= MAX_MESSAGE_LENGTH:
         return text
     lines = text.splitlines()
@@ -135,16 +129,16 @@ def truncate_message(text: str) -> str:
     return "\n".join(lines) + "\n..."
 
 
-def grouped_result_lines(state: dict[str, Any]) -> list[str]:
+def grouped_result_lines(state):
     results = [item for item in state.get("results", []) if isinstance(item, dict)]
     current = str(state.get("current") or "").strip()
     current_group = str(state.get("current_group") or "").strip()
     finished = bool(state.get("result"))
 
-    groups: dict[str, list[str]] = {}
-    seen_order: list[str] = []
+    groups = {}
+    seen_order = []
 
-    def bucket(name: str) -> list[str]:
+    def bucket(name):
         if name not in groups:
             groups[name] = []
             seen_order.append(name)
@@ -162,7 +156,7 @@ def grouped_result_lines(state: dict[str, Any]) -> list[str]:
     ordered = [g for g in GROUP_ORDER if g in groups]
     ordered += [g for g in seen_order if g not in GROUP_ORDER]
 
-    lines: list[str] = []
+    lines = []
     for name in ordered:
         lines.append("")
         lines.append(name)
@@ -170,7 +164,7 @@ def grouped_result_lines(state: dict[str, Any]) -> list[str]:
     return lines
 
 
-def failed_block(state: dict[str, Any]) -> list[str]:
+def failed_block(state):
     failed = first_failed_result(state)
     if not failed:
         return []
@@ -198,7 +192,7 @@ def failed_block(state: dict[str, Any]) -> list[str]:
     return lines
 
 
-def render_message(state: dict[str, Any]) -> str:
+def render_message(state):
     finished = bool(state.get("result"))
     lines = [title_line(state)]
 
@@ -207,7 +201,7 @@ def render_message(state: dict[str, Any]) -> str:
         start_clock = str(state.get("started_clock") or "").strip()
         finish_clock = str(state.get("finished_clock") or "").strip()
         duration = str(state.get("duration") or "").strip()
-        bits: list[str] = []
+        bits = []
         if start_clock and finish_clock:
             bits.append(f"{start_clock}–{finish_clock}")
         elif started_at:
@@ -221,7 +215,6 @@ def render_message(state: dict[str, Any]) -> str:
 
     lines.append(
         f"🖥 {server_host(str(state.get('server') or ''))}"
-        f" · {scope_label(str(state.get('scope') or 'smoke'))}"
         f" · {target_label(str(state.get('target') or 'all'))}"
     )
 
@@ -238,7 +231,7 @@ def render_message(state: dict[str, Any]) -> str:
     lines.extend(failed_block(state))
 
     if finished:
-        footer: list[str] = []
+        footer = []
         user_login = str(state.get("user_login") or "").strip()
         run_url = str(state.get("run_url") or "").strip()
         if user_login and user_login != "not found":
@@ -255,7 +248,7 @@ def render_message(state: dict[str, Any]) -> str:
     return truncate_message("\n".join(lines))
 
 
-def edit_progress(state: dict[str, Any]) -> None:
+def edit_progress(state):
     message_id = state.get("message_id")
     if not message_id:
         return
@@ -270,10 +263,9 @@ def edit_progress(state: dict[str, Any]) -> None:
     )
 
 
-def command_start(args: argparse.Namespace) -> int:
+def command_start(args):
     now = now_tashkent()
     state = {
-        "scope": args.scope,
         "server": args.server,
         "target": args.target,
         "status": args.status,
@@ -308,7 +300,7 @@ def command_start(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_update(args: argparse.Namespace) -> int:
+def command_update(args):
     state = load_state()
     if not state:
         return 0
@@ -321,7 +313,7 @@ def command_update(args: argparse.Namespace) -> int:
     return 0
 
 
-def update_from_event(state: dict[str, Any], event: dict[str, Any]) -> None:
+def update_from_event(state, event):
     event_name = str(event.get("event") or "")
     display = str(event.get("display") or event.get("title") or event.get("test_id") or "unknown")
     if event_name == "started":
@@ -352,7 +344,7 @@ def update_from_event(state: dict[str, Any], event: dict[str, Any]) -> None:
         state["current"] = display
 
 
-def failed_details_from_system_summary() -> dict[str, str]:
+def failed_details_from_system_summary():
     if not SYSTEM_SUMMARY_JSON.exists():
         return {}
     try:
@@ -380,7 +372,7 @@ def failed_details_from_system_summary() -> dict[str, str]:
     }
 
 
-def enrich_failed_result_from_summary(state: dict[str, Any]) -> None:
+def enrich_failed_result_from_summary(state):
     details = failed_details_from_system_summary()
     if not details:
         return
@@ -397,7 +389,7 @@ def enrich_failed_result_from_summary(state: dict[str, Any]) -> None:
     )
 
 
-def command_run(args: argparse.Namespace) -> int:
+def command_run(args):
     command = args.command
     if not command:
         print("telegram_progress.py run: command is required", file=sys.stderr)
@@ -438,7 +430,7 @@ def command_run(args: argparse.Namespace) -> int:
     return exit_code
 
 
-def read_ai_conclusion() -> str:
+def read_ai_conclusion():
     if not AI_SUMMARY_JSON.exists():
         return ""
     try:
@@ -450,7 +442,7 @@ def read_ai_conclusion() -> str:
     return str(data.get("summary") or "").strip()[:600]
 
 
-def derive_summary(state: dict[str, Any]) -> str:
+def derive_summary(state):
     results = [item for item in state.get("results", []) if isinstance(item, dict)]
     passed = sum(1 for item in results if str(item.get("status")).upper() == "PASSED")
     failed = sum(1 for item in results if str(item.get("status")).upper() == "FAILED")
@@ -460,7 +452,7 @@ def derive_summary(state: dict[str, Any]) -> str:
     return ", ".join(parts)
 
 
-def command_finish(args: argparse.Namespace) -> int:
+def command_finish(args):
     state = load_state()
     if not state:
         return 0
@@ -499,7 +491,7 @@ def command_finish(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_delete(_args: argparse.Namespace) -> int:
+def command_delete(_args):
     state = load_state()
     message_id = state.get("message_id")
     if message_id and telegram_enabled():
@@ -514,12 +506,11 @@ def command_delete(_args: argparse.Namespace) -> int:
     return 0
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args():
     parser = argparse.ArgumentParser(description="Telegram progress message helper for GitHub Actions smoke runs.")
     subparsers = parser.add_subparsers(dest="action", required=True)
 
     start = subparsers.add_parser("start")
-    start.add_argument("--scope", required=True)
     start.add_argument("--server", required=True)
     start.add_argument("--target", required=True)
     start.add_argument("--status", default="Installing requirements")
@@ -542,7 +533,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
+def main():
     args = parse_args()
     if args.action == "start":
         return command_start(args)

@@ -8,6 +8,13 @@ Room = **Рабочая зона**. Test: `tests/smoke/test_setup/test_room.py` 
 - Yaratish: `Создать` → `Рабочая зона (создание)`; code + nom + `Активный`.
 - Prikreplenie: room qatorini bosib → **`Прикрепление`** tugmasi → `Рабочая зона (прикрепление): room-pw{code}` (`.../anor/mrf/room_attachment?room_id=<id>`).
 
+## Create Form Locator/Loader Notes
+
+Tags: room, locator, loader, helper
+- 2026-06-26 debug: `Создать` bosilgandan keyin `room+add` sahifasida blocking loader/title kech yuklanishi mumkin; heading assertdan oldin `BasePage(page).wait_for_loader()` chaqirilsin.
+- Label helper: `Код` va `Название` ketma-ket maydonlar. Keng card/col konteyneridagi birinchi inputni olish `Название` qiymatini `Код` inputiga yozib yuboradi. `BasePage.input(...)` labeldan keyingi birinchi real inputni target qilishi kerak.
+- Screenshot: `references/forms/screenshots/room/room__add-loader__desktop-20260626.png`.
+
 ## Прикрепление tablari (link role)
 
 `Штаты`, **`Тип цены`**, `Типы оплат`, `Наборы ТМЦ`, `Скидки/наценки`, `Склады`, `Кассы`, `Расчетные счета`, `Проект`, `Юридические лица`, `Физические лица`, `Акции`, `Ограничения`, `Опросник`, `Технологические карты`.

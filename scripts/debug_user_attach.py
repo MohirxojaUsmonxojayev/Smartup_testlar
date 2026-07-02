@@ -14,7 +14,7 @@ from _debug_env import add_company_args, configure_company_env
 ARCHIVE_DIR = ROOT / "skills/smartup-guide/references/forms/screenshots/user"
 
 
-def checkbox_state(page) -> list[dict]:
+def checkbox_state(page):
     result = []
     inputs = page.locator("b-grid input[type='checkbox']")
     for index in range(min(inputs.count(), 8)):
@@ -42,7 +42,7 @@ def checkbox_state(page) -> list[dict]:
     return result
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser()
     add_company_args(parser)
     parser.add_argument("--headless", action="store_true")
@@ -87,7 +87,7 @@ def main() -> None:
         screenshot_path = ARCHIVE_DIR / "user__attach-forms-available__desktop-1920x1080.png"
         page.screenshot(path=str(screenshot_path), full_page=True)
         before = checkbox_state(page)
-        BasePage(page).click_first_visible_checkbox()
+        BasePage(page).checkbox(first_visible=True, checked=True)
         after = checkbox_state(page)
         print(
             json.dumps(
