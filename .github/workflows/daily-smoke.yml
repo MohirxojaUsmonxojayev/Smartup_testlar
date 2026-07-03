@@ -2,7 +2,8 @@ name: Daily Smoke Tests
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    # 00:00, 06:00, 12:00, 18:00 Toshkent vaqti (UTC+5)
+    - cron: "0 19,1,7,13 * * *"
   workflow_dispatch:
     inputs:
       server_url:
