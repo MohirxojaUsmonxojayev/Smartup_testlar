@@ -1,4 +1,37 @@
 # ==========================================================
+# ⚠️  MUHIM QOIDALAR — HAR QANDAY O'ZGARTIRISHDAN AVVAL O'QI
+# ==========================================================
+#
+# ushbu loyihada katta fayllar bor:
+#   test_check_forms_opening.py — 2800+ qator
+#
+# TOKEN TEJASH QOIDALARI (MAJBURIY):
+#
+# 1. HECH QACHON katta faylni (500+ qator) to'liq o'qima
+#    Avval: grep -n "PATTERN" fayl_nomi
+#    Keyin: Read(offset=X, limit=30) — faqat kerakli qism
+#
+# 2. Ko'p o'xshash o'zgarish kerak bo'lsa (10+ joy):
+#    Qo'lda birma-bir yozish TAQIQLANADI
+#    Python skript yoz (regex/re) — fayl ni bir martada,
+#    dasturiy ravishda o'zgartir
+#
+# 3. Kichik o'zgarish (1-10 qator):
+#    Edit (str_replace) ishlatilsin
+#    Write (create_file) bilan butun faylni qayta YOZMA
+#
+# 4. Natijani tekshirish:
+#    grep -c "PATTERN" fayl_nomi — son orqali tasdiqlа
+#    Butun faylni qayta o'qib tekshirish SHART EMAS
+#
+# 5. Yangi locator yozishdan oldin:
+#    Taxmin qilma — playwright codegen bilan tekshir
+#
+# To'liq qoidalar: tests/regression/TESTING_RULES.md
+# Bu faylni HAR DOIM avval o'qi — qoidalar batafsil yozilgan
+#
+# ==========================================================
+# ==========================================================
 # ⚠️  MUHIM QOIDALAR — O'ZGARTIRISHDAN AVVAL O'QI
 # ==========================================================
 # 1. expect() → DOIM try/except Exception ga o'ra

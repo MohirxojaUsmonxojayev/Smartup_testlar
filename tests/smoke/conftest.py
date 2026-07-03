@@ -9,6 +9,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 from tests.smoke.flows.flow_authorization import authorization
 from utils.logger import write_failure_log, get_logger
+from utils.run_logger import RunLogger
 
 TRACE_DIR = "test-results/traces"
 DATA_DIR = "test-results/data"
@@ -24,6 +25,9 @@ NAVIGATION_TIMEOUT = 20_000    # page.goto, wait_for_load_state (ms)
 _USER_SETUP_FAILED = False
 _FAILED_SMOKE_GROUPS = set()
 _LOCAL_DOTENV_EXISTS = False
+
+_run_logger: RunLogger | None = None
+_counted_nodeids: set = set()
 
 
 def _load_local_dotenv():
@@ -410,6 +414,21 @@ def pytest_configure(config):
 
 # ----------------------------------------------------------------------------------------------------------------------
 
+def pytest_sessionstart(session):
+    global _run_logger, _counted_nodeids
+    _counted_nodeids = set()
+    _run_logger = RunLogger()
+    base_url = os.getenv("COMPANY_URL", "")
+    headless = _is_headless(session.config)
+    _run_logger.session_start(base_url=base_url, headless=headless)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if _run_logger:
+        _run_logger.session_finish()
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 @pytest.fixture
 def browser(request):
     """Bitta browser instance, to'liq ekranda ochiladi."""
@@ -599,8 +618,25 @@ def logger(request):
 
 # ----------------------------------------------------------------------------------------------------------------------
 
+@pytest.fixture
+def run_logger(request):
+    """Kunlik konsolidatsiya log fayliga qadam (step) yozish uchun fixture."""
+    node_id = request.node.nodeid
+
+    class _Steps:
+        def step(self, message: str):
+            if _run_logger:
+                _run_logger.step(node_id, message)
+
+    return _Steps()
+
+# ----------------------------------------------------------------------------------------------------------------------
+
 def pytest_runtest_setup(item):
     """User setup va smoke group dependency skip mexanizmi."""
+    if _run_logger:
+        _run_logger.test_start(item.nodeid)
+
     if _is_user_setup(item) and _USER_SETUP_FAILED:
         pytest.skip("Oldingi user_setup testi failed bo'lgani uchun qolgan user_setup testlari skip qilindi")
 
@@ -671,5 +707,27 @@ def pytest_runtest_logreport(report):
         longrepr_str = str(report.longrepr) if report.longrepr else "Xabar yo'q"
         log_path = write_failure_log(report.nodeid, report.when, longrepr_str)
         print(f"\n[LOG] Xato logi saqlandi: {log_path}")
+
+    if not _run_logger or report.nodeid in _counted_nodeids:
+        return
+
+    if report.when == "call" and (report.passed or report.failed):
+        _counted_nodeids.add(report.nodeid)
+        safe = report.nodeid.replace("/", "_").replace("::", "__")
+        trace = os.path.join(TRACE_DIR, f"{safe}.zip")
+        trace_path = trace if os.path.exists(trace) else ""
+        if report.passed:
+            _run_logger.test_pass(report.nodeid, trace=trace_path)
+        else:
+            error = str(report.longrepr) if report.longrepr else ""
+            _run_logger.test_fail(report.nodeid, error=error, trace=trace_path)
+
+    elif report.when == "setup" and report.skipped:
+        _counted_nodeids.add(report.nodeid)
+        if isinstance(report.longrepr, tuple):
+            reason = str(report.longrepr[-1])
+        else:
+            reason = str(report.longrepr) if report.longrepr else ""
+        _run_logger.test_skip(report.nodeid, reason=reason)
 
 # ----------------------------------------------------------------------------------------------------------------------

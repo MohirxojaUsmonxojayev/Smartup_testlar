@@ -1,9 +1,41 @@
+> ⚠️ **BU HUJJATNI HAR SESSIYA BOSHIDA O'QI.**
+> Bu loyihada test fayllari 2000+ qator bo'lishi mumkin.
+> Faylga ishlov berishdan oldin pastdagi "TOKEN TEJASH QOIDALARI" bo'limiga rioya qil.
+
 # SmartupAuto — Test Yozish Qoidalari va Xatoliklar
 
 ## Ushbu hujjat haqida
 
 Bu fayl test yozishda qilingan **real xatoliklar** asosida tuzilgan.
 Har bir yangi test yoki o'zgartirish qilishdan avval o'qilishi **SHART**.
+
+---
+
+## ⚡ TOKEN TEJASH QOIDALARI
+
+### Katta faylda ko'p o'xshash o'zgarish kerak bo'lsa:
+1. Avval faylni TO'LIQ o'qima
+2. `grep -n` bilan o'zgaradigan qatorlarni top
+3. Python skript yoz (`re` / regex orqali) — skript faylni dasturiy o'zgartirsin
+4. Skriptni ishga tushir
+5. Natijani `grep -c` bilan tasdiqlа
+6. Faqat 1-2 ta namuna qadamni `Read(offset, limit)` bilan tekshir
+
+### Kichik o'zgarish kerak bo'lsa (1-10 qator):
+1. `Edit` (str_replace) ishlatilsin — `Write` (create_file) EMAS
+2. Faqat o'zgaradigan qismni o'qish yetarli
+
+### Fayl holatini tekshirish kerak bo'lsa:
+1. `wc -l` bilan qator sonini bil
+2. `grep -n` bilan kerakli joyni top
+3. `Read(offset=X, limit=Y)` bilan FAQAT shu joyni ko'r
+4. Butun faylni o'qish — oxirgi chora
+
+### Taqiqlanadi:
+- 100+ ta bir xil pattern bo'lsa, ularni birma-bir qo'lda yozish
+- Har edit dan keyin butun faylni qayta o'qish
+- `Write` orqali mavjud katta faylni qayta yaratish (`Edit` yetarli bo'lsa)
+- 2000+ qatorli faylni `Read` (limit ko'rsatmasdan) bilan to'liq ochish
 
 ---
 
