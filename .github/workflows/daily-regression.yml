@@ -52,6 +52,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Mask credentials
+        run: |
+          [ -n "$XTRADE_COMPANY_CODE" ] && echo "::add-mask::$XTRADE_COMPANY_CODE" || true
+          [ -n "$XTRADE_COMPANY_PASSWORD" ] && echo "::add-mask::$XTRADE_COMPANY_PASSWORD" || true
+          [ -n "$GEMINI_API_KEY" ] && echo "::add-mask::$GEMINI_API_KEY" || true
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -99,13 +105,10 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python scripts/telegram_progress.py update --status "Browser installed"
 
-      - name: Normalize URL and mask credentials
+      - name: Normalize URL
         run: |
           NORMALIZED_TEST_SERVER_URL="${TEST_SERVER_URL%/}"
           echo "TEST_SERVER_URL=$NORMALIZED_TEST_SERVER_URL" >> "$GITHUB_ENV"
-          [ -n "$XTRADE_COMPANY_CODE" ] && echo "::add-mask::$XTRADE_COMPANY_CODE" || true
-          [ -n "$XTRADE_COMPANY_PASSWORD" ] && echo "::add-mask::$XTRADE_COMPANY_PASSWORD" || true
-          [ -n "$GEMINI_API_KEY" ] && echo "::add-mask::$GEMINI_API_KEY" || true
 
       - name: Run daily regression tests
         env:

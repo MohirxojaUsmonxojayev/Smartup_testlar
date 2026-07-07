@@ -61,7 +61,7 @@ def command_text(command):
             hide_next = False
             continue
         masked.append(item)
-        if item in {"--company-password", "--head-password"}:
+        if item in {"--company-code", "--company-password", "--head-password"}:
             hide_next = True
     return " ".join(masked)
 
