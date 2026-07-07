@@ -1,8 +1,6 @@
 from dataclasses import dataclass, field
-
 import allure
 from playwright.sync_api import Page, expect
-
 from tests.regression.test_auth import run_user_login
 from utils.soft_assert import SoftAssert
 

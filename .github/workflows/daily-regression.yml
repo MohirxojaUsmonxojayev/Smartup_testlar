@@ -1,0 +1,170 @@
+name: Daily Regression Tests
+
+on:
+  schedule:
+    # 06:00 va 18:00 Toshkent vaqti (UTC+5)
+    - cron: "0 1,13 * * *"
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: Server URL
+        required: true
+        default: https://app3.greenwhite.uz/xtrade
+        type: string
+      target:
+        description: Test target
+        required: true
+        default: regression
+        type: choice
+        options:
+          - regression
+          - regression-forms
+          - regression-auth
+      ai_summary:
+        description: Add Gemini AI conclusion
+        required: false
+        default: false
+        type: boolean
+      telegram_progress_message_id:
+        description: Existing Telegram progress message id
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: daily-regression-tests
+  cancel-in-progress: false
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      TEST_SERVER_URL: ${{ github.event.inputs.server_url || 'https://app3.greenwhite.uz/xtrade' }}
+      TEST_TARGET: ${{ github.event.inputs.target || 'regression' }}
+      TEST_AI_SUMMARY: ${{ github.event.inputs.ai_summary || 'false' }}
+      TEST_TELEGRAM_PROGRESS_MESSAGE_ID: ${{ github.event.inputs.telegram_progress_message_id || '' }}
+      XTRADE_COMPANY_CODE: ${{ secrets.APP3_COMPANY_CODE }}
+      XTRADE_COMPANY_PASSWORD: ${{ secrets.APP3_COMPANY_PASSWORD }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Start Telegram progress
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          mkdir -p test-results
+          python scripts/telegram_progress.py start \
+            --server "$TEST_SERVER_URL" \
+            --target "$TEST_TARGET" \
+            --message-id "$TEST_TELEGRAM_PROGRESS_MESSAGE_ID" \
+            --status "Installing requirements"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Mark requirements installed
+        if: ${{ success() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/telegram_progress.py update --status "Requirements installed"
+
+      - name: Mark browser install started
+        if: ${{ success() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/telegram_progress.py update --status "Installing browser"
+
+      - name: Install Playwright browser
+        run: python -m playwright install --with-deps chromium
+
+      - name: Mark browser installed
+        if: ${{ success() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/telegram_progress.py update --status "Browser installed"
+
+      - name: Normalize URL and mask credentials
+        run: |
+          NORMALIZED_TEST_SERVER_URL="${TEST_SERVER_URL%/}"
+          echo "TEST_SERVER_URL=$NORMALIZED_TEST_SERVER_URL" >> "$GITHUB_ENV"
+          [ -n "$XTRADE_COMPANY_CODE" ] && echo "::add-mask::$XTRADE_COMPANY_CODE"
+          [ -n "$XTRADE_COMPANY_PASSWORD" ] && echo "::add-mask::$XTRADE_COMPANY_PASSWORD"
+          [ -n "$GEMINI_API_KEY" ] && echo "::add-mask::$GEMINI_API_KEY"
+
+      - name: Run daily regression tests
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          mkdir -p test-results
+          AI_SUMMARY_ARGS=()
+          if [ "$TEST_AI_SUMMARY" = "true" ]; then
+            AI_SUMMARY_ARGS+=(--ai-summary)
+          fi
+          set -o pipefail
+          python -u scripts/telegram_progress.py run -- python -u scripts/run_tests.py "$TEST_TARGET" \
+            --url "$TEST_SERVER_URL" \
+            --company-code "$XTRADE_COMPANY_CODE" \
+            --company-password "$XTRADE_COMPANY_PASSWORD" \
+            --headless \
+            "${AI_SUMMARY_ARGS[@]}" \
+            -s 2>&1 | tee test-results/ci-test-output.log
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-regression-test-results
+          path: test-results/
+          retention-days: 7
+
+      - name: Finalize Telegram progress
+        if: ${{ always() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram secrets are not configured; skipping notification."
+            exit 0
+          fi
+
+          SUMMARY=$(grep -E "={2,} .* (passed|failed|errors?|skipped|xfailed|xpassed).* in .* ={2,}" \
+            test-results/ci-test-output.log 2>/dev/null | tail -1 | sed -E 's/^=+ //; s/ =+$//' || true)
+
+          python scripts/telegram_progress.py finish \
+            --result "$JOB_STATUS" \
+            --run-url "$RUN_URL" \
+            --user-login "regression@${XTRADE_COMPANY_CODE#@}" \
+            --summary "$SUMMARY"
+
+          if [ "$JOB_STATUS" != "success" ]; then
+            SCREENSHOT=$(find test-results -type f -name "*.png" 2>/dev/null | sort | tail -1 || true)
+            if [ -n "$SCREENSHOT" ]; then
+              curl --fail-with-body -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto" \
+                -F "chat_id=${TELEGRAM_CHAT_ID}" \
+                -F "caption=Failed screenshot" \
+                -F "photo=@${SCREENSHOT}" \
+                || echo "Telegram screenshot upload failed."
+            else
+              echo "Failed screenshot not found; trace/log is in the artifact."
+            fi
+          fi

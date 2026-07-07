@@ -29,6 +29,9 @@ TARGETS = {
     "group-b": ("tests/smoke/test_groups/test_B_grup/test_b_group_runner.py", "--reuse-code"),
     "group-c": ("tests/smoke/test_groups/test_C_grup/test_c_group_runner.py", "--reuse-code"),
     "group-report": ("tests/smoke/test_groups/test_report_grup/test_report_group_runner.py", "--reuse-code"),
+    "regression": ("tests/regression/", ""),
+    "regression-forms": ("tests/regression/test_check_forms_opening.py", ""),
+    "regression-auth": ("tests/regression/test_auth.py", ""),
 }
 
 
@@ -123,7 +126,7 @@ def parse_args():
         "target",
         nargs="?",
         default="all",
-        help="Default: all. Debug uchun: setup, company, group-a, group-b, group-c, group-report yoki pytest target path.",
+        help="Default: all. Smoke: setup, company, group-a, group-b, group-c, group-report. Regression: regression, regression-forms, regression-auth. Yoki pytest path.",
     )
     parser.add_argument("--url", required=True, help="Majburiy server URL. Masalan: https://app3.greenwhite.uz/xtrade")
     parser.add_argument("--company-code", help="Mavjud company code. --create-company bo'lmasa majburiy.")
