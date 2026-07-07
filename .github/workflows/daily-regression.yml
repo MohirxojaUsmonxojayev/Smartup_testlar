@@ -103,9 +103,9 @@ jobs:
         run: |
           NORMALIZED_TEST_SERVER_URL="${TEST_SERVER_URL%/}"
           echo "TEST_SERVER_URL=$NORMALIZED_TEST_SERVER_URL" >> "$GITHUB_ENV"
-          [ -n "$XTRADE_COMPANY_CODE" ] && echo "::add-mask::$XTRADE_COMPANY_CODE"
-          [ -n "$XTRADE_COMPANY_PASSWORD" ] && echo "::add-mask::$XTRADE_COMPANY_PASSWORD"
-          [ -n "$GEMINI_API_KEY" ] && echo "::add-mask::$GEMINI_API_KEY"
+          [ -n "$XTRADE_COMPANY_CODE" ] && echo "::add-mask::$XTRADE_COMPANY_CODE" || true
+          [ -n "$XTRADE_COMPANY_PASSWORD" ] && echo "::add-mask::$XTRADE_COMPANY_PASSWORD" || true
+          [ -n "$GEMINI_API_KEY" ] && echo "::add-mask::$GEMINI_API_KEY" || true
 
       - name: Run daily regression tests
         env:

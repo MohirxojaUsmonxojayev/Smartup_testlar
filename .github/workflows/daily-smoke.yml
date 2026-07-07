@@ -118,13 +118,13 @@ jobs:
           echo "TEST_COMPANY_SOURCE=$SELECTED_COMPANY_SOURCE" >> "$GITHUB_ENV"
           echo "TEST_COMPANY_CODE=$SELECTED_COMPANY_CODE" >> "$GITHUB_ENV"
           echo "TEST_COMPANY_PASSWORD=$SELECTED_COMPANY_PASSWORD" >> "$GITHUB_ENV"
-          [ -n "$SMARTUP_COMPANY_CODE" ] && echo "::add-mask::$SMARTUP_COMPANY_CODE"
-          [ -n "$SMARTUP_COMPANY_PASSWORD" ] && echo "::add-mask::$SMARTUP_COMPANY_PASSWORD"
-          [ -n "$APP3_COMPANY_CODE" ] && echo "::add-mask::$APP3_COMPANY_CODE"
-          [ -n "$APP3_COMPANY_PASSWORD" ] && echo "::add-mask::$APP3_COMPANY_PASSWORD"
-          [ -n "$SELECTED_COMPANY_CODE" ] && echo "::add-mask::$SELECTED_COMPANY_CODE"
-          [ -n "$SELECTED_COMPANY_PASSWORD" ] && echo "::add-mask::$SELECTED_COMPANY_PASSWORD"
-          [ -n "$GEMINI_API_KEY" ] && echo "::add-mask::$GEMINI_API_KEY"
+          [ -n "$SMARTUP_COMPANY_CODE" ] && echo "::add-mask::$SMARTUP_COMPANY_CODE" || true
+          [ -n "$SMARTUP_COMPANY_PASSWORD" ] && echo "::add-mask::$SMARTUP_COMPANY_PASSWORD" || true
+          [ -n "$APP3_COMPANY_CODE" ] && echo "::add-mask::$APP3_COMPANY_CODE" || true
+          [ -n "$APP3_COMPANY_PASSWORD" ] && echo "::add-mask::$APP3_COMPANY_PASSWORD" || true
+          [ -n "$SELECTED_COMPANY_CODE" ] && echo "::add-mask::$SELECTED_COMPANY_CODE" || true
+          [ -n "$SELECTED_COMPANY_PASSWORD" ] && echo "::add-mask::$SELECTED_COMPANY_PASSWORD" || true
+          [ -n "$GEMINI_API_KEY" ] && echo "::add-mask::$GEMINI_API_KEY" || true
 
       - name: Run daily smoke tests
         env:
