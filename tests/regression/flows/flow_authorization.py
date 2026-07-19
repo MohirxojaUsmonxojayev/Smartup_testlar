@@ -14,7 +14,10 @@ _session_handler_pages: set[int] = set()
 
 
 def _normalize_company_code(value: str) -> str:
-    return value.strip().lstrip("@")
+    value = value.strip().lstrip("@")
+    if "@" in value:
+        value = value.rsplit("@", 1)[-1]
+    return value
 
 
 def _create_company_enabled() -> bool:
@@ -74,7 +77,7 @@ def logout(page: Page) -> None:
 
 def login(page: Page, email: str | None = None, password: str | None = None) -> None:
     email = email or admin_email()
-    password = password or company_password()
+    password = password or os.getenv("ADMIN_PASSWORD", "").strip() or company_password()
     page.goto(f"{company_url()}/login.html")
     page.get_by_placeholder("Логин@компания").fill(email)
     page.get_by_role("textbox", name="Пароль").fill(password)

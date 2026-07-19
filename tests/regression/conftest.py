@@ -121,7 +121,12 @@ def pytest_addoption(parser):
     group.addoption(
         "--company-password",
         default="",
-        help="Company admin paroli",
+        help="Company user paroli",
+    )
+    group.addoption(
+        "--admin-password",
+        default="",
+        help="Admin paroli (admin@<company> uchun). Bo'sh bo'lsa --company-password ishlatiladi.",
     )
     group.addoption(
         "--scope",
@@ -166,6 +171,9 @@ def pytest_configure(config):
     if not company_password:
         raise pytest.UsageError("--company-password majburiy.")
     os.environ["COMPANY_PASSWORD"] = company_password
+
+    admin_pw = str(config.getoption("--admin-password") or "").strip()
+    os.environ["ADMIN_PASSWORD"] = admin_pw if admin_pw else company_password
 
     os.makedirs(ALLURE_RESULTS_DIR, exist_ok=True)
 

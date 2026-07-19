@@ -214,7 +214,8 @@ allure-results/
 allure-report/
 
 .DS_Store
-.claude/
+.claude/.DS_Store
+.claude/worktrees/
 
 # Playwright MCP session output
 .playwright-mcp/
