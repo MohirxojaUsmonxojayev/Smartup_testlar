@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp"]
+    },
+    "qase": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@qase/mcp-server"
+      ],
+      "env": {"QASE_API_TOKEN": "2d3455d0c43bbca026b04f1567786e8e46a0fe7c486a6681feed23de56aefb18"}
+    }
+  }
+}

@@ -323,10 +323,7 @@ class GitHubActionsClient:
         url = f"https://api.github.com/repos/{self.repository}/actions/workflows/{self.workflow}/dispatches"
         inputs = {
             "server_url": request.server_url,
-            "target": request.target,
         }
-        if telegram_progress_message_id is not None:
-            inputs["telegram_progress_message_id"] = str(telegram_progress_message_id)
         response = self.session.post(
             url,
             json={
